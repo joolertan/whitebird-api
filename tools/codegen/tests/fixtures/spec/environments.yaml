@@ -1,0 +1,10 @@
+oauth:
+  token_path: /oauth/token
+  service: auth
+  basic: Y2xpZW50OnNlY3JldA==
+
+services:
+  auth: {title: Authorization server, production: https://auth.example.test}
+  shop: {title: Shop, production: https://shop.example.test, demo: https://shop-demo.example.test}
+
+environments: [production, demo]

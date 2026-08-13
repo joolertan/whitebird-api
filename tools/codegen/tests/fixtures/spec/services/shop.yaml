@@ -1,0 +1,227 @@
+# Exercises every IR feature. Emitter tests generate code from this document.
+openapi: 3.1.0
+info: {title: Shop, version: "1"}
+x-wb-service: shop
+servers: [{url: https://shop.example.test}]
+paths:
+  /api/v1/products:
+    get:
+      operationId: productsList
+      x-wb-resource: products
+      x-wb-name: list
+      x-wb-auth: none
+      summary: List products
+      description: Returns products page by page.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, default: 0}}
+        - {name: size, in: query, schema: {type: integer, default: 20}}
+        - {name: category, in: query, schema: {$ref: "#/components/schemas/Category"}}
+        - {name: tags, in: query, schema: {type: array, items: {type: string}}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PageProduct"}
+  /api/v1/products/{productId}:
+    get:
+      operationId: productsGet
+      x-wb-resource: products
+      x-wb-name: get
+      x-wb-auth: none
+      summary: Get a product
+      parameters:
+        - {name: productId, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Product"}
+    delete:
+      operationId: productsDelete
+      x-wb-resource: products
+      x-wb-name: delete
+      x-wb-status: deprecated
+      parameters:
+        - {name: productId, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        "204": {description: Deleted}
+  /api/v1/orders:
+    post:
+      operationId: ordersCreate
+      x-wb-resource: orders
+      x-wb-name: create
+      summary: Place an order
+      parameters:
+        - {name: X-Request-Id, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OrderRequest"}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Order"}
+  /api/v1/orders/search:
+    post:
+      operationId: ordersSearch
+      x-wb-resource: orders
+      x-wb-name: search
+      x-wb-status: experimental
+      x-wb-source: bundle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                page: {type: integer}
+                size: {type: integer}
+                statuses: {type: array, items: {$ref: "#/components/schemas/OrderStatus"}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PageOrder"}
+  /api/v1/orders/{orderId}/receipt:
+    get:
+      operationId: ordersReceipt
+      x-wb-resource: orders.documents
+      x-wb-name: receipt
+      parameters:
+        - {name: orderId, in: path, required: true, schema: {type: string}}
+        - {name: format, in: query, required: true, schema: {type: string, enum: [PDF, CSV]}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+  /api/v1/orders/{orderId}/withdraw:
+    post:
+      operationId: ordersWithdraw
+      x-wb-resource: orders
+      x-wb-name: withdraw
+      x-wb-auth: mfa
+      x-wb-mfa-operation: WITHDRAWAL
+      parameters:
+        - {name: orderId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address: {type: string}
+                memo: {type: string}
+      responses:
+        "200": {description: OK}
+  /api/v1/balances:
+    get:
+      operationId: balancesGet
+      x-wb-resource: balances
+      x-wb-name: get
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {type: number, format: decimal}
+  /api/v1/avatar:
+    post:
+      operationId: profileUploadAvatar
+      x-wb-resource: profile
+      x-wb-name: upload_avatar
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema: {type: string}
+  /api/v1/events:
+    get:
+      operationId: eventsStream
+      x-wb-resource: events
+      x-wb-name: stream
+      responses:
+        "200":
+          description: OK
+          content:
+            text/event-stream:
+              schema: {$ref: "#/components/schemas/Event"}
+components:
+  schemas:
+    Category: {type: string, enum: [BOOKS, GAMES, in-progress]}
+    OrderStatus: {type: string, enum: [NEW, FILLED, CANCELLED]}
+    Priority: {type: integer, enum: [1, 2, 3]}
+    Product:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        price: {type: number, format: decimal}
+        rating: {type: number}
+        category: {$ref: "#/components/schemas/Category"}
+        createdAt: {type: string, format: date-time}
+        releaseDate: {type: string, format: date}
+        attributes: {type: object, additionalProperties: {type: string}}
+        dimensions:
+          type: object
+          properties:
+            width: {type: number}
+            height: {type: number}
+        discount: {type: [number, "null"]}
+        legacyCode: {type: string, deprecated: true}
+        popularity: {type: integer, x-wb-inferred: true, description: Seen in the web app only.}
+        metadata: {}
+    OrderRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: {type: integer, format: int64}
+        quantity: {type: integer}
+        priority: {$ref: "#/components/schemas/Priority"}
+        note: {type: string}
+    Order:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: string}
+        status: {$ref: "#/components/schemas/OrderStatus"}
+        items: {type: array, items: {$ref: "#/components/schemas/Product"}}
+        total: {type: number, format: decimal}
+        type: {type: string}
+    PageProduct:
+      type: object
+      properties:
+        content: {type: array, items: {$ref: "#/components/schemas/Product"}}
+        totalElements: {type: integer, format: int64}
+        totalPages: {type: integer}
+        number: {type: integer}
+        size: {type: integer}
+    PageOrder:
+      type: object
+      properties:
+        content: {type: array, items: {$ref: "#/components/schemas/Order"}}
+        totalElements: {type: integer, format: int64}
+    Event:
+      type: object
+      properties:
+        type: {type: string}
+        payload: {type: object}
