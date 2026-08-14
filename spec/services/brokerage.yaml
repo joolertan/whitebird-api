@@ -1,0 +1,1706 @@
+openapi: 3.1.0
+info:
+  title: Brokerage API
+  version: '1.0'
+x-wb-service: brokerage
+servers:
+- url: https://brokerage-service.whitebird.io
+paths:
+  /api/v1/brokerage/balance-order/crypto/deposit:
+    post:
+      summary: Create Crypto Deposit
+      description: Create a crypto deposit balance order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoDepositRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceOrderResponse'
+      operationId: brokerageBalanceOrdersCreateCryptoDeposit
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: create_crypto_deposit
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/balance-order/crypto/deposit/cancel:
+    post:
+      summary: Cancel Crypto Deposit
+      description: Cancel a crypto deposit balance order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoDepositCancelRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+      operationId: brokerageBalanceOrdersCancelCryptoDeposit
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: cancel_crypto_deposit
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/balance-order/crypto/withdrawal:
+    post:
+      summary: Create Crypto Withdrawal
+      description: Create a crypto withdrawal balance order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoWithdrawalRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceOrderResponse'
+      operationId: brokerageBalanceOrdersCreateCryptoWithdrawal
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: create_crypto_withdrawal
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client:
+    post:
+      summary: Client confirms Crypto Withdrawal
+      description: Client confirmation step for crypto withdrawal by token (public)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCryptoWithdrawalTokenRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceOrderResponse'
+      operationId: brokerageBalanceOrdersConfirmCryptoWithdrawal
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: confirm_crypto_withdrawal
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/balance-order/fiat/deposit:
+    post:
+      summary: Create Fiat Deposit
+      description: Create a fiat deposit balance order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FiatDepositRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceOrderResponse'
+      operationId: brokerageBalanceOrdersCreateFiatDeposit
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: create_fiat_deposit
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/balance-order/fiat/withdrawal:
+    post:
+      summary: Create Fiat Withdrawal
+      description: Create a fiat withdrawal balance order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FiatWithdrawalRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceOrderResponse'
+      operationId: brokerageBalanceOrdersCreateFiatWithdrawal
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: create_fiat_withdrawal
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/balance-order/page:
+    post:
+      summary: Get Balance Orders for current broker (paged)
+      description: Get paginated balance orders filtered by fields
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          minimum: 1
+          default: 20
+      - name: sort
+        in: query
+        description: Sort criteria in the format `property,(asc|desc)`.
+        schema:
+          type: array
+          items:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceOrderFilterRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageBalanceOrderResponse'
+      operationId: brokerageBalanceOrdersList
+      x-wb-resource: brokerage.balance_orders
+      x-wb-name: list
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/broker/balances:
+    get:
+      summary: Get Broker Balances
+      description: Returns asset balances for the current broker
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: number
+      operationId: brokerageBalances
+      x-wb-resource: brokerage
+      x-wb-name: balances
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/crypto-address:
+    get:
+      summary: My Crypto Addresses
+      description: Get crypto addresses for the current user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CryptoAddressResponse'
+      operationId: brokerageCryptoAddressesList
+      x-wb-resource: brokerage.crypto_addresses
+      x-wb-name: list
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+    post:
+      summary: Add Crypto Address
+      description: Add a crypto address for the current subaccount
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoAddressRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoAddressResponse'
+      operationId: brokerageCryptoAddressesCreate
+      x-wb-resource: brokerage.crypto_addresses
+      x-wb-name: create
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/crypto-address/{addressId}:
+    delete:
+      summary: Delete Crypto Address
+      description: Soft delete a crypto address for the current subaccount
+      parameters:
+      - name: addressId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+      operationId: brokerageCryptoAddressesDelete
+      x-wb-resource: brokerage.crypto_addresses
+      x-wb-name: delete
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/crypto-address/{subaccountId}/list:
+    get:
+      summary: Subaccount Crypto Addresses
+      description: Get crypto addresses for a subaccount
+      parameters:
+      - name: subaccountId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CryptoAddressResponse'
+      operationId: brokerageCryptoAddressesListForSubaccount
+      x-wb-resource: brokerage.crypto_addresses
+      x-wb-name: list_for_subaccount
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/orders/current/page:
+    post:
+      summary: Get Orders unified (paged)
+      description: Get paginated unified orders for current broker filtered by fields
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          minimum: 1
+          default: 20
+      - name: sort
+        in: query
+        description: Sort criteria in the format `property,(asc|desc)`.
+        schema:
+          type: array
+          items:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUnifiedFilterRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageOrderUnifiedResponse'
+      operationId: brokerageOrdersList
+      x-wb-resource: brokerage.orders
+      x-wb-name: list
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/orders/current/report:
+    post:
+      summary: Download Orders report (current broker)
+      description: Generates an orders report for the current broker using the provided filters
+      parameters:
+      - name: fileType
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - CSV
+          - PDF
+          - XLSX
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUnifiedFilterRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+                format: byte
+      operationId: brokerageOrdersDownloadReport
+      x-wb-resource: brokerage.orders
+      x-wb-name: download_report
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+      x-wb-response: binary
+  /api/v1/brokerage/otc-order:
+    post:
+      summary: Create OTC Order
+      description: Create a new OTC order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtcOrderRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtcOrderResponse'
+      operationId: brokerageOtcOrdersCreate
+      x-wb-resource: brokerage.otc_orders
+      x-wb-name: create
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/otc-order/calculate:
+    post:
+      summary: Calculate OTC Order
+      description: Calculate OTC order for given exchange rate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtcOrderCalculateRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtcOrderCalculateResponse'
+      operationId: brokerageOtcOrdersCalculate
+      x-wb-resource: brokerage.otc_orders
+      x-wb-name: calculate
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/otc-order/confirm:
+    post:
+      summary: Process OTC Order
+      description: Approve or reject an OTC order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtcOrderConfirmRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+      operationId: brokerageOtcOrdersConfirm
+      x-wb-resource: brokerage.otc_orders
+      x-wb-name: confirm
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/otc-order/page:
+    post:
+      summary: Get OTC Orders for current broker (paged)
+      description: Get paginated OTC orders filtered by fields
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          minimum: 1
+          default: 20
+      - name: sort
+        in: query
+        description: Sort criteria in the format `property,(asc|desc)`.
+        schema:
+          type: array
+          items:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtcOrderFilterRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageOtcOrderResponse'
+      operationId: brokerageOtcOrdersList
+      x-wb-resource: brokerage.otc_orders
+      x-wb-name: list
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/payment/invoice/{balanceOrderId}/download-token:
+    post:
+      summary: Download invoice
+      description: Generate token to download deposit invoice
+      parameters:
+      - name: balanceOrderId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadTokenResponse'
+      operationId: brokeragePaymentsInvoiceDownloadToken
+      x-wb-resource: brokerage.payments
+      x-wb-name: invoice_download_token
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/payment/methods:
+    get:
+      summary: Get payment methods
+      description: Returns available payment methods
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentMethodResponse'
+      operationId: brokeragePaymentsMethods
+      x-wb-resource: brokerage.payments
+      x-wb-name: methods
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/add/individual:
+    post:
+      summary: Add Subaccount (Individual)
+      description: Add an Individual subaccount for current broker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubaccountIndividualRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubaccountResponse'
+      operationId: brokerageSubaccountsCreateIndividual
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: create_individual
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/add/individual-entrepreneur:
+    post:
+      summary: Add Subaccount (Individual Entrepreneur)
+      description: Add an Individual Entrepreneur subaccount for current broker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubaccountIndividualEntrepreneurRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubaccountResponse'
+      operationId: brokerageSubaccountsCreateIndividualEntrepreneur
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: create_individual_entrepreneur
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/add/organization:
+    post:
+      summary: Add Subaccount (Organization)
+      description: Add an Organization subaccount for current broker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubaccountOrganizationRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubaccountResponse'
+      operationId: brokerageSubaccountsCreateOrganization
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: create_organization
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/me:
+    get:
+      summary: My Subaccount
+      description: Get subaccount info for the current user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubaccountResponse'
+      operationId: brokerageSubaccountsMe
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: me
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/page:
+    get:
+      summary: Get Subaccounts (paged)
+      description: Get paginated subaccounts for current broker
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          minimum: 1
+          default: 20
+      - name: sort
+        in: query
+        description: Sort criteria in the format `property,(asc|desc)`.
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageSubaccountResponse'
+      operationId: brokerageSubaccountsList
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: list
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/{id}:
+    get:
+      summary: Get Subaccount
+      description: Get a single subaccount (with balances) for current broker
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubaccountResponse'
+      operationId: brokerageSubaccountsGet
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: get
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+  /api/v1/brokerage/subaccount/{id}/details:
+    get:
+      summary: Get Subaccount Details
+      description: Get CRM details for a subaccount
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubaccountDetailsResponse'
+      operationId: brokerageSubaccountsDetails
+      x-wb-resource: brokerage.subaccounts
+      x-wb-name: details
+      x-wb-source: openapi
+      x-wb-first-seen: '2026-11-07'
+components:
+  schemas:
+    AssetFilter:
+      type: object
+      properties:
+        fromAsset:
+          type: string
+          description: Source asset for OTC exchange (use together with toAsset)
+        toAsset:
+          type: string
+          description: Target asset for OTC exchange (use together with fromAsset)
+        asset:
+          type: string
+          description: Single asset for Balance orders (DEPOSIT/WITHDRAWAL)
+      description: Asset filters. For OTC orders specify both fromAsset and toAsset. For Balance orders
+        specify asset (single-asset).
+    BalanceOrderFilterRequest:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/BalanceOrderStatus'
+        creationDateFrame:
+          $ref: '#/components/schemas/DateFrame'
+        completionDateFrame:
+          $ref: '#/components/schemas/DateFrame'
+        brokerId:
+          type: string
+          description: Broker ID to filter by. If the requester is Broker, this value will be ignored
+            and overridden with the current broker's ID.
+          format: uuid
+        subaccountId:
+          type: string
+          format: uuid
+        assetCode:
+          type: string
+        amount:
+          type: number
+    BalanceOrderResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        subaccountId:
+          type: string
+          format: uuid
+        subaccountCustomId:
+          type: string
+        status:
+          $ref: '#/components/schemas/BalanceOrderStatus'
+        assetType:
+          type: string
+          enum:
+          - FIAT
+          - CRYPTO
+        assetCode:
+          type: string
+        assetNetwork:
+          type: string
+        direction:
+          type: string
+          enum:
+          - DEPOSIT
+          - WITHDRAWAL
+        providerType:
+          $ref: '#/components/schemas/ProviderType'
+        internalToken:
+          type: string
+        amount:
+          type: number
+        toCryptoAddressId:
+          type: string
+          format: uuid
+        toCryptoAddress:
+          type: string
+        depositAddress:
+          type: string
+        cryptoWithdrawalCalculation:
+          $ref: '#/components/schemas/CryptoWithdrawalCalculation'
+        expirationDate:
+          type: string
+          format: date-time
+        completionDate:
+          type: string
+          format: date-time
+        paymentLink:
+          type: string
+    BalanceOrderStatus:
+      type: string
+      enum:
+      - ARREST
+      - AWAITING_ADMIN_CONFIRMATION
+      - AWAITING_CLIENT_CONFIRMATION
+      - COMPLETED
+      - CONFIRMATION_EXPIRED
+      - DECLINED
+      - PENDING
+    ClientCryptoWithdrawalTokenRequest:
+      required:
+      - token
+      type: object
+      properties:
+        token:
+          type: string
+    CryptoAddressRequest:
+      required:
+      - address
+      - network
+      type: object
+      properties:
+        address:
+          type: string
+        network:
+          $ref: '#/components/schemas/Network'
+    CryptoAddressResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        address:
+          type: string
+        network:
+          $ref: '#/components/schemas/Network'
+        status:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - BLOCKED
+    CryptoDepositCancelRequest:
+      required:
+      - balanceOrderId
+      type: object
+      properties:
+        balanceOrderId:
+          type: string
+          format: uuid
+    CryptoDepositRequest:
+      required:
+      - amount
+      - assetCode
+      - assetNetwork
+      - subaccountId
+      type: object
+      properties:
+        subaccountId:
+          type: string
+          format: uuid
+        assetCode:
+          type: string
+        assetNetwork:
+          $ref: '#/components/schemas/Network'
+        amount:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+    CryptoWithdrawalCalculation:
+      type: object
+      properties:
+        commissionAmount:
+          type: number
+        receivedAmount:
+          type: number
+        expirationDate:
+          type: string
+          format: date-time
+    CryptoWithdrawalRequest:
+      required:
+      - amount
+      - assetCode
+      - assetNetwork
+      - subaccountId
+      - toCryptoAddressId
+      type: object
+      properties:
+        subaccountId:
+          type: string
+          format: uuid
+        toCryptoAddressId:
+          type: string
+          format: uuid
+        comment:
+          type: string
+        assetCode:
+          type: string
+        assetNetwork:
+          $ref: '#/components/schemas/Network'
+        amount:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+    DateFrame:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+    DownloadTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+    FiatDepositRequest:
+      required:
+      - amount
+      - assetCode
+      - fiatProviderType
+      - subaccountId
+      type: object
+      properties:
+        subaccountId:
+          type: string
+          format: uuid
+        fiatProviderType:
+          $ref: '#/components/schemas/ProviderType'
+        internalToken:
+          type: string
+        assetCode:
+          type: string
+        amount:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+    FiatWithdrawalRequest:
+      required:
+      - amount
+      - fiatProviderType
+      - subaccountId
+      type: object
+      properties:
+        subaccountId:
+          type: string
+          format: uuid
+        fiatProviderType:
+          $ref: '#/components/schemas/ProviderType'
+        paymentToken:
+          type: string
+        assetCode:
+          type: string
+        amount:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+    Network:
+      type: string
+      enum:
+      - BITCOIN
+      - BNB
+      - ETHEREUM
+      - SOLANA
+      - TON
+      - TRON
+    OrderUnifiedFilterRequest:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        operationTypes:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderUnifiedOperationType'
+        assetFilters:
+          uniqueItems: true
+          type: array
+          description: Asset filters. For OTC orders specify both fromAsset and toAsset. For Balance orders
+            specify asset (single-asset).
+          items:
+            $ref: '#/components/schemas/AssetFilter'
+        statuses:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+        creationDateFrame:
+          $ref: '#/components/schemas/DateFrame'
+        completionDateFrame:
+          $ref: '#/components/schemas/DateFrame'
+        brokerId:
+          type: string
+          description: Broker ID to filter by. If the requester is Broker, this value will be ignored
+            and overridden with the current broker's ID.
+          format: uuid
+        subaccountId:
+          type: string
+          format: uuid
+    OrderUnifiedOperationType:
+      type: string
+      enum:
+      - DEPOSIT
+      - OTC_EXCHANGE
+      - WITHDRAWAL
+    OrderUnifiedResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        creationDate:
+          type: string
+          format: date-time
+        completionDate:
+          type: string
+          format: date-time
+        assetCode:
+          type: string
+        assetNetwork:
+          $ref: '#/components/schemas/Network'
+        fromAsset:
+          type: string
+        toAsset:
+          type: string
+        amount:
+          type: number
+        fromAmount:
+          type: number
+        toAmount:
+          type: number
+        operationType:
+          $ref: '#/components/schemas/OrderUnifiedOperationType'
+        depositCryptoAddress:
+          type: string
+        balanceOperationId:
+          type: string
+          format: uuid
+        subaccountUuid:
+          type: string
+          format: uuid
+        subaccountCustomId:
+          type: string
+        brokerUuid:
+          type: string
+          format: uuid
+        txHash:
+          type: string
+        paymentLink:
+          type: string
+        status:
+          type: string
+          description: Status value is one of BalanceOrder.Status or OtcOrder.Status depending on the
+            source order
+        cryptoTxStatus:
+          type: string
+          enum:
+          - NEW
+          - PENDING_REVIEW
+          - NOT_FOUND
+          - REJECTED
+          - TIMEOUT
+          - INVALID_AMOUNT
+          - ERROR
+          - AML_ERROR
+          - AML_BLOCKED
+          - ARREST
+          - SUBMITTING
+          - SUBMITTED
+          - PENDING
+          - SELECTED
+          - CONFIRMED
+          - PENDING_RESOLVE
+        fiatTxStatus:
+          type: string
+          enum:
+          - NEW
+          - PENDING_REVIEW
+          - REJECTED
+          - TIMEOUT
+          - SUBMIT_TIMEOUT
+          - DECLINED
+          - INVALID_AMOUNT
+          - ERROR
+          - AML_BLOCKED
+          - PENDING
+          - PROCESSING
+          - APPROVED
+        requestedAmount:
+          type: number
+        commission:
+          type: number
+    OtcOrderCalculateRequest:
+      required:
+      - exchangeRatePair
+      - exchangeRateValue
+      - fromAmount
+      - fromAsset
+      - toAsset
+      type: object
+      properties:
+        fromAsset:
+          type: string
+        fromAmount:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+        toAsset:
+          type: string
+        exchangeRatePair:
+          type: string
+          description: Asset pair in format BASE/QUOTE
+          example: USDT/RUB
+        exchangeRateValue:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+    OtcOrderCalculateResponse:
+      type: object
+      properties:
+        toAmount:
+          type: number
+    OtcOrderConfirmRequest:
+      required:
+      - approve
+      - otcOrderId
+      type: object
+      properties:
+        otcOrderId:
+          type: string
+          format: uuid
+        approve:
+          type: boolean
+    OtcOrderFilterRequest:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OtcOrderStatus'
+        creationDateFrame:
+          $ref: '#/components/schemas/DateFrame'
+        completionDateFrame:
+          $ref: '#/components/schemas/DateFrame'
+        brokerId:
+          type: string
+          description: Broker ID to filter by. If the requester is Broker, this value will be ignored
+            and overridden with the current broker's ID.
+          format: uuid
+        subaccountId:
+          type: string
+          format: uuid
+        fromAsset:
+          type: string
+        fromAmount:
+          type: number
+        toAsset:
+          type: string
+        toAmount:
+          type: number
+    OtcOrderRequest:
+      required:
+      - exchangeRatePair
+      - exchangeRateValue
+      - fromAmount
+      - fromAsset
+      - subaccountId
+      - toAsset
+      type: object
+      properties:
+        subaccountId:
+          type: string
+          format: uuid
+        fromAsset:
+          type: string
+        fromAmount:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+        toAsset:
+          type: string
+        exchangeRatePair:
+          type: string
+          description: Asset pair in format BASE/QUOTE
+          example: USDT/RUB
+        exchangeRateValue:
+          minimum: 0.0
+          exclusiveMinimum: true
+          type: number
+    OtcOrderResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        subaccountId:
+          type: string
+          format: uuid
+        subaccountCustomId:
+          type: string
+        brokerUuid:
+          type: string
+          format: uuid
+        brokerIdentity:
+          type: string
+        fromAsset:
+          type: string
+        fromAmount:
+          type: number
+        toAsset:
+          type: string
+        toAmount:
+          type: number
+        exchangeRatePair:
+          type: string
+        exchangeRateValue:
+          type: number
+        status:
+          $ref: '#/components/schemas/OtcOrderStatus'
+        side:
+          type: string
+          enum:
+          - BUY
+          - SELL
+        creationDate:
+          type: string
+          format: date-time
+        modificationDate:
+          type: string
+          format: date-time
+        completionDate:
+          type: string
+          format: date-time
+    OtcOrderStatus:
+      type: string
+      enum:
+      - COMPLETED
+      - NEW
+      - REJECTED
+    PageBalanceOrderResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: '#/components/schemas/PageableObject'
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceOrderResponse'
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: '#/components/schemas/SortObject'
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PageOrderUnifiedResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: '#/components/schemas/PageableObject'
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderUnifiedResponse'
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: '#/components/schemas/SortObject'
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PageOtcOrderResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: '#/components/schemas/PageableObject'
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/OtcOrderResponse'
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: '#/components/schemas/SortObject'
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PageSubaccountResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: '#/components/schemas/PageableObject'
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubaccountResponse'
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: '#/components/schemas/SortObject'
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PageableObject:
+      type: object
+      properties:
+        unpaged:
+          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        pageSize:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        sort:
+          $ref: '#/components/schemas/SortObject'
+    PaymentMethodResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        bank:
+          type: string
+        providerType:
+          $ref: '#/components/schemas/ProviderType'
+        currency:
+          type: string
+    ProviderType:
+      type: string
+      enum:
+      - ALFA
+      - ASSIST
+      - AZERICARD
+      - BELVEB
+      - BEPAID
+      - BEPAID_CUSTOM
+      - BGP
+      - BRAZINO
+      - BRICS
+      - BSB
+      - CA
+      - CARUSELL
+      - CORTI_MILLI
+      - DSB
+      - ERIP
+      - INSNC
+      - MAXLINE
+      - MODULBANK
+      - MTS
+      - MTS_CASH
+      - MTS_MULTITRANSFER
+      - MTS_QR
+      - SBER
+      - SBP
+      - SGB
+      - SGB_CARD
+      - STATUSBANK
+      - TBANK
+      - TEST
+      - VTB
+      - VTB_SBP
+      - WILDBERRIES
+      - ZUBRPARI
+    SortObject:
+      type: object
+      properties:
+        unsorted:
+          type: boolean
+        sorted:
+          type: boolean
+        empty:
+          type: boolean
+    SubaccountAddressData:
+      type: object
+      properties:
+        country:
+          type: string
+        region:
+          type: string
+        district:
+          type: string
+        city:
+          type: string
+        street:
+          type: string
+        houseAndFlat:
+          type: string
+        postCode:
+          type: string
+        residenceAsRegistered:
+          type: boolean
+    SubaccountAddressRequest:
+      required:
+      - city
+      - country
+      - district
+      - houseAndFlat
+      - region
+      - street
+      type: object
+      properties:
+        country:
+          type: string
+        region:
+          type: string
+        district:
+          type: string
+        city:
+          type: string
+        street:
+          type: string
+        houseAndFlat:
+          type: string
+        postCode:
+          type: string
+        residenceAsRegistered:
+          type: boolean
+    SubaccountDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          $ref: '#/components/schemas/SubaccountStatus'
+        type:
+          $ref: '#/components/schemas/SubaccountType'
+        customId:
+          type: string
+        email:
+          type: string
+        brokerIdentity:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        patronymic:
+          type: string
+        engFirstName:
+          type: string
+        engLastName:
+          type: string
+        resCountry:
+          type: string
+        birthDate:
+          type: string
+          format: date
+        placeOfBirth:
+          type: string
+        placeOfResidence:
+          type: string
+        citizenship:
+          type: string
+        personalNumber:
+          type: string
+        docType:
+          $ref: '#/components/schemas/SubaccountDocType'
+        identityDocSeriesAndNumber:
+          type: string
+        identityDocDateOfIssue:
+          type: string
+          format: date
+        identityDocIssuer:
+          type: string
+        validTill:
+          type: string
+          format: date
+        companyName:
+          type: string
+        registrationDate:
+          type: string
+          format: date
+        registrationNumber:
+          type: string
+        registrationAuthority:
+          type: string
+        companyAddress:
+          type: string
+        unp:
+          type: string
+        registrationCountry:
+          type: string
+        address:
+          $ref: '#/components/schemas/SubaccountAddressData'
+        residenceAddress:
+          $ref: '#/components/schemas/SubaccountAddressData'
+    SubaccountDocType:
+      type: string
+      enum:
+      - BY_PASSPORT
+      - FOREIGNER_BIO_CARD
+      - FOREIGN_PASSPORT
+      - ID_CARD
+      - OTHER
+      - RESIDENT_CARD
+      - STATELESS_BIO_CARD
+    SubaccountIndividualEntrepreneurRequest:
+      required:
+      - customId
+      - email
+      - firstName
+      - lastName
+      - registrationAuthority
+      - registrationDate
+      - registrationNumber
+      - unp
+      type: object
+      properties:
+        customId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        patronymic:
+          type: string
+        registrationNumber:
+          type: string
+        registrationDate:
+          type: string
+          format: date
+        registrationAuthority:
+          type: string
+        unp:
+          type: string
+        registrationCountry:
+          type: string
+        type:
+          $ref: '#/components/schemas/SubaccountType'
+        displayName:
+          type: string
+    SubaccountIndividualRequest:
+      required:
+      - address
+      - birthDate
+      - citizenship
+      - customId
+      - email
+      - firstName
+      - identityDocDateOfIssue
+      - identityDocIssuer
+      - identityDocSeriesAndNumber
+      - lastName
+      - placeOfBirth
+      type: object
+      properties:
+        customId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        patronymic:
+          type: string
+        engFirstName:
+          type: string
+        engLastName:
+          type: string
+        resCountry:
+          type: string
+        birthDate:
+          type: string
+          format: date
+        placeOfBirth:
+          type: string
+        citizenship:
+          type: string
+        personalNumber:
+          type: string
+        docType:
+          $ref: '#/components/schemas/SubaccountDocType'
+        identityDocSeriesAndNumber:
+          type: string
+        identityDocDateOfIssue:
+          type: string
+          format: date
+        identityDocIssuer:
+          type: string
+        validTill:
+          type: string
+          format: date
+        address:
+          $ref: '#/components/schemas/SubaccountAddressRequest'
+        residenceAddress:
+          $ref: '#/components/schemas/SubaccountAddressRequest'
+        type:
+          $ref: '#/components/schemas/SubaccountType'
+        displayName:
+          type: string
+    SubaccountOrganizationRequest:
+      required:
+      - companyAddress
+      - companyName
+      - customId
+      - email
+      - registrationAuthority
+      - registrationDate
+      - registrationNumber
+      - unp
+      type: object
+      properties:
+        customId:
+          type: string
+        email:
+          type: string
+        companyName:
+          type: string
+        registrationDate:
+          type: string
+          format: date
+        registrationNumber:
+          type: string
+        registrationAuthority:
+          type: string
+        companyAddress:
+          type: string
+        unp:
+          type: string
+        registrationCountry:
+          type: string
+        type:
+          $ref: '#/components/schemas/SubaccountType'
+        displayName:
+          type: string
+    SubaccountResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        customId:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        brokerUuid:
+          type: string
+          format: uuid
+        brokerIdentity:
+          type: string
+          format: uuid
+        balances:
+          type: object
+          additionalProperties:
+            type: number
+        status:
+          $ref: '#/components/schemas/SubaccountStatus'
+    SubaccountStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - BLOCKED
+      - NEW
+    SubaccountType:
+      type: string
+      enum:
+      - BANK
+      - INDIVIDUAL
+      - INDIVIDUAL_ENTREPRENEUR
+      - ORGANIZATION

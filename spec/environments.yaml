@@ -1,0 +1,37 @@
+# Service hosts per environment. Paths in spec/services/*.yaml are absolute from the host root.
+# Services missing from an environment fall back to production.
+oauth:
+  token_path: /oauth/token
+  service: auth
+  # Public credentials of the whitebird.io web client (VITE_AUTH_BASIC_TOKEN).
+  basic: YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA=
+
+services:
+  accounting: {title: Accounting, production: https://accounting-service.whitebird.io}
+  alfa: {title: Alfa-Bank payments, production: https://alfa-service.whitebird.io}
+  api: {title: API gateway, production: https://api.whitebird.io, demo: https://api-demo.whitebird.io}
+  assist: {title: Assist payments, production: https://assist-service.whitebird.io}
+  auth: {title: Authorization server, production: https://authorization-server.whitebird.io}
+  bepaid: {title: bePaid payments, production: https://bepaid-service.whitebird.io}
+  brokerage: {title: Brokerage, production: https://brokerage-service.whitebird.io}
+  btc: {title: BTC block processor, production: https://btc-block-processor.whitebird.io}
+  carusell: {title: Carusell, production: https://carusell-service.whitebird.io}
+  current_account: {title: Current account, production: https://current-account-service.whitebird.io}
+  exchange: {title: Exchange core, production: https://exchange-core.whitebird.io}
+  gazprom: {title: Gazprombank payments, production: https://bgp-service.whitebird.io}
+  ico: {title: Digital tokens (ICO), production: https://ico-service.whitebird.io}
+  kyc: {title: KYC, production: https://kyc-service.whitebird.io}
+  lending: {title: Lending, production: https://lending-service.whitebird.io}
+  market_data: {title: Market data, production: https://market-data-service.whitebird.io, demo: https://market-data-demo-service.whitebird.io}
+  mts: {title: MTS Bank cards, production: https://mtsbank-service.whitebird.io}
+  notification: {title: Notifications, production: https://notification-service.whitebird.io}
+  order_management: {title: Order management, production: https://order-management-service.whitebird.io, demo: https://order-management-demo-service.whitebird.io}
+  sberpay: {title: SberPay payments, production: https://sberpay-service.whitebird.io}
+  statusbank: {title: Status Bank payments, production: https://status-bank-service.whitebird.io}
+  trading: {title: Trading, production: https://trading-service.whitebird.io, demo: https://trading-demo-service.whitebird.io}
+  trading_admin: {title: Trading configuration, production: https://trading-admin-service.whitebird.io, demo: https://trading-admin-demo-service.whitebird.io}
+  trading_integration: {title: Trading integration, production: https://trading-integration-service.whitebird.io}
+  vtb: {title: VTB payments, production: https://vtb-service.whitebird.io}
+  webmoney: {title: WebMoney payments, production: https://webmoney-service.whitebird.io}
+
+environments: [production, demo]
