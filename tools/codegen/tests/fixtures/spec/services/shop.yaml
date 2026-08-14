@@ -153,6 +153,23 @@ paths:
           content:
             text/plain:
               schema: {type: string}
+  /api/v1/tickers:
+    get:
+      operationId: tickersList
+      x-wb-resource: tickers
+      x-wb-name: list
+      x-wb-auth: none
+      x-wb-envelope: retcode
+      parameters:
+        - {name: symbol, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Ticker"}
   /api/v1/events:
     get:
       operationId: eventsStream
@@ -220,6 +237,11 @@ components:
       properties:
         content: {type: array, items: {$ref: "#/components/schemas/Order"}}
         totalElements: {type: integer, format: int64}
+    Ticker:
+      type: object
+      properties:
+        symbol: {type: string}
+        lastPrice: {type: string}
     Event:
       type: object
       properties:

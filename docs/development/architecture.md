@@ -47,6 +47,12 @@ Operation level:
 | `x-wb-source` | no | `openapi`, `bundle` or `live`: where the shape comes from |
 | `x-wb-first-seen` | no | Date the endpoint first appeared in a scan |
 | `x-wb-response` | no | `json` (default), `binary`, `text`, `empty`, `sse` |
+| `x-wb-envelope` | no | Response wrapper to unwrap; also allowed at document level (see below) |
+
+Most services answer with the payload directly. Market data answers with a Bybit-style envelope
+`{"retCode": 0, "retMsg": "OK", "result": ...}`; such operations are marked
+`x-wb-envelope: retcode`, the response schema describes `result` only, and the client unwraps it,
+raising `APIError` (with `code = retCode`, `message = retMsg`) when `retCode` is not 0.
 
 Schema properties may carry `x-wb-inferred: true` when the field was inferred from how the web
 application uses the response rather than observed on the wire. Inferred fields are never

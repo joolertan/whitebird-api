@@ -17,6 +17,7 @@ from .ir import (
     BodyKind,
     Enum,
     EnumValue,
+    Envelope,
     Field,
     Model,
     OAuth,
@@ -131,6 +132,10 @@ class Builder:
             self._problem(f"{where}: duplicate operationId {op_id}")
         self.operation_ids.add(op_id)
 
+        envelope = raw.get("x-wb-envelope", self.document.get("x-wb-envelope"))
+        if envelope not in (None, *get_args(Envelope)):
+            self._problem(f"{where}: invalid x-wb-envelope {envelope!r}")
+            return
         auth = raw.get("x-wb-auth", "user")
         status = raw.get("x-wb-status", "deprecated" if raw.get("deprecated") else "stable")
         if auth not in get_args(Auth) or status not in get_args(Status):
@@ -182,6 +187,7 @@ class Builder:
                 source=raw.get("x-wb-source"),
                 pagination=self._pagination(response, query, body),
                 mfa_operation=raw.get("x-wb-mfa-operation"),
+                envelope=cast(Envelope | None, envelope),
             )
         )
 

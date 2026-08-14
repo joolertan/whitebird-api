@@ -18,7 +18,14 @@ def operation(ir: IR, op_id: str) -> Operation:
 
 
 def test_resources_follow_x_wb_resource(ir: IR) -> None:
-    assert sorted(ir.root.children) == ["balances", "events", "orders", "products", "profile"]
+    assert sorted(ir.root.children) == [
+        "balances",
+        "events",
+        "orders",
+        "products",
+        "profile",
+        "tickers",
+    ]
     assert [op.name for op in ir.root.children["orders"].children["documents"].operations] == [
         "receipt"
     ]
@@ -112,3 +119,10 @@ def test_invalid_spec_reports_every_problem(tmp_path: Path) -> None:
     with pytest.raises(SpecError) as error:
         load(tmp_path)
     assert len(error.value.problems) == 2
+
+
+def test_envelope(ir: IR) -> None:
+    op = operation(ir, "tickersList")
+    assert op.envelope == "retcode"
+    assert op.response.type == TypeRef.array(TypeRef.model("Ticker"))
+    assert operation(ir, "productsList").envelope is None

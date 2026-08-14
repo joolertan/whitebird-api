@@ -26,6 +26,7 @@ BodyKind = Literal["json", "form", "multipart"]
 ResponseKind = Literal["json", "binary", "text", "empty", "sse"]
 Auth = Literal["none", "user", "mfa"]
 Status = Literal["stable", "experimental", "deprecated"]
+Envelope = Literal["retcode"]
 
 
 @dataclass(frozen=True)
@@ -154,6 +155,7 @@ class Operation:
     source: str | None = None
     pagination: Pagination | None = None
     mfa_operation: str | None = None
+    envelope: Envelope | None = None
 
     @property
     def deprecated(self) -> bool:
