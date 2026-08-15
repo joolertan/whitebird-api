@@ -1,0 +1,26 @@
+<!-- {{ HEADER }} -->
+# Endpoint catalog
+
+The SDKs cover {{ total }} operations. Calls are shown with Python naming; the other SDKs use
+the same structure with their own conventions (`client.brokerage.otcOrders.list()` in
+TypeScript, `client.Brokerage.OtcOrders.List(ctx)` in Go, `client.brokerage().otc_orders().list()`
+in Rust).
+
+| Auth | Meaning |
+|---|---|
+| public | No credentials needed |
+| user | Sends the access token |
+| user + MFA | Also needs an operation MFA token |
+
+Operations marked *experimental* were recovered from the web application without a public
+schema; their response models may be incomplete.
+{% for resource, operations in sections %}
+
+## `{{ resource.name }}`
+
+| Call | Request | Auth | Notes |
+|---|---|---|---|
+{% for op in operations %}
+| `{{ call(op) }}()` | `{{ op.method }} {{ services[op.service].urls["production"] | replace("https://", "") }}{{ op.path }}` | {{ auth_labels[op.auth] }} | {% if op.status != "stable" %}*{{ op.status }}*{% if op.summary %}. {% endif %}{% endif %}{{ (op.summary or "") | replace("|", "\\|") }} |
+{% endfor %}
+{% endfor %}

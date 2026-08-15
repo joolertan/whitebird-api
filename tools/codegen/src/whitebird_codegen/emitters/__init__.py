@@ -13,12 +13,12 @@ import importlib
 import importlib.util
 from types import ModuleType
 
-LANGUAGES = ("python", "node", "go", "rust")
+LANGUAGES = ("python", "node", "go", "rust", "docs")
 
 
 def load(language: str) -> ModuleType:
     if language not in LANGUAGES:
-        raise ValueError(f"unknown language {language!r}, expected one of {', '.join(LANGUAGES)}")
+        raise ValueError(f"unknown target {language!r}, expected one of {', '.join(LANGUAGES)}")
     return importlib.import_module(f"{__name__}.{language}")
 
 
