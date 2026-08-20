@@ -1,0 +1,32 @@
+// {{ HEADER }}
+
+{% for line in imports %}
+{{ line }}
+{% endfor %}
+{% for resource in resources %}
+
+{{ resource.doc | doc }}export class {{ resource.cls }} extends APIResource {
+{% for child in resource.children %}
+{{ child.doc | doc(2) }}  readonly {{ child.prop }} = new {{ child.cls }}(this._client);
+{% endfor %}
+{% for method in resource.methods %}
+{% if resource.children or not loop.first %}
+
+{% endif %}
+{{ method.doc | doc(2) }}  {{ method.name }}({{ method.args | join(', ') }}): {{ method.returns }} {
+{% if method.prelude %}
+    {{ method.prelude }}
+{% endif %}
+    return this._client.{{ method.call }}({ {{ method.request | join(', ') }} }, options);
+  }
+{% endfor %}
+}
+{% endfor %}
+{% for params in params %}
+
+{{ params.doc | doc }}export interface {{ params.name }}{% if params.extends %} extends {{ params.extends }}{% endif %} {
+{% for member in params.members %}
+{{ member.doc | doc(2) }}  {{ member.key }}{{ '?' if member.optional }}: {{ member.type }};
+{% endfor %}
+}
+{% endfor %}

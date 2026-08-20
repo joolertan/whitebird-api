@@ -1,0 +1,25 @@
+// {{ HEADER }}
+
+/** Deployment of the Whitebird platform: `demo` is the sandbox trading contour. */
+export type Environment = {{ environments | map('quote') | join(' | ') }};
+
+/** Key of a Whitebird backend service. */
+export type ServiceName = {{ services | map(attribute='key') | map('quote') | join(' | ') }};
+
+/** Base URL of every service per environment. */
+export const SERVICE_URLS: Record<ServiceName, Record<Environment, string>> = {
+{% for service in services %}
+{{ [service.title] | doc(2) }}  {{ service.key | key }}: {
+{% for environment, url in service.urls %}
+    {{ environment | key }}: {{ url | quote }},
+{% endfor %}
+  },
+{% endfor %}
+};
+
+/** OAuth client of the whitebird.io web application, used to log in. */
+export const OAUTH = {
+  service: {{ oauth.service | quote }},
+  tokenPath: {{ oauth.token_path | quote }},
+  basic: {{ oauth.basic | quote }},
+} as const;

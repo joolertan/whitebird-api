@@ -1,0 +1,19 @@
+// {{ HEADER }}
+
+import { APIResource } from '../resource.js';
+{% for resource in resources %}
+import { {{ resource.cls }} } from './resources/{{ resource.module }}.js';
+{% endfor %}
+
+export * from './models.js';
+{% for resource in resources %}
+export * from './resources/{{ resource.module }}.js';
+{% endfor %}
+export * from './services.js';
+
+/** The API resources, exposed as properties of {@link Whitebird}. */
+export class Resources extends APIResource {
+{% for resource in resources %}
+{{ resource.doc | doc(2) }}  readonly {{ resource.prop }} = new {{ resource.cls }}(this._client);
+{% endfor %}
+}

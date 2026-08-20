@@ -1,0 +1,28 @@
+// {{ HEADER }}
+{% if uses.page %}
+
+import type { Page } from '../pagination.js';
+{% endif %}
+{% for enum in enums %}
+
+{{ enum.doc | doc }}export type {{ enum.name }} = {{ enum.union }};
+
+/** Known values of {@link {{ enum.name }}}; others may appear as the API evolves. */
+export const {{ enum.name }} = {
+{% for value in enum.members %}
+{{ value.doc | doc(2) }}  {{ value.key }}: {{ value.literal }},
+{% endfor %}
+} as const;
+{% endfor %}
+{% for model in models %}
+
+{% if model.fields %}
+{{ model.doc | doc }}export interface {{ model.name }} {
+{% for member in model.fields %}
+{{ member.doc | doc(2) }}  {{ member.key }}{{ '?' if member.optional }}: {{ member.type }};
+{% endfor %}
+}
+{% else %}
+{{ model.doc | doc }}export type {{ model.name }} = Record<string, unknown>;
+{% endif %}
+{% endfor %}
