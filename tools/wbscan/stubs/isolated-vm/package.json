@@ -1,0 +1,8 @@
+{
+  "name": "isolated-vm",
+  "version": "0.0.0-wbscan-stub",
+  "description": "Stub replacing webcrack's sandbox dependency: wbscan never evaluates bundle code.",
+  "private": true,
+  "type": "module",
+  "main": "index.js"
+}

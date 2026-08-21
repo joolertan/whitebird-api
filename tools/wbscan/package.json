@@ -1,0 +1,31 @@
+{
+  "name": "wbscan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reverse-engineers the whitebird.io HTTP API inventory from its public frontend bundles",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "scan": "node src/cli.ts scan",
+    "diff": "node src/cli.ts diff",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@babel/parser": "^8.1.0",
+    "@babel/traverse": "^8.1.0",
+    "@babel/types": "^8.1.0",
+    "isolated-vm": "file:./stubs/isolated-vm",
+    "webcrack": "^2.16.0",
+    "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "isolated-vm": "$isolated-vm"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3"
+  }
+}

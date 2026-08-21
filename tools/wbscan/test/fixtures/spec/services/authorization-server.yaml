@@ -1,0 +1,13 @@
+openapi: 3.1.0
+info: { title: authorization-server, version: '1' }
+x-wb-service: auth
+servers:
+  - url: https://authorization-server.whitebird.io
+paths:
+  /oauth/token:
+    post:
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties: { grant_type: {}, username: {}, password: {} }

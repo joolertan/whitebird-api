@@ -1,0 +1,5 @@
+{
+  "openapi": "3.0.1",
+  "servers": [{ "url": "https://exchange-core.whitebird.io:80" }],
+  "paths": { "/api/v1/admin/report": { "get": {} } }
+}

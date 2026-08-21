@@ -1,0 +1,19 @@
+oauth:
+  token_path: /oauth/token
+  service: auth
+  basic: b2xkQ2xpZW50OnNlY3JldA==
+services:
+  auth:
+    title: Authorization server
+    production: https://authorization-server.whitebird.io
+  exchange:
+    title: Exchange core
+    production: https://exchange-core.whitebird.io
+  kyc:
+    title: KYC
+    production: https://kyc-service.whitebird.io
+  legacy:
+    title: Legacy
+    production: https://legacy-service.whitebird.io
+    demo: https://legacy-demo-service.whitebird.io
+environments: [production, demo]

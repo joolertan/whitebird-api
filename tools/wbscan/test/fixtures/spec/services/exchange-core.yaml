@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info: { title: exchange-core, version: '1' }
+x-wb-service: exchange
+servers:
+  - url: https://exchange-core.whitebird.io
+paths:
+  /api/v1/orders:
+    get:
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: size, in: query, schema: { type: integer } }
+  /api/v1/orders/{orderId}:
+    delete: {}
+  /api/v1/quote:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Quote' }
+  /api/v1/subaccount/add/organization:
+    post: {}
+  /api/v1/admin/report:
+    get:
+      x-wb-source: openapi
+  /api/v1/admin/legacy:
+    get:
+      x-wb-source: openapi
+components:
+  schemas:
+    Quote:
+      allOf:
+        - properties: { amount: { type: number } }
+        - properties: { asset: { type: string } }
