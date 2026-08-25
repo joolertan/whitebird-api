@@ -1,0 +1,28 @@
+name: wbscan
+
+on:
+  push:
+    branches: [main]
+    paths: [tools/wbscan/**, .github/workflows/wbscan.yml]
+  pull_request:
+    paths: [tools/wbscan/**, .github/workflows/wbscan.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/wbscan
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tools/wbscan/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
