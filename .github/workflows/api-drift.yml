@@ -1,0 +1,71 @@
+name: API drift
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: api-drift
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: tools/wbscan
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tools/wbscan/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: .cache/wbscan
+          key: wbscan-${{ github.run_id }}
+          restore-keys: wbscan-
+      - run: npm ci
+      - run: npm run scan
+      - run: node src/cli.ts openapi
+      - name: Compare with spec
+        id: diff
+        run: |
+          set +e
+          node src/cli.ts diff --check > "$RUNNER_TEMP/drift.md"
+          status=$?
+          set -e
+          if [ "$status" -eq 1 ]; then
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+          elif [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
+          cat "$RUNNER_TEMP/drift.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Report drift
+        if: steps.diff.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create api-drift --color D93F0B --description "whitebird.io API changed" --force
+          issue=$(gh issue list --label api-drift --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --body-file "$RUNNER_TEMP/drift.md"
+            gh issue comment "$issue" --body "Updated by run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          else
+            gh issue create --title "whitebird.io API changed" --label api-drift --body-file "$RUNNER_TEMP/drift.md"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wbscan-inventory
+          path: .cache/wbscan/*/inventory.json
+          if-no-files-found: ignore
