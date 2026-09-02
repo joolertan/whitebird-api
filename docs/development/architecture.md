@@ -54,6 +54,10 @@ Most services answer with the payload directly. Market data answers with a Bybit
 `x-wb-envelope: retcode`, the response schema describes `result` only, and the client unwraps it,
 raising `APIError` (with `code = retCode`, `message = retMsg`) when `retCode` is not 0.
 
+Numbers without a `format` are treated as decimals: Springdoc renders Java `BigDecimal` that
+way, and on an exchange they are amounts, prices and rates. `format: double` or `float` marks a
+plain floating-point number.
+
 Schema properties may carry `x-wb-inferred: true` when the field was inferred from how the web
 application uses the response rather than observed on the wire. Inferred fields are never
 `required`.

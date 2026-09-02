@@ -193,7 +193,7 @@ components:
         id: {type: integer, format: int64}
         name: {type: string}
         price: {type: number, format: decimal}
-        rating: {type: number}
+        rating: {type: number, format: double}
         category: {$ref: "#/components/schemas/Category"}
         createdAt: {type: string, format: date-time}
         releaseDate: {type: string, format: date}
@@ -201,9 +201,9 @@ components:
         dimensions:
           type: object
           properties:
-            width: {type: number}
-            height: {type: number}
-        discount: {type: [number, "null"]}
+            width: {type: number, format: double}
+            height: {type: number, format: double}
+        discount: {type: [number, "null"], format: double}
         legacyCode: {type: string, deprecated: true}
         popularity: {type: integer, x-wb-inferred: true, description: Seen in the web app only.}
         metadata: {}

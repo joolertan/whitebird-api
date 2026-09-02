@@ -92,6 +92,7 @@ class Builder:
     def build(self, documents: list[tuple[str, Schema]]) -> IR:
         for file, document in documents:
             self._document(file, document)
+        self._check_resources()
         if self.problems:
             raise SpecError(self.problems)
         return IR(
@@ -190,6 +191,13 @@ class Builder:
                 envelope=cast(Envelope | None, envelope),
             )
         )
+
+    def _check_resources(self) -> None:
+        for resource in self.root.walk():
+            for op in resource.operations:
+                if op.name in resource.children:
+                    path = ".".join((*resource.path, op.name))
+                    self.problems.append(f"{path} is both an operation and a resource")
 
     def _check_collisions(self, where: str, params: list[Param], body: Body | None) -> None:
         names = [p.name for p in params] + [f.name for f in (body.fields if body else [])]
@@ -295,7 +303,8 @@ class Builder:
         if kind == "integer":
             return TypeRef("integer", format=fmt)
         if kind == "number":
-            return TypeRef("decimal") if fmt == "decimal" else TypeRef("number", format=fmt)
+            # Springdoc renders BigDecimal as a bare number; float and double carry a format.
+            return TypeRef("decimal") if fmt in (None, "decimal") else TypeRef("number", format=fmt)
         if kind == "boolean":
             return TypeRef("boolean")
         if kind == "array":

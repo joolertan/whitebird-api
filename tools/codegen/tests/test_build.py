@@ -126,3 +126,44 @@ def test_envelope(ir: IR) -> None:
     assert op.envelope == "retcode"
     assert op.response.type == TypeRef.array(TypeRef.model("Ticker"))
     assert operation(ir, "productsList").envelope is None
+
+
+def test_bare_number_is_decimal(tmp_path: Path) -> None:
+    (tmp_path / "services").mkdir()
+    (tmp_path / "environments.yaml").write_text((FIXTURE / "environments.yaml").read_text())
+    (tmp_path / "services" / "shop.yaml").write_text(
+        "x-wb-service: shop\n"
+        "paths:\n"
+        "  /a:\n"
+        "    get:\n"
+        "      operationId: a\n"
+        "      x-wb-resource: a\n"
+        "      x-wb-name: get\n"
+        "      responses:\n"
+        "        '200':\n"
+        "          content:\n"
+        "            application/json:\n"
+        "              schema:\n"
+        "                properties:\n"
+        "                  amount: {type: number}\n"
+        "                  ratio: {type: number, format: double}\n"
+    )
+    fields = {f.name: f.type for f in load(tmp_path).models["AResponse"].fields}
+    assert fields == {"amount": TypeRef("decimal"), "ratio": TypeRef("number", format="double")}
+
+
+def test_operation_and_resource_names_must_differ(tmp_path: Path) -> None:
+    (tmp_path / "services").mkdir()
+    (tmp_path / "environments.yaml").write_text((FIXTURE / "environments.yaml").read_text())
+    operation = (
+        "    get: {{operationId: {0}, x-wb-resource: {1}, x-wb-name: {2}, responses: {{}}}}\n"
+    )
+    (tmp_path / "services" / "shop.yaml").write_text(
+        "x-wb-service: shop\npaths:\n"
+        "  /a:\n"
+        + operation.format("aOrders", "a", "orders")
+        + "  /b:\n"
+        + operation.format("aOrdersList", "a.orders", "list")
+    )
+    with pytest.raises(SpecError, match="both an operation and a resource"):
+        load(tmp_path)
