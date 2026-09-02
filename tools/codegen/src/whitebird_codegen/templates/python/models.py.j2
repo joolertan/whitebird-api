@@ -1,0 +1,46 @@
+# {{ HEADER }}
+"""Models and enums of the Whitebird API."""
+
+from __future__ import annotations
+
+{% for line in imports %}
+{{ line }}
+{% endfor %}
+
+{% if exports %}
+__all__ = [{{ exports | map("literal") | join(", ") }}]
+{% else %}
+__all__: list[str] = []
+{% endif %}
+{% for enum in enums %}
+
+
+class {{ enum.name }}({{ enum.base }}):
+    {{ enum.doc | docstring(4) }}
+
+{% for name, value, doc in enum.members %}
+    {{ name }} = {{ value }}
+{% if doc %}
+    {{ doc | docstring(4) }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% for model in models %}
+
+
+class {{ model.name }}(WhitebirdModel):
+    {{ model.doc | docstring(4) }}
+{% if model.fields %}
+
+{% endif %}
+{% for field in model.fields %}
+    {{ field.name }}: {{ field.annotation }}{% if field.value is not none %} = {{ field.value }}{% endif %}
+
+{% if field.doc %}
+    {{ field.doc | docstring(4) }}
+{% if not loop.last %}
+
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}

@@ -1,0 +1,23 @@
+# {{ HEADER }}
+"""Hosts of the Whitebird services and the OAuth client of the web application."""
+
+from typing import Final, Literal
+
+Environment = Literal[{{ ir.environments | map("literal") | join(", ") }}]
+"""Deployment to connect to. A service missing from an environment uses its production host."""
+
+SERVICE_URLS: Final[dict[str, dict[str, str]]] = {
+{% for key, service in ir.services.items() %}
+    {{ key | literal }}: { {%- for environment, url in service.urls.items() %}{{ environment | literal }}: {{ url | literal }}{{ ", " if not loop.last }}{% endfor -%} },
+{% endfor %}
+}
+"""Base URL of every service, by environment."""
+
+OAUTH_SERVICE: Final = {{ ir.oauth.service | literal }}
+"""Service that issues OAuth tokens."""
+
+OAUTH_TOKEN_PATH: Final = {{ ir.oauth.token_path | literal }}
+"""Path of the OAuth token endpoint."""
+
+OAUTH_BASIC: Final = {{ ir.oauth.basic | literal }}
+"""HTTP Basic credentials of the public web client, sent to the token endpoint."""

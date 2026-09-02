@@ -1,0 +1,28 @@
+# {{ HEADER }}
+"""Top-level resources of the clients."""
+
+from __future__ import annotations
+
+{% if resources %}
+from functools import cached_property
+
+{% endif %}
+from whitebird._engine import AsyncEngine, SyncEngine
+{% for resource in resources %}
+from whitebird._generated.resources.{{ resource.module }} import {{ resource.classes.async }}, {{ resource.classes.sync }}
+{% endfor %}
+{% for flavor, client, engine in [("sync", "Whitebird", "SyncEngine"), ("async", "AsyncWhitebird", "AsyncEngine")] %}
+
+
+class {{ "AsyncResources" if flavor == "async" else "Resources" }}:
+    """Resources of `whitebird.{{ client }}`."""
+
+    _engine: {{ engine }}
+{% for resource in resources %}
+
+    @cached_property
+    def {{ resource.attribute }}(self) -> {{ resource.classes[flavor] }}:
+        {{ resource.doc | docstring(8) }}
+        return {{ resource.classes[flavor] }}(self._engine)
+{% endfor %}
+{% endfor %}

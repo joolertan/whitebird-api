@@ -1,0 +1,52 @@
+# {{ HEADER }}
+"""Operations under `client.{{ path }}`."""
+
+from __future__ import annotations
+
+{% for line in imports %}
+{{ line }}
+{% endfor %}
+{% macro method(m, flavor) %}
+{% set asynchronous = flavor == "async" and m.awaitable %}
+
+{% for decorator in m.decorators %}
+    {{ decorator }}
+{% endfor %}
+    {{ "async " if asynchronous }}def {{ m.name }}(
+        self,
+{% for argument in m.positional %}
+        {{ argument.name }}: {{ argument.annotation }},
+{% endfor %}
+{% if m.keyword %}
+        *,
+{% endif %}
+{% for argument in m.keyword %}
+        {{ argument.name }}: {{ argument.annotation }}{% if argument.default is not none %} = {{ argument.default }}{% endif %},
+{% endfor %}
+        **options: Unpack[RequestOptions],
+    ) -> {{ m.returns[flavor] }}:
+        {{ m.doc | docstring(8) }}
+        {{ "return " if m.returns_value }}{% if m.cast %}cast({{ m.cast | literal }}, {% endif %}{{ "await " if asynchronous }}self._engine.{{ m.call }}(
+{% for argument in m.arguments %}
+            {{ argument }},
+{% endfor %}
+        ){{ ")" if m.cast }}
+{% endmacro %}
+{% for flavor in ["sync", "async"] %}
+{% for resource in resources %}
+
+
+class {{ resource.classes[flavor] }}({{ "AsyncResource" if flavor == "async" else "SyncResource" }}):
+    {{ resource.doc | docstring(4) }}
+{% for child in resource.children %}
+
+    @cached_property
+    def {{ child.attribute }}(self) -> {{ child.classes[flavor] }}:
+        {{ child.doc | docstring(8) }}
+        return {{ child.classes[flavor] }}(self._engine)
+{% endfor %}
+{% for m in resource.methods %}
+{{ method(m, flavor) }}
+{% endfor %}
+{% endfor %}
+{% endfor %}
