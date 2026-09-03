@@ -6,6 +6,7 @@ from __future__ import annotations
 import builtins
 from collections.abc import Sequence
 from datetime import date
+from decimal import Decimal
 from functools import cached_property
 
 from typing_extensions import Unpack
@@ -73,7 +74,7 @@ class BrokerageResource(SyncResource):
     def balances(
         self,
         **options: Unpack[RequestOptions],
-    ) -> dict[str, float]:
+    ) -> dict[str, Decimal]:
         """Get Broker Balances.
 
         Returns asset balances for the current broker.
@@ -82,13 +83,13 @@ class BrokerageResource(SyncResource):
             **options: Per-request options, see `RequestOptions`.
 
         Returns:
-            The response as `dict[str, float]`.
+            The response as `dict[str, Decimal]`.
         """
         return self._engine.request(
             "brokerage",
             "GET",
             "/api/v1/brokerage/broker/balances",
-            cast_to=dict[str, float],
+            cast_to=dict[str, Decimal],
             options=options,
         )
 
@@ -102,7 +103,7 @@ class BrokerageBalanceOrdersResource(SyncResource):
         subaccount_id: str,
         asset_code: str,
         asset_network: Network | str,
-        amount: float,
+        amount: Decimal | float,
         **options: Unpack[RequestOptions],
     ) -> BalanceOrderResponse:
         """Create Crypto Deposit.
@@ -162,7 +163,7 @@ class BrokerageBalanceOrdersResource(SyncResource):
         to_crypto_address_id: str,
         asset_code: str,
         asset_network: Network | str,
-        amount: float,
+        amount: Decimal | float,
         comment: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> BalanceOrderResponse:
@@ -230,7 +231,7 @@ class BrokerageBalanceOrdersResource(SyncResource):
         subaccount_id: str,
         fiat_provider_type: ProviderType | str,
         asset_code: str,
-        amount: float,
+        amount: Decimal | float,
         internal_token: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> BalanceOrderResponse:
@@ -269,7 +270,7 @@ class BrokerageBalanceOrdersResource(SyncResource):
         *,
         subaccount_id: str,
         fiat_provider_type: ProviderType | str,
-        amount: float,
+        amount: Decimal | float,
         payment_token: str | None = None,
         asset_code: str | None = None,
         **options: Unpack[RequestOptions],
@@ -317,7 +318,7 @@ class BrokerageBalanceOrdersResource(SyncResource):
         broker_id: str | None = None,
         subaccount_id: str | None = None,
         asset_code: str | None = None,
-        amount: float | None = None,
+        amount: Decimal | float | None = None,
         **options: Unpack[RequestOptions],
     ) -> SyncPager[BalanceOrderResponse]:
         """Get Balance Orders for current broker (paged).
@@ -586,10 +587,10 @@ class BrokerageOtcOrdersResource(SyncResource):
         *,
         subaccount_id: str,
         from_asset: str,
-        from_amount: float,
+        from_amount: Decimal | float,
         to_asset: str,
         exchange_rate_pair: str,
-        exchange_rate_value: float,
+        exchange_rate_value: Decimal | float,
         **options: Unpack[RequestOptions],
     ) -> OtcOrderResponse:
         """Create OTC Order.
@@ -628,10 +629,10 @@ class BrokerageOtcOrdersResource(SyncResource):
         self,
         *,
         from_asset: str,
-        from_amount: float,
+        from_amount: Decimal | float,
         to_asset: str,
         exchange_rate_pair: str,
-        exchange_rate_value: float,
+        exchange_rate_value: Decimal | float,
         **options: Unpack[RequestOptions],
     ) -> OtcOrderCalculateResponse:
         """Calculate OTC Order.
@@ -701,9 +702,9 @@ class BrokerageOtcOrdersResource(SyncResource):
         broker_id: str | None = None,
         subaccount_id: str | None = None,
         from_asset: str | None = None,
-        from_amount: float | None = None,
+        from_amount: Decimal | float | None = None,
         to_asset: str | None = None,
-        to_amount: float | None = None,
+        to_amount: Decimal | float | None = None,
         **options: Unpack[RequestOptions],
     ) -> SyncPager[OtcOrderResponse]:
         """Get OTC Orders for current broker (paged).
@@ -1152,7 +1153,7 @@ class AsyncBrokerageResource(AsyncResource):
     async def balances(
         self,
         **options: Unpack[RequestOptions],
-    ) -> dict[str, float]:
+    ) -> dict[str, Decimal]:
         """Get Broker Balances.
 
         Returns asset balances for the current broker.
@@ -1161,13 +1162,13 @@ class AsyncBrokerageResource(AsyncResource):
             **options: Per-request options, see `RequestOptions`.
 
         Returns:
-            The response as `dict[str, float]`.
+            The response as `dict[str, Decimal]`.
         """
         return await self._engine.request(
             "brokerage",
             "GET",
             "/api/v1/brokerage/broker/balances",
-            cast_to=dict[str, float],
+            cast_to=dict[str, Decimal],
             options=options,
         )
 
@@ -1181,7 +1182,7 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
         subaccount_id: str,
         asset_code: str,
         asset_network: Network | str,
-        amount: float,
+        amount: Decimal | float,
         **options: Unpack[RequestOptions],
     ) -> BalanceOrderResponse:
         """Create Crypto Deposit.
@@ -1241,7 +1242,7 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
         to_crypto_address_id: str,
         asset_code: str,
         asset_network: Network | str,
-        amount: float,
+        amount: Decimal | float,
         comment: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> BalanceOrderResponse:
@@ -1309,7 +1310,7 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
         subaccount_id: str,
         fiat_provider_type: ProviderType | str,
         asset_code: str,
-        amount: float,
+        amount: Decimal | float,
         internal_token: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> BalanceOrderResponse:
@@ -1348,7 +1349,7 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
         *,
         subaccount_id: str,
         fiat_provider_type: ProviderType | str,
-        amount: float,
+        amount: Decimal | float,
         payment_token: str | None = None,
         asset_code: str | None = None,
         **options: Unpack[RequestOptions],
@@ -1396,7 +1397,7 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
         broker_id: str | None = None,
         subaccount_id: str | None = None,
         asset_code: str | None = None,
-        amount: float | None = None,
+        amount: Decimal | float | None = None,
         **options: Unpack[RequestOptions],
     ) -> AsyncPager[BalanceOrderResponse]:
         """Get Balance Orders for current broker (paged).
@@ -1665,10 +1666,10 @@ class AsyncBrokerageOtcOrdersResource(AsyncResource):
         *,
         subaccount_id: str,
         from_asset: str,
-        from_amount: float,
+        from_amount: Decimal | float,
         to_asset: str,
         exchange_rate_pair: str,
-        exchange_rate_value: float,
+        exchange_rate_value: Decimal | float,
         **options: Unpack[RequestOptions],
     ) -> OtcOrderResponse:
         """Create OTC Order.
@@ -1707,10 +1708,10 @@ class AsyncBrokerageOtcOrdersResource(AsyncResource):
         self,
         *,
         from_asset: str,
-        from_amount: float,
+        from_amount: Decimal | float,
         to_asset: str,
         exchange_rate_pair: str,
-        exchange_rate_value: float,
+        exchange_rate_value: Decimal | float,
         **options: Unpack[RequestOptions],
     ) -> OtcOrderCalculateResponse:
         """Calculate OTC Order.
@@ -1780,9 +1781,9 @@ class AsyncBrokerageOtcOrdersResource(AsyncResource):
         broker_id: str | None = None,
         subaccount_id: str | None = None,
         from_asset: str | None = None,
-        from_amount: float | None = None,
+        from_amount: Decimal | float | None = None,
         to_asset: str | None = None,
-        to_amount: float | None = None,
+        to_amount: Decimal | float | None = None,
         **options: Unpack[RequestOptions],
     ) -> AsyncPager[OtcOrderResponse]:
         """Get OTC Orders for current broker (paged).

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from whitebird._models import Date, DateTime, StrEnum, WhitebirdModel
 
 __all__ = [
@@ -283,7 +285,7 @@ class BalanceOrderFilterRequest(WhitebirdModel):
 
     subaccount_id: str | None = None
     asset_code: str | None = None
-    amount: float | None = None
+    amount: Decimal | None = None
 
 
 class BalanceOrderResponse(WhitebirdModel):
@@ -304,7 +306,7 @@ class BalanceOrderResponse(WhitebirdModel):
     direction: BalanceOrderResponseDirection | str | None = None
     provider_type: ProviderType | str | None = None
     internal_token: str | None = None
-    amount: float | None = None
+    amount: Decimal | None = None
     to_crypto_address_id: str | None = None
     to_crypto_address: str | None = None
     deposit_address: str | None = None
@@ -353,14 +355,14 @@ class CryptoDepositRequest(WhitebirdModel):
     subaccount_id: str
     asset_code: str
     asset_network: Network | str
-    amount: float
+    amount: Decimal
 
 
 class CryptoWithdrawalCalculation(WhitebirdModel):
     """Used in `BalanceOrderResponse.crypto_withdrawal_calculation`."""
 
-    commission_amount: float | None = None
-    received_amount: float | None = None
+    commission_amount: Decimal | None = None
+    received_amount: Decimal | None = None
     expiration_date: DateTime | None = None
 
 
@@ -372,7 +374,7 @@ class CryptoWithdrawalRequest(WhitebirdModel):
     comment: str | None = None
     asset_code: str
     asset_network: Network | str
-    amount: float
+    amount: Decimal
 
 
 class DateFrame(WhitebirdModel):
@@ -400,7 +402,7 @@ class FiatDepositRequest(WhitebirdModel):
     fiat_provider_type: ProviderType | str
     internal_token: str | None = None
     asset_code: str
-    amount: float
+    amount: Decimal
 
 
 class FiatWithdrawalRequest(WhitebirdModel):
@@ -410,7 +412,7 @@ class FiatWithdrawalRequest(WhitebirdModel):
     fiat_provider_type: ProviderType | str
     payment_token: str | None = None
     asset_code: str | None = None
-    amount: float
+    amount: Decimal
 
 
 class OrderUnifiedFilterRequest(WhitebirdModel):
@@ -452,9 +454,9 @@ class OrderUnifiedResponse(WhitebirdModel):
     asset_network: Network | str | None = None
     from_asset: str | None = None
     to_asset: str | None = None
-    amount: float | None = None
-    from_amount: float | None = None
-    to_amount: float | None = None
+    amount: Decimal | None = None
+    from_amount: Decimal | None = None
+    to_amount: Decimal | None = None
     operation_type: OrderUnifiedOperationType | str | None = None
     deposit_crypto_address: str | None = None
     balance_operation_id: str | None = None
@@ -469,26 +471,26 @@ class OrderUnifiedResponse(WhitebirdModel):
 
     crypto_tx_status: OrderUnifiedResponseCryptoTxStatus | str | None = None
     fiat_tx_status: OrderUnifiedResponseFiatTxStatus | str | None = None
-    requested_amount: float | None = None
-    commission: float | None = None
+    requested_amount: Decimal | None = None
+    commission: Decimal | None = None
 
 
 class OtcOrderCalculateRequest(WhitebirdModel):
     """Request body of `client.brokerage.otc_orders.calculate()`."""
 
     from_asset: str
-    from_amount: float
+    from_amount: Decimal
     to_asset: str
     exchange_rate_pair: str
     """Asset pair in format BASE/QUOTE."""
 
-    exchange_rate_value: float
+    exchange_rate_value: Decimal
 
 
 class OtcOrderCalculateResponse(WhitebirdModel):
     """Returned by `client.brokerage.otc_orders.calculate()`."""
 
-    to_amount: float | None = None
+    to_amount: Decimal | None = None
 
 
 class OtcOrderConfirmRequest(WhitebirdModel):
@@ -514,9 +516,9 @@ class OtcOrderFilterRequest(WhitebirdModel):
 
     subaccount_id: str | None = None
     from_asset: str | None = None
-    from_amount: float | None = None
+    from_amount: Decimal | None = None
     to_asset: str | None = None
-    to_amount: float | None = None
+    to_amount: Decimal | None = None
 
 
 class OtcOrderRequest(WhitebirdModel):
@@ -524,12 +526,12 @@ class OtcOrderRequest(WhitebirdModel):
 
     subaccount_id: str
     from_asset: str
-    from_amount: float
+    from_amount: Decimal
     to_asset: str
     exchange_rate_pair: str
     """Asset pair in format BASE/QUOTE."""
 
-    exchange_rate_value: float
+    exchange_rate_value: Decimal
 
 
 class OtcOrderResponse(WhitebirdModel):
@@ -544,11 +546,11 @@ class OtcOrderResponse(WhitebirdModel):
     broker_uuid: str | None = None
     broker_identity: str | None = None
     from_asset: str | None = None
-    from_amount: float | None = None
+    from_amount: Decimal | None = None
     to_asset: str | None = None
-    to_amount: float | None = None
+    to_amount: Decimal | None = None
     exchange_rate_pair: str | None = None
-    exchange_rate_value: float | None = None
+    exchange_rate_value: Decimal | None = None
     status: OtcOrderStatus | str | None = None
     side: OtcOrderResponseSide | str | None = None
     creation_date: DateTime | None = None
@@ -709,5 +711,5 @@ class SubaccountResponse(WhitebirdModel):
     email: str | None = None
     broker_uuid: str | None = None
     broker_identity: str | None = None
-    balances: dict[str, float] | None = None
+    balances: dict[str, Decimal] | None = None
     status: SubaccountStatus | str | None = None
