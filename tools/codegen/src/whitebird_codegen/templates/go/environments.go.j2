@@ -1,0 +1,34 @@
+// {{ HEADER }}
+
+package whitebird
+
+// Environments. A service without a host of its own in an environment uses its {{ environments[0].name }} host.
+const (
+{% for e in environments %}
+	{{ e.name }} Environment = {{ e.value }}
+{% endfor %}
+)
+
+// Whitebird services.
+const (
+{% for s in services %}
+	{{ s.name }} Service = {{ s.key }} // {{ s.title }}
+{% endfor %}
+)
+
+var environments = []Environment{ {{ environments | map(attribute="name") | join(", ") }} }
+
+const defaultEnvironment = {{ environments[0].name }}
+
+var serviceURLs = map[Service]map[Environment]string{
+{% for s in services %}
+	{{ s.name }}: { {% for env, url in s.urls %}{{ env }}: {{ url }}, {% endfor %}},
+{% endfor %}
+}
+
+// The token endpoint and the public credentials of the web application's OAuth client.
+const (
+	tokenService      = {{ oauth_service }}
+	tokenPath         = {{ token_path }}
+	clientCredentials = {{ basic }}
+)

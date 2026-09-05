@@ -1,0 +1,20 @@
+// {{ HEADER }}
+
+package whitebird
+{% for e in enums %}
+
+{% for line in e.doc %}
+{{ line }}
+{% endfor %}
+type {{ e.name }} {{ e.base }}
+
+// Known values of [{{ e.name }}].
+const (
+{% for v in e.values %}
+{% for line in v.doc %}
+	{{ line }}
+{% endfor %}
+	{{ v.name }} {{ e.name }} = {{ v.value }}
+{% endfor %}
+)
+{% endfor %}

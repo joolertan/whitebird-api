@@ -1,0 +1,29 @@
+// {{ HEADER }}
+
+package whitebird
+{% if imports %}
+
+import (
+{% for path in imports %}
+	"{{ path }}"
+{% endfor %}
+)
+{% endif %}
+{% for m in models %}
+
+{% for line in m.doc %}
+{{ line }}
+{% endfor %}
+{% if m.map_value %}
+type {{ m.name }} map[string]{{ m.map_value }}
+{% else %}
+type {{ m.name }} struct {
+{% for f in m.fields %}
+{% for line in f.doc %}
+	{{ line }}
+{% endfor %}
+	{{ f.name }} {{ f.type }}{{ f.suffix }}
+{% endfor %}
+}
+{% endif %}
+{% endfor %}

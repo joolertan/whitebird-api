@@ -1,0 +1,33 @@
+// {{ HEADER }}
+
+package whitebird
+
+// Client is a client for the Whitebird API, created with [NewClient]. Its fields group the
+// operations by resource, following the layout of the API. A Client is safe for concurrent use.
+type Client struct {
+{% for r in resources %}
+	{{ r.name }} *{{ r.type }}
+{% endfor %}
+
+	core *core
+}
+{% macro literal(r) %}
+{% if r.children %}
+&{{ r.type }}{
+{% for child in r.children %}
+{{ child.name }}: {{ literal(child) }},
+{% endfor %}
+{% if r.has_core %}
+core: c.core,
+{% endif %}
+}
+{%- else %}
+&{{ r.type }}{core: c.core}
+{%- endif %}
+{% endmacro %}
+
+func (c *Client) initResources() {
+{% for r in resources %}
+	c.{{ r.name }} = {{ literal(r) }}
+{% endfor %}
+}

@@ -1,0 +1,61 @@
+// {{ HEADER }}
+
+package whitebird
+
+import (
+{% for path in imports %}
+	"{{ path }}"
+{% endfor %}
+)
+{% for r in resources %}
+
+{% for line in r.doc %}
+{{ line }}
+{% endfor %}
+type {{ r.type }} struct {
+{% for child in r.children %}
+	{{ child.name }} *{{ child.type }}
+{% endfor %}
+{% if r.has_core %}
+{% if r.children %}
+
+{% endif %}
+	core *core
+{% endif %}
+}
+{% for s in r.params %}
+
+{% for line in s.doc %}
+{{ line }}
+{% endfor %}
+type {{ s.name }} struct {
+{% for f in s.fields %}
+{% for line in f.doc %}
+	{{ line }}
+{% endfor %}
+	{{ f.name }} {{ f.type }}{{ f.suffix }}
+{% endfor %}
+}
+{% endfor %}
+{% for m in r.methods %}
+
+{% for line in m.doc %}
+{{ line }}
+{% endfor %}
+func (r *{{ r.type }}) {{ m.signature }} {
+{% if m.kind == "paginate" %}
+	return paginate(params.{{ m.page_field }}, func(page int) (*Page[{{ m.item }}], error) {
+		p := params
+		p.{{ m.page_field }} = page
+		return r.{{ m.page_method }}({{ m.page_args }})
+	})
+{% else %}
+	return {{ m.invoke }}&operation{
+{% for key, value in m.operation %}
+		{{ key }}: {{ value }},
+{% endfor %}
+	}, opts)
+{% endif %}
+}
+{% endfor %}
+{% endfor %}
