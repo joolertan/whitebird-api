@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: Assist payments API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4).
+
+    Assist is the payment gateway Whitebird uses to bind cards of Belarusian banks other than
+    Alfa-Bank: Belarusbank (`ASSIST_BELARUSBANK`) and every other bank (`ASSIST_OTHER`). Only
+    Visa and Belkart cards are accepted; a test payment may be charged and immediately refunded.
+    Bound cards appear in the client's payment methods with provider type `ASSIST`.
+x-wb-service: assist
+servers:
+- url: https://assist-service.whitebird.io
+paths:
+  /api/v1/card/bind/post-form:
+    get:
+      operationId: providersAssistCardBindForm
+      x-wb-resource: providers.assist
+      x-wb-name: card_bind_form
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Start binding a card through Assist
+      description: |
+        Creates an Assist card-binding session. Binding requires a browser:
+
+        - when the response has `action` and `fields` (the web app expects this for cards of
+          "other" banks), submit an HTML form from the browser: `POST` to `action`,
+          `application/x-www-form-urlencoded`, one hidden input per entry of `fields`;
+        - otherwise open `url` (or `iFrame`) in the browser (the web app expects this for
+          Belarusbank cards).
+
+        The user enters the card details and passes 3-D Secure on the Assist page, then the
+        browser is sent back to `returnUrl`. The web app passes
+        `https://whitebird.io/account/payments?card_bind=success`.
+      parameters:
+      - name: type
+        in: query
+        description: Binding owner type; the web app always sends `CLIENT`.
+        schema:
+          $ref: '#/components/schemas/AssistCardBindType'
+          default: CLIENT
+      - name: returnUrl
+        in: query
+        required: true
+        description: Where Assist sends the browser after the binding.
+        schema: {type: string, format: uri}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssistCardBindForm'}
+  /api/v1/card/bind/url:
+    get:
+      operationId: providersAssistCardBindUrl
+      x-wb-resource: providers.assist
+      x-wb-name: card_bind_url
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get an Assist card binding URL
+      description: |
+        Older variant of `card_bind_form`. The current web app only references it from unused
+        legacy code and never reads the response; it presumably returns a URL of the Assist
+        binding page to open in a browser, which sends the user back to `returnUrl`.
+      parameters:
+      - name: type
+        in: query
+        description: Binding owner type; the web app always sends `CLIENT`.
+        schema:
+          $ref: '#/components/schemas/AssistCardBindType'
+          default: CLIENT
+      - name: returnUrl
+        in: query
+        required: true
+        description: Where Assist sends the browser after the binding.
+        schema: {type: string, format: uri}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+  /api/v1/card/unbind/{cardId}:
+    post:
+      operationId: providersAssistUnbindCard
+      x-wb-resource: providers.assist
+      x-wb-name: unbind_card
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Unbind an Assist card
+      description: The web app ignores the response body and reloads the payment methods list.
+      parameters:
+      - name: cardId
+        in: path
+        required: true
+        description: Id of the card in the client's payment methods (provider type `ASSIST`).
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+components:
+  schemas:
+    AssistCardBindType:
+      type: string
+      enum: [CLIENT]
+    AssistCardBindForm:
+      type: object
+      properties:
+        action:
+          type: string
+          description: Form action URL (Assist binding page).
+          x-wb-inferred: true
+        fields:
+          type: object
+          additionalProperties: {type: string}
+          description: Hidden form fields to post to `action`, by name.
+          x-wb-inferred: true
+        url:
+          type: string
+          description: Binding page to open in a browser when no form is returned.
+          x-wb-inferred: true
+        iFrame:
+          type: string
+          description: Alternative page URL; used when `url` is absent.
+          x-wb-inferred: true

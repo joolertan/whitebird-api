@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: VTB payments API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4).
+
+    VTB Bank is a ruble payout partner (provider types `VTB`, `VTB_SBP` and `CORTI_MILLI` in the
+    web app). The only call the web app makes to this service is the exchange rate for transfers
+    to cards of Corti Milli, Tajikistan's national payment system: the client sells crypto for
+    RUB and the recipient's card is credited in somoni (TJS) at the issuing bank's rate.
+x-wb-service: vtb
+servers:
+- url: https://vtb-service.whitebird.io
+paths:
+  /api/v1/corti-milli/rate:
+    post:
+      operationId: providersVtbCortiMilliRate
+      x-wb-resource: providers.vtb.corti_milli
+      x-wb-name: rate
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the RUB to TJS rate for a Corti Milli card
+      description: Indicative rate for a transfer to the given card; the issuing bank may change
+        it. The web app asks for it as soon as a full card number is entered and shows
+        "<rate> TJS = 1,00 RUB".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VtbCortiMilliRateRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VtbCortiMilliRate'}
+components:
+  schemas:
+    VtbCortiMilliServiceType:
+      type: string
+      enum: [EXCHANGE]
+    VtbCortiMilliRateRequest:
+      type: object
+      required: [card]
+      properties:
+        card:
+          type: string
+          description: Recipient's 16-digit Corti Milli card number, digits only. The web app
+            also sends the card token of an existing quote's output here.
+        serviceType:
+          $ref: '#/components/schemas/VtbCortiMilliServiceType'
+          default: EXCHANGE
+    VtbCortiMilliRate:
+      type: object
+      properties:
+        rate:
+          type: number
+          format: decimal
+          description: Somoni (TJS) paid per 1 RUB.
+          x-wb-inferred: true

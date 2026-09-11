@@ -1,0 +1,266 @@
+openapi: 3.1.0
+info:
+  title: Alfa-Bank payments API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4).
+
+    Alfa-Bank (Belarus) is a card acquirer for Whitebird. This service binds Alfa-Bank cards to
+    the client's account as payment methods (provider type `ALFA`), serves the 3-D Secure data for
+    card payments made through the Alfa-Bank gateway, and handles applications for the co-branded
+    Alfa-Bank crypto card (a Mastercard issued by the bank and linked to the Whitebird account).
+x-wb-service: alfa
+servers:
+- url: https://alfa-service.whitebird.io
+paths:
+  /api/v1/customer/card/bind/url:
+    post:
+      operationId: providersAlfaCardBindUrl
+      x-wb-resource: providers.alfa
+      x-wb-name: card_bind_url
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Start binding an Alfa-Bank card
+      description: |
+        Creates a card-binding session on the Alfa-Bank payment page and returns the page to open.
+        Binding requires a browser: open `url` (or `iFrame` when `url` is absent), the user enters
+        the card details and passes 3-D Secure on the bank's page, and the bank redirects the
+        browser to `returnUrl` on success or to `failUrl` on failure. The web app passes
+        `https://whitebird.io/account/payments?card_bind=success` and `...?card_bind=failed`.
+        Once bound, the card shows up in the client's payment methods with provider type `ALFA`.
+        The same flow is used to bind an issued Alfa crypto card manually (see
+        `providers.alfa.crypto_card.release_details`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AlfaCardBindUrlRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlfaCardBindUrl'}
+  /api/v1/customer/card/unbind/{cardId}:
+    post:
+      operationId: providersAlfaUnbindCard
+      x-wb-resource: providers.alfa
+      x-wb-name: unbind_card
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Unbind an Alfa-Bank card
+      description: The web app ignores the response body and reloads the payment methods list.
+      parameters:
+      - name: cardId
+        in: path
+        required: true
+        description: Id of the card in the client's payment methods (provider type `ALFA`).
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+  /api/v1/payment:
+    get:
+      operationId: providersAlfaPayment
+      x-wb-resource: providers.alfa
+      x-wb-name: payment
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get 3-D Secure data for an Alfa-Bank card payment
+      description: |
+        When a fiat deposit or exchange order paid by card returns a payment link that carries an
+        `mdOrder` query parameter (the Alfa-Bank gateway order id), the web app calls this endpoint
+        with `alfaOrderId = mdOrder` instead of opening the link. It then submits an HTML form
+        (`POST`, `application/x-www-form-urlencoded`) from the user's browser to `acsUrl` with the
+        fields `MD` (the order id), `PaReq` (`paReq`) and `TermUrl` (`termUrl`). The issuer's
+        3-D Secure page returns the browser to `termUrl` when the user is done. Payment links
+        without `mdOrder` are opened in the browser as they are.
+      parameters:
+      - name: alfaOrderId
+        in: query
+        required: true
+        description: Alfa-Bank gateway order id (`mdOrder` from the payment link).
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlfaPayment'}
+  /api/v1/release/crypto-card-release-details:
+    get:
+      operationId: providersAlfaCryptoCardReleaseDetails
+      x-wb-resource: providers.alfa.crypto_card
+      x-wb-name: release_details
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the status of the client's Alfa crypto card
+      description: |
+        The web app shows an "unlinked" Alfa crypto card when `cardMask` is set,
+        `hasInactiveCryptoCard` is false and `status` is one of the known values: the card was
+        issued but automatic binding to the account failed. The user is then asked to save the
+        card details in the Alfa-Bank app and bind the card manually with
+        `providers.alfa.card_bind_url`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlfaCryptoCardReleaseDetails'}
+  /api/v1/release/partner/validate:
+    post:
+      operationId: providersAlfaCryptoCardValidate
+      x-wb-resource: providers.alfa.crypto_card
+      x-wb-name: validate
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Check the client's data for an Alfa crypto card application
+      description: |
+        First step of an Alfa crypto card application. When `validationErrors` is not empty the
+        profile must be completed first: without `phoneNumber` the web app asks the user to add a
+        phone number, without `gender` it asks for the gender (set through the authorization
+        server, `POST /api/v1/user/gender`). When the list is empty the application continues with
+        `init`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlfaCryptoCardValidation'}
+  /api/v1/release/partner/init:
+    post:
+      operationId: providersAlfaCryptoCardInit
+      x-wb-resource: providers.alfa.crypto_card
+      x-wb-name: init
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Start an Alfa crypto card application
+      description: |
+        Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set,
+        the user identifies through MSI (the Belarusian interbank identification system) by
+        opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check in
+        its own UI and then calls `client_info` to get the bank's application page.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlfaCryptoCardInit'}
+  /api/v1/release/partner/client-info:
+    post:
+      operationId: providersAlfaCryptoCardClientInfo
+      x-wb-resource: providers.alfa.crypto_card
+      x-wb-name: client_info
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the Alfa crypto card application page
+      description: Final step after identity verification. The user completes the application with
+        Alfa-Bank by opening `redirectUrl` in a browser.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlfaCryptoCardClientInfo'}
+components:
+  schemas:
+    AlfaCardBindUrlRequest:
+      type: object
+      required: [returnUrl, failUrl]
+      properties:
+        returnUrl:
+          type: string
+          format: uri
+          description: Where the bank redirects the browser after a successful binding.
+        failUrl:
+          type: string
+          format: uri
+          description: Where the bank redirects the browser when the binding fails.
+    AlfaCardBindUrl:
+      type: object
+      properties:
+        url:
+          type: string
+          description: Alfa-Bank card binding page to open in a browser.
+          x-wb-inferred: true
+        iFrame:
+          type: string
+          description: Alternative page URL; the web app uses it when `url` is absent.
+          x-wb-inferred: true
+    AlfaPayment:
+      type: object
+      description: 3-D Secure redirect data for an Alfa-Bank gateway order.
+      properties:
+        acsUrl:
+          type: string
+          description: Issuer's 3-D Secure page (form action).
+          x-wb-inferred: true
+        paReq:
+          type: string
+          description: Payer authentication request, posted as `PaReq`.
+          x-wb-inferred: true
+        termUrl:
+          type: string
+          description: Where the issuer returns the browser, posted as `TermUrl`.
+          x-wb-inferred: true
+    AlfaCryptoCardStatus:
+      type: string
+      enum: [CARD_CREATED, CARD_ACTIVATED, CARD_PIN_CREATED, CARD_RBS_BIND_ERROR]
+      description: Issuance state of the Alfa crypto card. `CARD_RBS_BIND_ERROR` means the card
+        was issued but could not be bound to the account automatically.
+    AlfaCryptoCardReleaseDetails:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/AlfaCryptoCardStatus'
+          x-wb-inferred: true
+        cardMask:
+          type: [string, 'null']
+          description: Masked card number of the issued card.
+          x-wb-inferred: true
+        hasInactiveCryptoCard:
+          type: boolean
+          x-wb-inferred: true
+    AlfaCryptoCardValidation:
+      type: object
+      properties:
+        validationErrors:
+          type: array
+          items: {}
+          description: Problems with the client's data; empty when the application can continue.
+          x-wb-inferred: true
+        phoneNumber:
+          type: [string, 'null']
+          description: Client's phone number; missing when the profile has none.
+          x-wb-inferred: true
+        gender:
+          type: [string, 'null']
+          description: Client's gender; missing when the profile has none.
+          x-wb-inferred: true
+    AlfaCryptoCardInit:
+      type: object
+      properties:
+        msi:
+          type: boolean
+          description: True when the client identifies through MSI at `redirectUrl`.
+          x-wb-inferred: true
+        redirectUrl:
+          type: string
+          description: MSI identification page to open in a browser.
+          x-wb-inferred: true
+    AlfaCryptoCardClientInfo:
+      type: object
+      properties:
+        redirectUrl:
+          type: string
+          description: Alfa-Bank card application page to open in a browser.
+          x-wb-inferred: true

@@ -1,0 +1,255 @@
+openapi: 3.1.0
+info:
+  title: MTS Bank payments API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4).
+
+    MTS Bank (Russia) is Whitebird's provider for Russian rubles. This service binds Russian
+    (MIR) cards and cards of a few neighbouring countries by number (provider types `MTS` and
+    `MTS_RF_CARDS`), tracks cash deposits made in MTS retail stores (`MTS_CASH`) and through the
+    Multitransfer system (`MTS_MULTITRANSFER`), and decodes SBP QR codes so that clients can pay
+    Russian merchants from their balance (`MTS_QR`).
+x-wb-service: mts
+servers:
+- url: https://mtsbank-service.whitebird.io
+paths:
+  /api/v1/card/bind:
+    post:
+      operationId: providersMtsBindCard
+      x-wb-resource: providers.mts
+      x-wb-name: bind_card
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Bind a card by number
+      description: |
+        Binds a card to the client's account from its number alone; there is no browser or
+        3-D Secure step. The current web app only offers Russian MIR cards (`country: RUSSIA`);
+        `countries` lists every accepted country. Errors carry one of these `status` codes:
+        `CARD_ALREADY_EXISTS`, `CARD_BINDING_ERROR`, `EMPTY_PHONE_NUMBER` (the profile needs a
+        phone number), `TOTAL_CARD_LIMIT_REACHED`, `RECENT_CARD_LIMIT_REACHED`, `INVALID_TOKEN`,
+        `PAYMENT_PROVIDER_FORBIDDEN`.
+      parameters:
+      - name: token
+        in: query
+        description: Access token to authenticate with instead of the `Authorization` header.
+          The web app's standalone card form uses it when opened from the mobile apps
+          (`?token=...&returnUrl=...`); not needed with bearer authentication.
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MtsCardBindRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+  /api/v1/card/unbind/{cardId}:
+    post:
+      operationId: providersMtsUnbindCard
+      x-wb-resource: providers.mts
+      x-wb-name: unbind_card
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Unbind an MTS Bank card
+      description: The web app ignores the response body and reloads the payment methods list.
+      parameters:
+      - name: cardId
+        in: path
+        required: true
+        description: Id of the card in the client's payment methods (provider type `MTS`).
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+  /api/v1/card/countries:
+    get:
+      operationId: providersMtsCountries
+      x-wb-resource: providers.mts
+      x-wb-name: countries
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: List countries whose cards can be bound
+      description: 'Values for `bind_card`. Observed on 2026-11-07: `["RUSSIA", "KYRGYZSTAN",
+        "KAZAKHSTAN", "UZBEKISTAN"]`.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/MtsCardCountry'}
+  /api/v1/operations/deposit/pending-number:
+    get:
+      operationId: providersMtsPendingDepositNumber
+      x-wb-resource: providers.mts
+      x-wb-name: pending_deposit_number
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the order number of a pending MTS deposit
+      description: |
+        Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
+        (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the cashier
+        or enters in the transfer form. This endpoint returns the number of the client's pending
+        deposit. The response shape is unknown: the web app declares the call but never reads
+        the result.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+  /api/v1/qr/info:
+    post:
+      operationId: providersMtsQrInfo
+      x-wb-resource: providers.mts.qr
+      x-wb-name: info
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Decode an SBP QR code
+      description: |
+        First step of paying a Russian merchant's SBP (Faster Payments System) QR code from the
+        Whitebird balance. The request carries the scanned QR content; the response is a payment
+        ticket (`qrTicketId`) used by the next steps:
+
+        1. Check `error.code`: anything but `0` is a failure described by `error.message`
+           (in Russian; e.g. code `102` means the QR code was not found). The web app also refuses
+           tickets with more than one entry in `payments`.
+        2. For a static QR code (`payments[0].qrType == "static"`) the payer chooses the amount
+           and gets the amount to pay from `commission`; otherwise the amount is
+           `payments[0].settlementAmount`.
+        3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
+           (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or by
+           selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+           token: qrTicketId}`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MtsQrInfoRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MtsQrInfo'}
+  /api/v1/qr/payment/commission:
+    post:
+      operationId: providersMtsQrCommission
+      x-wb-resource: providers.mts.qr
+      x-wb-name: commission
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Calculate the amount to pay for a static SBP QR code
+      description: Used for static QR codes, where the payer enters the amount. The returned
+        `amount` is what the web app then pays (see `info` for the whole flow).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MtsQrCommissionRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MtsQrCommission'}
+components:
+  schemas:
+    MtsCardCountry:
+      type: string
+      enum: [RUSSIA, KYRGYZSTAN, KAZAKHSTAN, UZBEKISTAN]
+    MtsCardBindRequest:
+      type: object
+      required: [cardNumber, country]
+      properties:
+        cardNumber:
+          type: string
+          description: Card number, digits only (the web app requires 16 digits).
+        country:
+          $ref: '#/components/schemas/MtsCardCountry'
+    MtsQrInfoRequest:
+      type: object
+      required: [qrData]
+      properties:
+        qrData:
+          type: string
+          description: Raw content of the scanned SBP QR code.
+    MtsQrInfo:
+      type: object
+      properties:
+        qrTicketId:
+          type: string
+          description: Payment ticket, used as `paymentToken` / quote `token` when paying.
+          x-wb-inferred: true
+        error:
+          $ref: '#/components/schemas/MtsQrError'
+          x-wb-inferred: true
+        payments:
+          type: array
+          items: {$ref: '#/components/schemas/MtsQrPayment'}
+          x-wb-inferred: true
+    MtsQrError:
+      type: object
+      description: Result of decoding; `code` 0 means success.
+      properties:
+        code:
+          type: integer
+          x-wb-inferred: true
+        message:
+          type: string
+          x-wb-inferred: true
+    MtsQrPayment:
+      type: object
+      properties:
+        qrType:
+          type: string
+          description: '`static` when the payer chooses the amount; otherwise the amount is fixed.'
+          x-wb-inferred: true
+        amount:
+          $ref: '#/components/schemas/MtsQrAmount'
+          x-wb-inferred: true
+        settlementAmount:
+          $ref: '#/components/schemas/MtsQrAmount'
+          x-wb-inferred: true
+    MtsQrAmount:
+      type: object
+      properties:
+        base:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        currencyCode:
+          type: string
+          description: Currency code, `RUB` in practice.
+          x-wb-inferred: true
+    MtsQrCommissionRequest:
+      type: object
+      required: [qrTicketId, amount]
+      properties:
+        qrTicketId:
+          type: string
+          description: Ticket returned by `info`.
+        amount:
+          type: number
+          format: decimal
+          description: Amount the payer entered, in the QR code's currency.
+    MtsQrCommission:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: decimal
+          description: Amount the web app then pays for the ticket (presumably including the provider
+            commission).
+          x-wb-inferred: true

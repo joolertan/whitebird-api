@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: Status Bank payments API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4).
+
+    StatusBank (Belarus) issues partner crypto cards linked to the Whitebird account (provider
+    type `STATUSBANK`: Mastercard in BYN and RUB, Visa in USD, Belkart in BYN) and processes
+    fiat deposits that the client confirms with a code sent by SMS.
+x-wb-service: statusbank
+servers:
+- url: https://status-bank-service.whitebird.io
+paths:
+  /api/v1/statusbank/card/systems:
+    get:
+      operationId: providersStatusbankCardSystems
+      x-wb-resource: providers.statusbank
+      x-wb-name: card_systems
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List available StatusBank card types
+      description: Payment system and currency combinations that can be issued. The web app hides
+        the combinations the client already holds.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusbankCardSystems'}
+  /api/v1/statusbank/client/register:
+    post:
+      operationId: providersStatusbankRegisterCard
+      x-wb-resource: providers.statusbank
+      x-wb-name: register_card
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Apply for a StatusBank crypto card
+      description: |
+        Registers the client with StatusBank and starts issuing a card of the chosen type. The web
+        app first calls the KYC service (`POST /api/v1/kyc/client/validate`); unless it reports
+        `clientStatus: VERIFIED`, the user reviews the personal data that will be sent to the bank
+        and confirms it (`POST /api/v1/kyc/client/confirm`). For the first card the web app
+        requests `MASTERCARD`/`BYN`; further cards use a type from `card_systems`.
+
+        On success the response carries `iFrame`: the bank's application page, which the user
+        completes in a browser. `errorMessage` signals a failure, explained by `status`;
+        `DATA_REQUIRED` with the message `gender is required` means the profile needs a gender.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StatusbankRegisterCardRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusbankRegistration'}
+  /api/v1/statusbank/card/{cardId}:
+    get:
+      operationId: providersStatusbankCardDetails
+      x-wb-resource: providers.statusbank
+      x-wb-name: card_details
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the StatusBank page with a card's balance and details
+      description: The balance and card details are not returned as data; open `iFrame` in a
+        browser to show them. `errorMessage` is set on failure.
+      parameters:
+      - name: cardId
+        in: path
+        required: true
+        description: Id of the card in the client's payment methods (provider type `STATUSBANK`).
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusbankCardDetails'}
+  /api/v1/statusbank/order/confirm:
+    post:
+      operationId: providersStatusbankConfirmOrder
+      x-wb-resource: providers.statusbank
+      x-wb-name: confirm_order
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm a StatusBank deposit with an SMS code
+      description: |
+        While a StatusBank fiat deposit is `PENDING` or `PROCESSING`, StatusBank sends the client
+        an SMS with a 4-digit code. The order id is the fiat operation's `orderIdentity` (or the
+        exchange order input's `processorTransactionId`). A 200 response with `errorMessage` set
+        is a rejection; `status.text` explains it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StatusbankConfirmOrderRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusbankOrderConfirmation'}
+components:
+  schemas:
+    StatusbankPaymentSystem:
+      type: string
+      enum: [MASTERCARD, VISA, BELKART]
+    StatusbankCardSystems:
+      type: object
+      properties:
+        systems:
+          type: array
+          items: {$ref: '#/components/schemas/StatusbankCardSystem'}
+          x-wb-inferred: true
+    StatusbankCardSystem:
+      type: object
+      properties:
+        system:
+          $ref: '#/components/schemas/StatusbankPaymentSystem'
+          x-wb-inferred: true
+        currency:
+          type: string
+          description: Card currency, e.g. `BYN`, `RUB`, `USD`.
+          x-wb-inferred: true
+    StatusbankRegisterCardRequest:
+      type: object
+      required: [system, currency]
+      properties:
+        system:
+          $ref: '#/components/schemas/StatusbankPaymentSystem'
+        currency:
+          type: string
+          description: Card currency, one offered for `system` by `card_systems`.
+    StatusbankRegistrationStatus:
+      type: string
+      enum:
+      - CARD_ISSUANCE_NOT_AVAILABLE
+      - DATA_REQUIRED
+      - REGISTRATION_REQUIRED
+      - OUTDATED
+      - ADDRESS_ERROR
+      - IDENTITY_CARD_ERROR
+      - CARD_EXISTS
+      - INTERNAL_ERROR
+      - PROVIDER_ERROR
+      description: |
+        Outcome reported by StatusBank. `CARD_ISSUANCE_NOT_AVAILABLE`: the client is not
+        eligible (cards are issued to citizens of Belarus and Russia and holders of a Belarusian
+        residence permit). The other values come with `errorMessage`; the web app treats them as
+        outdated personal data that the client must update.
+    StatusbankRegistration:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/StatusbankRegistrationStatus'
+          x-wb-inferred: true
+        iFrame:
+          type: string
+          description: StatusBank application page to open in a browser.
+          x-wb-inferred: true
+        errorMessage:
+          type: string
+          x-wb-inferred: true
+    StatusbankCardDetails:
+      type: object
+      properties:
+        iFrame:
+          type: string
+          description: StatusBank page with the card's balance and details.
+          x-wb-inferred: true
+        errorMessage:
+          type: string
+          x-wb-inferred: true
+    StatusbankConfirmOrderRequest:
+      type: object
+      required: [orderId, code]
+      properties:
+        orderId:
+          type: string
+          description: Deposit order id (`orderIdentity` of the fiat operation).
+        code:
+          type: string
+          description: 4-digit code from StatusBank's SMS.
+    StatusbankOrderConfirmation:
+      type: object
+      properties:
+        errorMessage:
+          type: string
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/StatusbankOrderConfirmationStatus'
+          x-wb-inferred: true
+    StatusbankOrderConfirmationStatus:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Human-readable reason, shown to the user when `errorMessage` is set.
+          x-wb-inferred: true

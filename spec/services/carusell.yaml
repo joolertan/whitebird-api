@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: Carusell API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4).
+
+    Carusell is a ruble payout provider (provider type `CARUSELL`) that sends money through SBP,
+    the Russian Faster Payments System, to the client's phone number at a bank of their choice.
+    The web app uses this service's bank list for every SBP payout provider (`SBP`, `VTB_SBP`,
+    `CARUSELL`) when a client sells crypto for RUB.
+x-wb-service: carusell
+servers:
+- url: https://carusell-service.whitebird.io
+paths:
+  /api/v1/bank:
+    get:
+      operationId: providersCarusellBanks
+      x-wb-resource: providers.carusell
+      x-wb-name: banks
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: List SBP banks
+      description: Banks that can receive an SBP payout (196 on 2026-11-07). The chosen bank's
+        `id` is sent as `bankIdentifier` when creating the exchange order.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/CarusellBank'}
+components:
+  schemas:
+    CarusellBank:
+      type: object
+      required: [id, description, active]
+      properties:
+        id:
+          type: string
+          description: SBP member id of the bank, e.g. `100000000008`.
+        description:
+          type: string
+          description: Bank name, mostly in Russian.
+        active:
+          type: boolean
