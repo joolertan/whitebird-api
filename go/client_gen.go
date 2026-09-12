@@ -6,6 +6,7 @@ package whitebird
 // operations by resource, following the layout of the API. A Client is safe for concurrent use.
 type Client struct {
 	Brokerage *BrokerageResource
+	Providers *ProvidersResource
 
 	core *core
 }
@@ -19,5 +20,22 @@ func (c *Client) initResources() {
 		Payments:        &BrokeragePaymentsResource{core: c.core},
 		Subaccounts:     &BrokerageSubaccountsResource{core: c.core},
 		core:            c.core,
+	}
+	c.Providers = &ProvidersResource{
+		Alfa: &ProvidersAlfaResource{
+			CryptoCard: &ProvidersAlfaCryptoCardResource{core: c.core},
+			core:       c.core,
+		},
+		Assist:   &ProvidersAssistResource{core: c.core},
+		Bepaid:   &ProvidersBepaidResource{core: c.core},
+		Carusell: &ProvidersCarusellResource{core: c.core},
+		Mts: &ProvidersMtsResource{
+			QR:   &ProvidersMtsQRResource{core: c.core},
+			core: c.core,
+		},
+		Statusbank: &ProvidersStatusbankResource{core: c.core},
+		Vtb: &ProvidersVtbResource{
+			CortiMilli: &ProvidersVtbCortiMilliResource{core: c.core},
+		},
 	}
 }

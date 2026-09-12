@@ -7,6 +7,7 @@ from functools import cached_property
 
 from whitebird._engine import AsyncEngine, SyncEngine
 from whitebird._generated.resources.brokerage import AsyncBrokerageResource, BrokerageResource
+from whitebird._generated.resources.providers import AsyncProvidersResource, ProvidersResource
 
 
 class Resources:
@@ -19,6 +20,11 @@ class Resources:
         """Operations of `client.brokerage`."""
         return BrokerageResource(self._engine)
 
+    @cached_property
+    def providers(self) -> ProvidersResource:
+        """Operations of `client.providers`."""
+        return ProvidersResource(self._engine)
+
 
 class AsyncResources:
     """Resources of `whitebird.AsyncWhitebird`."""
@@ -29,3 +35,8 @@ class AsyncResources:
     def brokerage(self) -> AsyncBrokerageResource:
         """Operations of `client.brokerage`."""
         return AsyncBrokerageResource(self._engine)
+
+    @cached_property
+    def providers(self) -> AsyncProvidersResource:
+        """Operations of `client.providers`."""
+        return AsyncProvidersResource(self._engine)

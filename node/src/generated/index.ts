@@ -2,13 +2,17 @@
 
 import { APIResource } from '../resource.js';
 import { Brokerage } from './resources/brokerage.js';
+import { Providers } from './resources/providers.js';
 
 export * from './models.js';
 export * from './resources/brokerage.js';
+export * from './resources/providers.js';
 export * from './services.js';
 
 /** The API resources, exposed as properties of {@link Whitebird}. */
 export class Resources extends APIResource {
   /** Endpoints under `client.brokerage`. */
   readonly brokerage = new Brokerage(this._client);
+  /** Endpoints under `client.providers`. */
+  readonly providers = new Providers(this._client);
 }

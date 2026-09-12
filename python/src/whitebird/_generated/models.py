@@ -4,16 +4,28 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 from whitebird._models import Date, DateTime, StrEnum, WhitebirdModel
 
 __all__ = [
+    "AlfaCardBindUrl",
+    "AlfaCardBindUrlRequest",
+    "AlfaCryptoCardClientInfo",
+    "AlfaCryptoCardInit",
+    "AlfaCryptoCardReleaseDetails",
+    "AlfaCryptoCardStatus",
+    "AlfaCryptoCardValidation",
+    "AlfaPayment",
     "AssetFilter",
+    "AssistCardBindForm",
+    "AssistCardBindType",
     "BalanceOrderFilterRequest",
     "BalanceOrderResponse",
     "BalanceOrderResponseAssetType",
     "BalanceOrderResponseDirection",
     "BalanceOrderStatus",
+    "CarusellBank",
     "ClientCryptoWithdrawalTokenRequest",
     "CryptoAddressRequest",
     "CryptoAddressResponse",
@@ -27,6 +39,15 @@ __all__ = [
     "FiatDepositRequest",
     "FiatWithdrawalRequest",
     "FileType",
+    "MtsCardBindRequest",
+    "MtsCardCountry",
+    "MtsQrAmount",
+    "MtsQrCommission",
+    "MtsQrCommissionRequest",
+    "MtsQrError",
+    "MtsQrInfo",
+    "MtsQrInfoRequest",
+    "MtsQrPayment",
     "Network",
     "OrderUnifiedFilterRequest",
     "OrderUnifiedOperationType",
@@ -43,6 +64,16 @@ __all__ = [
     "OtcOrderStatus",
     "PaymentMethodResponse",
     "ProviderType",
+    "StatusbankCardDetails",
+    "StatusbankCardSystem",
+    "StatusbankCardSystems",
+    "StatusbankConfirmOrderRequest",
+    "StatusbankOrderConfirmation",
+    "StatusbankOrderConfirmationStatus",
+    "StatusbankPaymentSystem",
+    "StatusbankRegisterCardRequest",
+    "StatusbankRegistration",
+    "StatusbankRegistrationStatus",
     "SubaccountAddressData",
     "SubaccountAddressRequest",
     "SubaccountDetailsResponse",
@@ -53,7 +84,33 @@ __all__ = [
     "SubaccountResponse",
     "SubaccountStatus",
     "SubaccountType",
+    "VtbCortiMilliRate",
+    "VtbCortiMilliRateRequest",
+    "VtbCortiMilliServiceType",
 ]
+
+
+class AlfaCryptoCardStatus(StrEnum):
+    """Issuance state of the Alfa crypto card.
+
+    `CARD_RBS_BIND_ERROR` means the card was issued but could not be bound to the account
+    automatically.
+    """
+
+    CARD_CREATED = "CARD_CREATED"
+    CARD_ACTIVATED = "CARD_ACTIVATED"
+    CARD_PIN_CREATED = "CARD_PIN_CREATED"
+    CARD_RBS_BIND_ERROR = "CARD_RBS_BIND_ERROR"
+
+
+class AssistCardBindType(StrEnum):
+    """Assist card bind type.
+
+    Values of the `type` parameter of `client.providers.assist.card_bind_form()` and the `type`
+    parameter of `client.providers.assist.card_bind_url()`.
+    """
+
+    CLIENT = "CLIENT"
 
 
 class BalanceOrderResponseAssetType(StrEnum):
@@ -96,6 +153,15 @@ class FileType(StrEnum):
     CSV = "CSV"
     PDF = "PDF"
     XLSX = "XLSX"
+
+
+class MtsCardCountry(StrEnum):
+    """Returned by `client.providers.mts.countries()`. Values of `MtsCardBindRequest.country`."""
+
+    RUSSIA = "RUSSIA"
+    KYRGYZSTAN = "KYRGYZSTAN"
+    KAZAKHSTAN = "KAZAKHSTAN"
+    UZBEKISTAN = "UZBEKISTAN"
 
 
 class Network(StrEnum):
@@ -219,6 +285,33 @@ class ProviderType(StrEnum):
     ZUBRPARI = "ZUBRPARI"
 
 
+class StatusbankPaymentSystem(StrEnum):
+    """Values of `StatusbankCardSystem.system` and `StatusbankRegisterCardRequest.system`."""
+
+    MASTERCARD = "MASTERCARD"
+    VISA = "VISA"
+    BELKART = "BELKART"
+
+
+class StatusbankRegistrationStatus(StrEnum):
+    """Outcome reported by StatusBank.
+
+    `CARD_ISSUANCE_NOT_AVAILABLE`: the client is not eligible (cards are issued to citizens of
+    Belarus and Russia and holders of a Belarusian residence permit). The other values come with
+    `errorMessage`; the web app treats them as outdated personal data that the client must update.
+    """
+
+    CARD_ISSUANCE_NOT_AVAILABLE = "CARD_ISSUANCE_NOT_AVAILABLE"
+    DATA_REQUIRED = "DATA_REQUIRED"
+    REGISTRATION_REQUIRED = "REGISTRATION_REQUIRED"
+    OUTDATED = "OUTDATED"
+    ADDRESS_ERROR = "ADDRESS_ERROR"
+    IDENTITY_CARD_ERROR = "IDENTITY_CARD_ERROR"
+    CARD_EXISTS = "CARD_EXISTS"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+    PROVIDER_ERROR = "PROVIDER_ERROR"
+
+
 class SubaccountDocType(StrEnum):
     """Values of `SubaccountDetailsResponse.doc_type` and `SubaccountIndividualRequest.doc_type`."""
 
@@ -252,6 +345,118 @@ class SubaccountType(StrEnum):
     ORGANIZATION = "ORGANIZATION"
 
 
+class VtbCortiMilliServiceType(StrEnum):
+    """Values of `VtbCortiMilliRateRequest.service_type`."""
+
+    EXCHANGE = "EXCHANGE"
+
+
+class AlfaCardBindUrl(WhitebirdModel):
+    """Returned by `client.providers.alfa.card_bind_url()`."""
+
+    url: str | None = None
+    """Alfa-Bank card binding page to open in a browser.
+
+    Inferred from the web application; may be missing.
+    """
+
+    i_frame: str | None = None
+    """Alternative page URL; the web app uses it when `url` is absent.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class AlfaCardBindUrlRequest(WhitebirdModel):
+    """Request body of `client.providers.alfa.card_bind_url()`."""
+
+    return_url: str
+    """Where the bank redirects the browser after a successful binding."""
+
+    fail_url: str
+    """Where the bank redirects the browser when the binding fails."""
+
+
+class AlfaCryptoCardClientInfo(WhitebirdModel):
+    """Returned by `client.providers.alfa.crypto_card.client_info()`."""
+
+    redirect_url: str | None = None
+    """Alfa-Bank card application page to open in a browser.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class AlfaCryptoCardInit(WhitebirdModel):
+    """Returned by `client.providers.alfa.crypto_card.init()`."""
+
+    msi: bool | None = None
+    """True when the client identifies through MSI at `redirectUrl`.
+
+    Inferred from the web application; may be missing.
+    """
+
+    redirect_url: str | None = None
+    """MSI identification page to open in a browser.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class AlfaCryptoCardReleaseDetails(WhitebirdModel):
+    """Returned by `client.providers.alfa.crypto_card.release_details()`."""
+
+    status: AlfaCryptoCardStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    card_mask: str | None = None
+    """Masked card number of the issued card. Inferred from the web application; may be missing."""
+
+    has_inactive_crypto_card: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AlfaCryptoCardValidation(WhitebirdModel):
+    """Returned by `client.providers.alfa.crypto_card.validate()`."""
+
+    validation_errors: list[Any] | None = None
+    """Problems with the client's data; empty when the application can continue.
+
+    Inferred from the web application; may be missing.
+    """
+
+    phone_number: str | None = None
+    """Client's phone number; missing when the profile has none.
+
+    Inferred from the web application; may be missing.
+    """
+
+    gender: str | None = None
+    """Client's gender; missing when the profile has none.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class AlfaPayment(WhitebirdModel):
+    """3-D Secure redirect data for an Alfa-Bank gateway order."""
+
+    acs_url: str | None = None
+    """Issuer's 3-D Secure page (form action). Inferred from the web application; may be missing."""
+
+    pa_req: str | None = None
+    """Payer authentication request, posted as `PaReq`.
+
+    Inferred from the web application; may be missing.
+    """
+
+    term_url: str | None = None
+    """Where the issuer returns the browser, posted as `TermUrl`.
+
+    Inferred from the web application; may be missing.
+    """
+
+
 class AssetFilter(WhitebirdModel):
     """Asset filters.
 
@@ -267,6 +472,31 @@ class AssetFilter(WhitebirdModel):
 
     asset: str | None = None
     """Single asset for Balance orders (DEPOSIT/WITHDRAWAL)."""
+
+
+class AssistCardBindForm(WhitebirdModel):
+    """Returned by `client.providers.assist.card_bind_form()`."""
+
+    action: str | None = None
+    """Form action URL (Assist binding page). Inferred from the web application; may be missing."""
+
+    fields: dict[str, str] | None = None
+    """Hidden form fields to post to `action`, by name.
+
+    Inferred from the web application; may be missing.
+    """
+
+    url: str | None = None
+    """Binding page to open in a browser when no form is returned.
+
+    Inferred from the web application; may be missing.
+    """
+
+    i_frame: str | None = None
+    """Alternative page URL; used when `url` is absent.
+
+    Inferred from the web application; may be missing.
+    """
 
 
 class BalanceOrderFilterRequest(WhitebirdModel):
@@ -314,6 +544,18 @@ class BalanceOrderResponse(WhitebirdModel):
     expiration_date: DateTime | None = None
     completion_date: DateTime | None = None
     payment_link: str | None = None
+
+
+class CarusellBank(WhitebirdModel):
+    """Returned by `client.providers.carusell.banks()`."""
+
+    id: str
+    """SBP member id of the bank, e.g. `100000000008`."""
+
+    description: str
+    """Bank name, mostly in Russian."""
+
+    active: bool
 
 
 class ClientCryptoWithdrawalTokenRequest(WhitebirdModel):
@@ -413,6 +655,93 @@ class FiatWithdrawalRequest(WhitebirdModel):
     payment_token: str | None = None
     asset_code: str | None = None
     amount: Decimal
+
+
+class MtsCardBindRequest(WhitebirdModel):
+    """Request body of `client.providers.mts.bind_card()`."""
+
+    card_number: str
+    """Card number, digits only (the web app requires 16 digits)."""
+
+    country: MtsCardCountry | str
+
+
+class MtsQrAmount(WhitebirdModel):
+    """Used in `MtsQrPayment.amount` and `MtsQrPayment.settlement_amount`."""
+
+    base: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency_code: str | None = None
+    """Currency code, `RUB` in practice. Inferred from the web application; may be missing."""
+
+
+class MtsQrCommission(WhitebirdModel):
+    """Returned by `client.providers.mts.qr.commission()`."""
+
+    amount: Decimal | None = None
+    """Amount the web app then pays for the ticket (presumably including the provider commission).
+    Inferred from the web application; may be missing.
+    """
+
+
+class MtsQrCommissionRequest(WhitebirdModel):
+    """Request body of `client.providers.mts.qr.commission()`."""
+
+    qr_ticket_id: str
+    """Ticket returned by `info`."""
+
+    amount: Decimal
+    """Amount the payer entered, in the QR code's currency."""
+
+
+class MtsQrError(WhitebirdModel):
+    """Result of decoding; `code` 0 means success."""
+
+    code: int | None = None
+    """Inferred from the web application; may be missing."""
+
+    message: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MtsQrInfo(WhitebirdModel):
+    """Returned by `client.providers.mts.qr.info()`."""
+
+    qr_ticket_id: str | None = None
+    """Payment ticket, used as `paymentToken` / quote `token` when paying.
+
+    Inferred from the web application; may be missing.
+    """
+
+    error: MtsQrError | None = None
+    """Inferred from the web application; may be missing."""
+
+    payments: list[MtsQrPayment] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MtsQrInfoRequest(WhitebirdModel):
+    """Request body of `client.providers.mts.qr.info()`."""
+
+    qr_data: str
+    """Raw content of the scanned SBP QR code."""
+
+
+class MtsQrPayment(WhitebirdModel):
+    """Used in `MtsQrInfo.payments`."""
+
+    qr_type: str | None = None
+    """`static` when the payer chooses the amount; otherwise the amount is fixed.
+
+    Inferred from the web application; may be missing.
+    """
+
+    amount: MtsQrAmount | None = None
+    """Inferred from the web application; may be missing."""
+
+    settlement_amount: MtsQrAmount | None = None
+    """Inferred from the web application; may be missing."""
 
 
 class OrderUnifiedFilterRequest(WhitebirdModel):
@@ -568,6 +897,93 @@ class PaymentMethodResponse(WhitebirdModel):
     currency: str | None = None
 
 
+class StatusbankCardDetails(WhitebirdModel):
+    """Returned by `client.providers.statusbank.card_details()`."""
+
+    i_frame: str | None = None
+    """StatusBank page with the card's balance and details.
+
+    Inferred from the web application; may be missing.
+    """
+
+    error_message: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class StatusbankCardSystem(WhitebirdModel):
+    """Used in `StatusbankCardSystems.systems`."""
+
+    system: StatusbankPaymentSystem | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Card currency, e.g.
+
+    `BYN`, `RUB`, `USD`. Inferred from the web application; may be missing.
+    """
+
+
+class StatusbankCardSystems(WhitebirdModel):
+    """Returned by `client.providers.statusbank.card_systems()`."""
+
+    systems: list[StatusbankCardSystem] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class StatusbankConfirmOrderRequest(WhitebirdModel):
+    """Request body of `client.providers.statusbank.confirm_order()`."""
+
+    order_id: str
+    """Deposit order id (`orderIdentity` of the fiat operation)."""
+
+    code: str
+    """4-digit code from StatusBank's SMS."""
+
+
+class StatusbankOrderConfirmation(WhitebirdModel):
+    """Returned by `client.providers.statusbank.confirm_order()`."""
+
+    error_message: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: StatusbankOrderConfirmationStatus | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class StatusbankOrderConfirmationStatus(WhitebirdModel):
+    """Used in `StatusbankOrderConfirmation.status`."""
+
+    text: str | None = None
+    """Human-readable reason, shown to the user when `errorMessage` is set.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class StatusbankRegisterCardRequest(WhitebirdModel):
+    """Request body of `client.providers.statusbank.register_card()`."""
+
+    system: StatusbankPaymentSystem | str
+    currency: str
+    """Card currency, one offered for `system` by `card_systems`."""
+
+
+class StatusbankRegistration(WhitebirdModel):
+    """Returned by `client.providers.statusbank.register_card()`."""
+
+    status: StatusbankRegistrationStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    i_frame: str | None = None
+    """StatusBank application page to open in a browser.
+
+    Inferred from the web application; may be missing.
+    """
+
+    error_message: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
 class SubaccountAddressData(WhitebirdModel):
     """Subaccount address data.
 
@@ -713,3 +1129,22 @@ class SubaccountResponse(WhitebirdModel):
     broker_identity: str | None = None
     balances: dict[str, Decimal] | None = None
     status: SubaccountStatus | str | None = None
+
+
+class VtbCortiMilliRate(WhitebirdModel):
+    """Returned by `client.providers.vtb.corti_milli.rate()`."""
+
+    rate: Decimal | None = None
+    """Somoni (TJS) paid per 1 RUB. Inferred from the web application; may be missing."""
+
+
+class VtbCortiMilliRateRequest(WhitebirdModel):
+    """Request body of `client.providers.vtb.corti_milli.rate()`."""
+
+    card: str
+    """Recipient's 16-digit Corti Milli card number, digits only.
+
+    The web app also sends the card token of an existing quote's output here.
+    """
+
+    service_type: VtbCortiMilliServiceType | str | None = VtbCortiMilliServiceType.EXCHANGE

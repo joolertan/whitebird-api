@@ -2,6 +2,29 @@
 
 package whitebird
 
+// AlfaCryptoCardStatus is used in [AlfaCryptoCardReleaseDetails].
+//
+// Issuance state of the Alfa crypto card. `CARD_RBS_BIND_ERROR` means the card was issued but
+// could not be bound to the account automatically.
+type AlfaCryptoCardStatus string
+
+// Known values of [AlfaCryptoCardStatus].
+const (
+	AlfaCryptoCardStatusCardCreated      AlfaCryptoCardStatus = "CARD_CREATED"
+	AlfaCryptoCardStatusCardActivated    AlfaCryptoCardStatus = "CARD_ACTIVATED"
+	AlfaCryptoCardStatusCardPinCreated   AlfaCryptoCardStatus = "CARD_PIN_CREATED"
+	AlfaCryptoCardStatusCardRbsBindError AlfaCryptoCardStatus = "CARD_RBS_BIND_ERROR"
+)
+
+// AssistCardBindType is used in [ProvidersAssistCardBindFormParams] and
+// [ProvidersAssistCardBindURLParams].
+type AssistCardBindType string
+
+// Known values of [AssistCardBindType].
+const (
+	AssistCardBindTypeClient AssistCardBindType = "CLIENT"
+)
+
 // BalanceOrderResponseAssetType is used in [BalanceOrderResponse].
 type BalanceOrderResponseAssetType string
 
@@ -52,6 +75,17 @@ const (
 	FileTypeCSV  FileType = "CSV"
 	FileTypePDF  FileType = "PDF"
 	FileTypeXLSX FileType = "XLSX"
+)
+
+// MtsCardCountry is returned by [ProvidersMtsResource.Countries].
+type MtsCardCountry string
+
+// Known values of [MtsCardCountry].
+const (
+	MtsCardCountryRussia     MtsCardCountry = "RUSSIA"
+	MtsCardCountryKyrgyzstan MtsCardCountry = "KYRGYZSTAN"
+	MtsCardCountryKazakhstan MtsCardCountry = "KAZAKHSTAN"
+	MtsCardCountryUzbekistan MtsCardCountry = "UZBEKISTAN"
 )
 
 // Network is used in [BrokerageBalanceOrdersCreateCryptoDepositParams],
@@ -183,6 +217,38 @@ const (
 	ProviderTypeZubrpari         ProviderType = "ZUBRPARI"
 )
 
+// StatusbankPaymentSystem is used in [ProvidersStatusbankRegisterCardParams] and
+// [StatusbankCardSystem].
+type StatusbankPaymentSystem string
+
+// Known values of [StatusbankPaymentSystem].
+const (
+	StatusbankPaymentSystemMastercard StatusbankPaymentSystem = "MASTERCARD"
+	StatusbankPaymentSystemVisa       StatusbankPaymentSystem = "VISA"
+	StatusbankPaymentSystemBelkart    StatusbankPaymentSystem = "BELKART"
+)
+
+// StatusbankRegistrationStatus is used in [StatusbankRegistration].
+//
+// Outcome reported by StatusBank. `CARD_ISSUANCE_NOT_AVAILABLE`: the client is not eligible (cards
+// are issued to citizens of Belarus and Russia and holders of a Belarusian residence permit). The
+// other values come with `errorMessage`; the web app treats them as outdated personal data that
+// the client must update.
+type StatusbankRegistrationStatus string
+
+// Known values of [StatusbankRegistrationStatus].
+const (
+	StatusbankRegistrationStatusCardIssuanceNotAvailable StatusbankRegistrationStatus = "CARD_ISSUANCE_NOT_AVAILABLE"
+	StatusbankRegistrationStatusDataRequired             StatusbankRegistrationStatus = "DATA_REQUIRED"
+	StatusbankRegistrationStatusRegistrationRequired     StatusbankRegistrationStatus = "REGISTRATION_REQUIRED"
+	StatusbankRegistrationStatusOutdated                 StatusbankRegistrationStatus = "OUTDATED"
+	StatusbankRegistrationStatusAddressError             StatusbankRegistrationStatus = "ADDRESS_ERROR"
+	StatusbankRegistrationStatusIdentityCardError        StatusbankRegistrationStatus = "IDENTITY_CARD_ERROR"
+	StatusbankRegistrationStatusCardExists               StatusbankRegistrationStatus = "CARD_EXISTS"
+	StatusbankRegistrationStatusInternalError            StatusbankRegistrationStatus = "INTERNAL_ERROR"
+	StatusbankRegistrationStatusProviderError            StatusbankRegistrationStatus = "PROVIDER_ERROR"
+)
+
 // SubaccountDocType is used in [BrokerageSubaccountsCreateIndividualParams] and
 // [SubaccountDetailsResponse].
 type SubaccountDocType string
@@ -219,4 +285,12 @@ const (
 	SubaccountTypeIndividual             SubaccountType = "INDIVIDUAL"
 	SubaccountTypeIndividualEntrepreneur SubaccountType = "INDIVIDUAL_ENTREPRENEUR"
 	SubaccountTypeOrganization           SubaccountType = "ORGANIZATION"
+)
+
+// VtbCortiMilliServiceType is used in [ProvidersVtbCortiMilliRateParams].
+type VtbCortiMilliServiceType string
+
+// Known values of [VtbCortiMilliServiceType].
+const (
+	VtbCortiMilliServiceTypeExchange VtbCortiMilliServiceType = "EXCHANGE"
 )

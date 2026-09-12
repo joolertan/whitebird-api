@@ -2,6 +2,72 @@
 
 package whitebird
 
+// AlfaCardBindURL is returned by [ProvidersAlfaResource.CardBindURL].
+type AlfaCardBindURL struct {
+	// Alfa-Bank card binding page to open in a browser. Inferred from the web application; not yet
+	// observed in responses.
+	URL string `json:"url,omitzero"`
+	// Alternative page URL; the web app uses it when `url` is absent. Inferred from the web
+	// application; not yet observed in responses.
+	IFrame string `json:"iFrame,omitzero"`
+}
+
+// AlfaCryptoCardClientInfo is returned by [ProvidersAlfaCryptoCardResource.ClientInfo].
+type AlfaCryptoCardClientInfo struct {
+	// Alfa-Bank card application page to open in a browser. Inferred from the web application; not yet
+	// observed in responses.
+	RedirectURL string `json:"redirectUrl,omitzero"`
+}
+
+// AlfaCryptoCardInit is returned by [ProvidersAlfaCryptoCardResource.Init].
+type AlfaCryptoCardInit struct {
+	// True when the client identifies through MSI at `redirectUrl`. Inferred from the web application;
+	// not yet observed in responses.
+	Msi bool `json:"msi,omitzero"`
+	// MSI identification page to open in a browser. Inferred from the web application; not yet
+	// observed in responses.
+	RedirectURL string `json:"redirectUrl,omitzero"`
+}
+
+// AlfaCryptoCardReleaseDetails is returned by [ProvidersAlfaCryptoCardResource.ReleaseDetails].
+type AlfaCryptoCardReleaseDetails struct {
+	// Inferred from the web application; not yet observed in responses.
+	Status AlfaCryptoCardStatus `json:"status,omitzero"`
+	// Masked card number of the issued card. Inferred from the web application; not yet observed in
+	// responses.
+	CardMask string `json:"cardMask,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	HasInactiveCryptoCard bool `json:"hasInactiveCryptoCard,omitzero"`
+}
+
+// AlfaCryptoCardValidation is returned by [ProvidersAlfaCryptoCardResource.Validate].
+type AlfaCryptoCardValidation struct {
+	// Problems with the client's data; empty when the application can continue. Inferred from the web
+	// application; not yet observed in responses.
+	ValidationErrors []any `json:"validationErrors,omitzero"`
+	// Client's phone number; missing when the profile has none. Inferred from the web application; not
+	// yet observed in responses.
+	PhoneNumber string `json:"phoneNumber,omitzero"`
+	// Client's gender; missing when the profile has none. Inferred from the web application; not yet
+	// observed in responses.
+	Gender string `json:"gender,omitzero"`
+}
+
+// AlfaPayment is returned by [ProvidersAlfaResource.Payment].
+//
+// 3-D Secure redirect data for an Alfa-Bank gateway order.
+type AlfaPayment struct {
+	// Issuer's 3-D Secure page (form action). Inferred from the web application; not yet observed in
+	// responses.
+	AcsURL string `json:"acsUrl,omitzero"`
+	// Payer authentication request, posted as `PaReq`. Inferred from the web application; not yet
+	// observed in responses.
+	PaReq string `json:"paReq,omitzero"`
+	// Where the issuer returns the browser, posted as `TermUrl`. Inferred from the web application;
+	// not yet observed in responses.
+	TermURL string `json:"termUrl,omitzero"`
+}
+
 // AssetFilter is used in [BrokerageOrdersListParams] and [BrokerageOrdersDownloadReportParams].
 //
 // Asset filters. For OTC orders specify both fromAsset and toAsset. For Balance orders specify
@@ -13,6 +79,22 @@ type AssetFilter struct {
 	ToAsset *string `json:"toAsset,omitzero"`
 	// Single asset for Balance orders (DEPOSIT/WITHDRAWAL).
 	Asset *string `json:"asset,omitzero"`
+}
+
+// AssistCardBindForm is returned by [ProvidersAssistResource.CardBindForm].
+type AssistCardBindForm struct {
+	// Form action URL (Assist binding page). Inferred from the web application; not yet observed in
+	// responses.
+	Action string `json:"action,omitzero"`
+	// Hidden form fields to post to `action`, by name. Inferred from the web application; not yet
+	// observed in responses.
+	Fields map[string]string `json:"fields,omitzero"`
+	// Binding page to open in a browser when no form is returned. Inferred from the web application;
+	// not yet observed in responses.
+	URL string `json:"url,omitzero"`
+	// Alternative page URL; used when `url` is absent. Inferred from the web application; not yet
+	// observed in responses.
+	IFrame string `json:"iFrame,omitzero"`
 }
 
 // BalanceOrderResponse is returned by [BrokerageBalanceOrdersResource.CreateCryptoDeposit],
@@ -38,6 +120,15 @@ type BalanceOrderResponse struct {
 	ExpirationDate              Time                          `json:"expirationDate,omitzero"`
 	CompletionDate              Time                          `json:"completionDate,omitzero"`
 	PaymentLink                 string                        `json:"paymentLink,omitzero"`
+}
+
+// CarusellBank is returned by [ProvidersCarusellResource.Banks].
+type CarusellBank struct {
+	// SBP member id of the bank, e.g. `100000000008`.
+	ID string `json:"id"`
+	// Bank name, mostly in Russian.
+	Description string `json:"description"`
+	Active      bool   `json:"active"`
 }
 
 // CryptoAddressResponse is returned by [BrokerageCryptoAddressesResource.List],
@@ -67,6 +158,54 @@ type DateFrame struct {
 // DownloadTokenResponse is returned by [BrokeragePaymentsResource.InvoiceDownloadToken].
 type DownloadTokenResponse struct {
 	Token string `json:"token,omitzero"`
+}
+
+// MtsQRAmount is used in [MtsQRPayment].
+type MtsQRAmount struct {
+	// Inferred from the web application; not yet observed in responses.
+	Base Decimal `json:"base,omitzero"`
+	// Currency code, `RUB` in practice. Inferred from the web application; not yet observed in
+	// responses.
+	CurrencyCode string `json:"currencyCode,omitzero"`
+}
+
+// MtsQRCommission is returned by [ProvidersMtsQRResource.Commission].
+type MtsQRCommission struct {
+	// Amount the web app then pays for the ticket (presumably including the provider commission).
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+}
+
+// MtsQRError is used in [MtsQRInfo].
+//
+// Result of decoding; `code` 0 means success.
+type MtsQRError struct {
+	// Inferred from the web application; not yet observed in responses.
+	Code int `json:"code,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Message string `json:"message,omitzero"`
+}
+
+// MtsQRInfo is returned by [ProvidersMtsQRResource.Info].
+type MtsQRInfo struct {
+	// Payment ticket, used as `paymentToken` / quote `token` when paying. Inferred from the web
+	// application; not yet observed in responses.
+	QRTicketID string `json:"qrTicketId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Error *MtsQRError `json:"error,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Payments []MtsQRPayment `json:"payments,omitzero"`
+}
+
+// MtsQRPayment is used in [MtsQRInfo].
+type MtsQRPayment struct {
+	// `static` when the payer chooses the amount; otherwise the amount is fixed. Inferred from the web
+	// application; not yet observed in responses.
+	QRType string `json:"qrType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount *MtsQRAmount `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	SettlementAmount *MtsQRAmount `json:"settlementAmount,omitzero"`
 }
 
 // OrderUnifiedResponse is returned by [BrokerageOrdersResource.List].
@@ -130,6 +269,56 @@ type PaymentMethodResponse struct {
 	Bank         string       `json:"bank,omitzero"`
 	ProviderType ProviderType `json:"providerType,omitzero"`
 	Currency     string       `json:"currency,omitzero"`
+}
+
+// StatusbankCardDetails is returned by [ProvidersStatusbankResource.CardDetails].
+type StatusbankCardDetails struct {
+	// StatusBank page with the card's balance and details. Inferred from the web application; not yet
+	// observed in responses.
+	IFrame string `json:"iFrame,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ErrorMessage string `json:"errorMessage,omitzero"`
+}
+
+// StatusbankCardSystem is used in [StatusbankCardSystems].
+type StatusbankCardSystem struct {
+	// Inferred from the web application; not yet observed in responses.
+	System StatusbankPaymentSystem `json:"system,omitzero"`
+	// Card currency, e.g. `BYN`, `RUB`, `USD`. Inferred from the web application; not yet observed in
+	// responses.
+	Currency string `json:"currency,omitzero"`
+}
+
+// StatusbankCardSystems is returned by [ProvidersStatusbankResource.CardSystems].
+type StatusbankCardSystems struct {
+	// Inferred from the web application; not yet observed in responses.
+	Systems []StatusbankCardSystem `json:"systems,omitzero"`
+}
+
+// StatusbankOrderConfirmation is returned by [ProvidersStatusbankResource.ConfirmOrder].
+type StatusbankOrderConfirmation struct {
+	// Inferred from the web application; not yet observed in responses.
+	ErrorMessage string `json:"errorMessage,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status *StatusbankOrderConfirmationStatus `json:"status,omitzero"`
+}
+
+// StatusbankOrderConfirmationStatus is used in [StatusbankOrderConfirmation].
+type StatusbankOrderConfirmationStatus struct {
+	// Human-readable reason, shown to the user when `errorMessage` is set. Inferred from the web
+	// application; not yet observed in responses.
+	Text string `json:"text,omitzero"`
+}
+
+// StatusbankRegistration is returned by [ProvidersStatusbankResource.RegisterCard].
+type StatusbankRegistration struct {
+	// Inferred from the web application; not yet observed in responses.
+	Status StatusbankRegistrationStatus `json:"status,omitzero"`
+	// StatusBank application page to open in a browser. Inferred from the web application; not yet
+	// observed in responses.
+	IFrame string `json:"iFrame,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ErrorMessage string `json:"errorMessage,omitzero"`
 }
 
 // SubaccountAddressData is used in [SubaccountDetailsResponse].
@@ -205,4 +394,10 @@ type SubaccountResponse struct {
 	BrokerIdentity string             `json:"brokerIdentity,omitzero"`
 	Balances       map[string]Decimal `json:"balances,omitzero"`
 	Status         SubaccountStatus   `json:"status,omitzero"`
+}
+
+// VtbCortiMilliRate is returned by [ProvidersVtbCortiMilliResource.Rate].
+type VtbCortiMilliRate struct {
+	// Somoni (TJS) paid per 1 RUB. Inferred from the web application; not yet observed in responses.
+	Rate Decimal `json:"rate,omitzero"`
 }
