@@ -118,7 +118,7 @@ def test_resources(files: dict[str, str]) -> None:
     assert "@deprecated" in products
 
     orders = source(files, "resources/orders.ts")
-    assert "readonly documents = new OrdersDocuments(this._client);" in orders
+    assert "readonly documents = new OrdersDocumentsResource(this._client);" in orders
     assert "const { 'X-Request-Id': xRequestId, ...body } = params;" in orders
     assert "pageIn: 'body'" in orders
     assert "bodyType: 'form'" in orders

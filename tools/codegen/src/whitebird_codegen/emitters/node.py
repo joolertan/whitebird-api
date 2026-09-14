@@ -563,7 +563,7 @@ def _ts(ref: TypeRef) -> str:
 
 
 def _class_name(path: tuple[str, ...]) -> str:
-    return "".join(naming.pascal(segment) for segment in path)
+    return "".join(naming.pascal(segment) for segment in path) + "Resource"
 
 
 def _enum_key(name: str) -> str:
