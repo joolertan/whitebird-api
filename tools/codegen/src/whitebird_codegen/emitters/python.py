@@ -199,8 +199,10 @@ class Context:
 
     def describe(self, name: str, description: str | None) -> Doc:
         """Documents a model or enum by its description, or else by where the API uses it."""
+        title = " ".join(naming.words(name)).capitalize()
         if description:
-            return Doc(description)
+            summary = _split_summary(_sentence(description), WIDTH - 10)[0]
+            return Doc(description) if len(summary) <= WIDTH - 10 else Doc(title, [description])
         sentences = []
         if self.returned_by[name]:
             sentences.append(f"Returned by {_enumerate(self.returned_by[name])}.")
@@ -212,7 +214,7 @@ class Context:
         text = " ".join(sentences)
         if text and len(text) <= WIDTH - len('    """"""'):
             return Doc(text)
-        return Doc(" ".join(naming.words(name)).capitalize(), [text] if text else [])
+        return Doc(title, [text] if text else [])
 
 
 # Types
