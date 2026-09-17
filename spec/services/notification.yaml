@@ -1,0 +1,275 @@
+openapi: 3.1.0
+info:
+  title: Notifications API
+  version: '1'
+  description: |
+    Reconstructed from the whitebird.io web application (build By9aTaK4). The notification
+    service also exposes a SockJS/STOMP endpoint (`/api/v1/wb-ws?bearerToken=<access token>`,
+    destination `/user/notifications/events`, message body = `NotificationEvent`) that the web app
+    uses to push new events into the bell menu; it is not modelled here.
+x-wb-service: notification
+servers:
+- url: https://notification-service.whitebird.io
+paths:
+  /api/v1/notifications/events/search:
+    post:
+      operationId: notificationsSearch
+      x-wb-resource: notifications
+      x-wb-name: search
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Search notification events
+      description: |
+        Spring Data page of the user's notification events. The web app asks for unread events
+        only (`{"viewed": false}`), 5 per page, sorted by `creationDate,DESC`, and loads further
+        pages on scroll while `page < totalPages`.
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema: {type: integer, minimum: 0, default: 0}
+      - name: size
+        in: query
+        description: Page size (the web app uses 5).
+        schema: {type: integer, minimum: 1}
+      - name: sort
+        in: query
+        description: 'Sort expression `property,direction`, e.g. `creationDate,DESC`.'
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationSearchRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationEventPage'}
+  /api/v1/notifications/events/viewed:
+    put:
+      operationId: notificationsMarkViewed
+      x-wb-resource: notifications
+      x-wb-name: mark_viewed
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Mark notification events as viewed
+      description: The web app sends one id at a time when the user dismisses an event and ignores
+        the response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationMarkViewedRequest'}
+      responses:
+        '200':
+          description: OK
+  /api/v1/sse/connect:
+    get:
+      operationId: notificationsStream
+      x-wb-resource: notifications
+      x-wb-name: stream
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-response: sse
+      summary: Stream real-time account updates
+      description: |
+        Server-Sent Events stream of account updates (order progress, balance operations, KYC
+        applicant and client status). The web app opens it with `fetch` (not `EventSource`) so it
+        can send `Authorization: Bearer <access token>` and `Accept-Language`; it sends
+        `Accept: text/event-stream` and optionally `Cache-Control: no-cache, no-store,
+        must-revalidate` / `Pragma: no-cache`.
+
+        Every message carries a JSON `data` field (`NotificationStreamMessage`); the SSE `event`
+        name is not used for routing, messages are dispatched on `data.type`:
+
+        - `ORDER_UPDATE`: `payload` is `NotificationOrderUpdate` (exchange order progress).
+        - `BALANCE_OPERATION_UPDATE`: `payload` is `NotificationBalanceOperationUpdate`
+          (deposits and withdrawals).
+        - `APPLICANT_STATUS_UPDATE`: `payload` is a string, e.g. `APPLICANT_OPENED` (KYC
+          applicant opened on the verification page).
+        - `CLIENT_STATUS_UPDATE`: client status change; `payload` shape not used by the web app.
+
+        Messages without `data` (keep-alive comments) are ignored. The `id` of the last message
+        is sent back as `Last-Event-ID` on reconnect. The web app reconnects with backoff
+        1 s x 4^(n-1), capped at 30 s; 401/403 are fatal (re-authenticate before reconnecting).
+        It also reconnects when the UI language changes, since the server localises messages
+        by `Accept-Language`.
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: {$ref: '#/components/schemas/NotificationStreamMessage'}
+        '401':
+          description: Missing or expired access token (fatal, do not retry with the same token).
+        '403':
+          description: Forbidden (fatal).
+components:
+  schemas:
+    NotificationSearchRequest:
+      type: object
+      properties:
+        viewed:
+          type: boolean
+          description: '`false` returns unread events only.'
+    NotificationMarkViewedRequest:
+      type: object
+      required: [eventsIds]
+      properties:
+        eventsIds:
+          type: array
+          items: {type: string}
+          description: Ids (`NotificationEvent.id`) of the events to mark as viewed.
+    NotificationEventPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/NotificationEvent'}
+          x-wb-inferred: true
+        totalPages: {type: integer, x-wb-inferred: true}
+        totalElements: {type: integer, format: int64, x-wb-inferred: true}
+        number: {type: integer, x-wb-inferred: true}
+        size: {type: integer, x-wb-inferred: true}
+        first: {type: boolean, x-wb-inferred: true}
+        last: {type: boolean, x-wb-inferred: true}
+        empty: {type: boolean, x-wb-inferred: true}
+    NotificationEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        type:
+          $ref: '#/components/schemas/NotificationEventType'
+          x-wb-inferred: true
+        level:
+          $ref: '#/components/schemas/NotificationLevel'
+          x-wb-inferred: true
+        title:
+          type: string
+          description: Localised title (not shown for `GENERAL` events).
+          x-wb-inferred: true
+        body:
+          type: string
+          description: Localised text.
+          x-wb-inferred: true
+        creationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+    NotificationEventType:
+      type: string
+      description: |
+        Event type. Known values: identification data (IDD) and actualization reminders for
+        individuals and organizations (`ORG_*`), which link to the account settings and cannot be
+        dismissed in the web app, and trading bonus assignment.
+      enum:
+      - IDD_EXPIRATION
+      - ORG_IDD_EXPIRATION
+      - IDD_EXPIRED
+      - ORG_IDD_EXPIRED
+      - ACTUALIZATION_REQUIRED
+      - ORG_ACTUALIZATION_REQUIRED
+      - ACTUALIZATION_EXPIRED
+      - ORG_ACTUALIZATION_EXPIRED
+      - TRADING_BONUS_ASSIGNED_EVENT
+    NotificationLevel:
+      type: string
+      description: '`GENERAL` events show the body only; `ERROR` is highlighted.'
+      enum: [GENERAL, INFO, WARN, ERROR]
+    NotificationStreamMessageType:
+      type: string
+      enum: [ORDER_UPDATE, BALANCE_OPERATION_UPDATE, APPLICANT_STATUS_UPDATE, CLIENT_STATUS_UPDATE]
+    NotificationStreamMessage:
+      type: object
+      description: JSON `data` of one SSE message.
+      properties:
+        type:
+          $ref: '#/components/schemas/NotificationStreamMessageType'
+          x-wb-inferred: true
+        createdAt:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+        payload:
+          description: |
+            Depends on `type`: `NotificationOrderUpdate` for `ORDER_UPDATE`,
+            `NotificationBalanceOperationUpdate` for `BALANCE_OPERATION_UPDATE`, a string for
+            `APPLICANT_STATUS_UPDATE`, unknown for `CLIENT_STATUS_UPDATE`.
+          oneOf:
+          - $ref: '#/components/schemas/NotificationOrderUpdate'
+          - $ref: '#/components/schemas/NotificationBalanceOperationUpdate'
+          - type: string
+          - type: object
+          x-wb-inferred: true
+    NotificationOrderUpdate:
+      type: object
+      description: Payload of `ORDER_UPDATE` (exchange order, see the `exchange` client order).
+      properties:
+        type:
+          $ref: '#/components/schemas/NotificationOrderUpdateType'
+          x-wb-inferred: true
+        orderId:
+          type: string
+          x-wb-inferred: true
+        transactionHash:
+          type: string
+          description: Blockchain transaction hash, when known.
+          x-wb-inferred: true
+    NotificationOrderUpdateType:
+      type: string
+      description: |
+        `order.*` is the whole order, `order.operation.in.*` the incoming (payment) leg,
+        `order.operation.out.*` the outgoing (payout) leg. `completed`, `failed` and `expired` on
+        the order are final.
+      enum:
+      - order.processing
+      - order.completed
+      - order.failed
+      - order.expired
+      - order.operation.in.processing
+      - order.operation.in.completed
+      - order.operation.in.failed
+      - order.operation.in.expired
+      - order.operation.in.wrong_amount_received
+      - order.operation.out.updated
+      - order.operation.out.processing
+      - order.operation.out.completed
+      - order.operation.out.failed
+      - order.operation.out.expired
+    NotificationBalanceOperationUpdate:
+      type: object
+      description: Payload of `BALANCE_OPERATION_UPDATE` (deposit or withdrawal).
+      properties:
+        type:
+          type: string
+          description: |
+            `balanceoperation.<deposit|withdrawal>.<crypto|fiat>.<status>`; the last segment,
+            upper-cased, is the operation status. Values seen: `deposit.crypto.{new, confirmed,
+            invalid_amount, rejected, arrest}`, `deposit.fiat.{approved, arrest}`,
+            `withdrawal.crypto.{submitting, pending_review, confirmed, rejected}`,
+            `withdrawal.fiat.{new, pending, pending_review, processing, approved, declined, error}`.
+          x-wb-inferred: true
+        balanceOperationId:
+          type: string
+          x-wb-inferred: true
+        number:
+          type: string
+          description: Operation number (the web app compares it numerically).
+          x-wb-inferred: true
+        asset:
+          type: string
+          x-wb-inferred: true
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        transactionHash:
+          type: string
+          x-wb-inferred: true
+        externalCryptoAddress:
+          type: string
+          x-wb-inferred: true

@@ -1,0 +1,387 @@
+openapi: 3.1.0
+info:
+  title: KYC service
+  version: '1'
+  description: >-
+    Identity verification questionnaire, personal data checks, SumSub tokens, the crypto knowledge
+    test, profile closure and the support form. Reconstructed from the whitebird.io web app.
+x-wb-service: kyc
+servers:
+- url: https://kyc-service.whitebird.io
+paths:
+  /api/v1/kyc:
+    get:
+      operationId: kycGet
+      x-wb-resource: kyc
+      x-wb-name: get
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the verification questionnaire
+      description: >-
+        The web app calls it while the client status is `NOT_VERIFIED`, with the provider picked from
+        the client's feature flags (`SUMSUB` or `PIN`). A 400 with status `INVALID_CLIENT_STATUS`
+        means the client cannot (or no longer needs to) go through verification.
+      parameters:
+      - name: provider
+        in: query
+        description: Verification provider; the web app defaults to `SUMSUB`.
+        schema:
+          $ref: '#/components/schemas/KycProvider'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycVerification'
+    post:
+      operationId: kycSubmit
+      x-wb-resource: kyc
+      x-wb-name: submit
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Submit the verification questionnaire
+      description: >-
+        The web app sends the questionnaire returned by `GET /api/v1/kyc` with its own answers
+        overlaid (see `KycVerificationRequest`), then starts the provider flow once the response has
+        `firstStageConfirmed: true`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KycVerificationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycVerification'
+  /api/v1/kyc/client/validate:
+    post:
+      operationId: kycPersonalDataValidate
+      x-wb-resource: kyc.personal_data
+      x-wb-name: validate
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Validate personal data before a crypto card release
+      description: >-
+        Returns the personal data the card issuer will receive. The web app asks the client to review
+        it unless `clientStatus` is `VERIFIED`, then calls `confirm`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycPersonalData'
+  /api/v1/kyc/client/confirm:
+    post:
+      operationId: kycPersonalDataConfirm
+      x-wb-resource: kyc.personal_data
+      x-wb-name: confirm
+      x-wb-source: bundle
+      summary: Confirm personal data before a crypto card release
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
+  /api/v1/kyc/profile-closure/confirm:
+    post:
+      operationId: kycProfileClosureConfirm
+      x-wb-resource: kyc.profile_closure
+      x-wb-name: confirm
+      x-wb-auth: none
+      x-wb-source: bundle
+      summary: Confirm a profile closure request
+      description: >-
+        Called from the link in the profile closure e-mail (`?identity=...&token=...`); the page
+        works without a session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KycProfileClosureConfirmRequest'
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
+  /api/v1/kyc/sumsub/sdk/token:
+    get:
+      operationId: kycSumsubToken
+      x-wb-resource: kyc.sumsub
+      x-wb-name: token
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get a SumSub WebSDK access token
+      description: >-
+        The token initialises the SumSub (Cyberity) WebSDK, `https://api.cyberity.ru`. `MAIN` is the
+        onboarding verification level, `LIVENESS` a selfie check used before a crypto card release.
+      parameters:
+      - name: levelType
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/KycSumsubLevelType'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycSumsubToken'
+  /api/v1/verification-test:
+    get:
+      operationId: kycCryptoTestQuestions
+      x-wb-resource: kyc.crypto_test
+      x-wb-name: questions
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the crypto knowledge test
+      description: >-
+        Questions of the test clients take after verification when the client has
+        `testingNeeded` and not yet `testingCompleted`. Answers go to `kyc.crypto_test.submit`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycCryptoTest'
+  /api/v1/support:
+    post:
+      operationId: supportSend
+      x-wb-resource: support
+      x-wb-name: send
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Send a message to support
+      description: >-
+        Multipart form: `request` is a JSON-encoded `SupportRequest` sent as a plain text part, `files`
+        are optional attachments (the web app repeats the `files` part once per file). The public
+        support form adds a Google reCAPTCHA v3 token in the `recaptcha` header; errors seen:
+        `INVALID_EMAIL`, `INVALID_RECAPTCHA`.
+      parameters:
+      - name: recaptcha
+        in: header
+        description: Google reCAPTCHA v3 token (public support form).
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [request]
+              properties:
+                request:
+                  type: string
+                  contentMediaType: application/json
+                  contentSchema:
+                    $ref: '#/components/schemas/SupportRequest'
+                  description: JSON-encoded `SupportRequest`.
+                files:
+                  type: string
+                  format: binary
+                  description: Attachment; the server accepts the part repeated once per file.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportResponse'
+components:
+  schemas:
+    KycProvider:
+      type: string
+      description: Verification provider (from the client's feature flags).
+      enum: [SUMSUB, PIN]
+    KycSumsubLevelType:
+      type: string
+      enum: [MAIN, LIVENESS]
+    KycVerification:
+      type: object
+      description: Verification questionnaire state.
+      properties:
+        provider:
+          $ref: '#/components/schemas/KycProvider'
+          x-wb-inferred: true
+        firstStageConfirmed:
+          type: boolean
+          x-wb-inferred: true
+        secondStageConfirmed:
+          type: boolean
+          x-wb-inferred: true
+        userConfirmed:
+          type: boolean
+          x-wb-inferred: true
+        emailVerified:
+          type: boolean
+          x-wb-inferred: true
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code.
+          x-wb-inferred: true
+        countryFlag:
+          type: boolean
+          x-wb-inferred: true
+        residencePermitInBelarusPresent:
+          type: boolean
+          x-wb-inferred: true
+        exchangeInPersonalInterests:
+          type: boolean
+          x-wb-inferred: true
+        notUSTaxpayer:
+          type: boolean
+          x-wb-inferred: true
+        sdkOferta:
+          type: boolean
+          description: Public offer accepted in the provider SDK.
+          x-wb-inferred: true
+    KycVerificationRequest:
+      type: object
+      description: >-
+        The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (from geo,
+        default `BY`), `countryFlag: false`, `residencePermitInBelarusPresent: true`,
+        `exchangeInPersonalInterests: true`, `notUSTaxpayer: true`, `userConfirmed: false`,
+        `firstStageConfirmed: true`, `secondStageConfirmed: false` and `emailVerified: true`.
+      properties:
+        provider:
+          $ref: '#/components/schemas/KycProvider'
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code.
+        countryFlag:
+          type: boolean
+        residencePermitInBelarusPresent:
+          type: boolean
+        exchangeInPersonalInterests:
+          type: boolean
+        notUSTaxpayer:
+          type: boolean
+        userConfirmed:
+          type: boolean
+        sdkOferta:
+          type: boolean
+        firstStageConfirmed:
+          type: boolean
+        secondStageConfirmed:
+          type: boolean
+        emailVerified:
+          type: boolean
+    KycPersonalData:
+      type: object
+      description: Personal data shared with the card issuer; empty values come back as null.
+      properties:
+        clientStatus:
+          type: string
+          description: Client verification status (`VERIFIED`, `PENDING`, `NOT_VERIFIED`, ...).
+          x-wb-inferred: true
+        firstName: {type: ['string', 'null'], x-wb-inferred: true}
+        lastName: {type: ['string', 'null'], x-wb-inferred: true}
+        firstNameRus: {type: ['string', 'null'], x-wb-inferred: true}
+        lastNameRus: {type: ['string', 'null'], x-wb-inferred: true}
+        patronymicRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residenceCountryRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residenceDistrictRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residenceRegionRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residenceCityRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residenceStreetRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residenceHouseAndFlatRus: {type: ['string', 'null'], x-wb-inferred: true}
+        residencePostCode: {type: ['string', 'null'], x-wb-inferred: true}
+        identityDocId: {type: ['string', 'null'], x-wb-inferred: true}
+        identityDocIssuer: {type: ['string', 'null'], x-wb-inferred: true}
+        identityConfirmationDocType: {type: ['string', 'null'], x-wb-inferred: true}
+        additionalNumber: {type: ['string', 'null'], x-wb-inferred: true}
+        email: {type: ['string', 'null'], x-wb-inferred: true}
+        phoneNumber: {type: ['string', 'null'], x-wb-inferred: true}
+        gender: {type: ['string', 'null'], x-wb-inferred: true}
+        birthDate: {type: ['string', 'null'], x-wb-inferred: true}
+        birthPlace: {type: ['string', 'null'], x-wb-inferred: true}
+        nationality: {type: ['string', 'null'], x-wb-inferred: true}
+        docIssueDate: {type: ['string', 'null'], x-wb-inferred: true}
+        docExpirationDate: {type: ['string', 'null'], x-wb-inferred: true}
+    KycProfileClosureConfirmRequest:
+      type: object
+      required: [identity, token]
+      properties:
+        identity:
+          type: string
+          description: Client identity from the e-mail link.
+        token:
+          type: string
+          description: Confirmation token from the e-mail link.
+    KycSumsubToken:
+      type: object
+      properties:
+        token:
+          type: string
+          description: SumSub WebSDK access token.
+          x-wb-inferred: true
+    KycCryptoTest:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycCryptoTestQuestion'
+          x-wb-inferred: true
+    KycCryptoTestQuestion:
+      type: object
+      properties:
+        id:
+          type: integer
+          x-wb-inferred: true
+        title:
+          type: string
+          x-wb-inferred: true
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/KycCryptoTestAnswer'
+          x-wb-inferred: true
+    KycCryptoTestAnswer:
+      type: object
+      properties:
+        id:
+          type: integer
+          x-wb-inferred: true
+        title:
+          type: string
+          x-wb-inferred: true
+        correct:
+          type: boolean
+          description: The web app only lets the client move on after picking the correct answer.
+          x-wb-inferred: true
+    SupportRequest:
+      type: object
+      description: Content of the `request` part of `POST /api/v1/support`.
+      required: [name, email, topic, message]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        topic:
+          type: string
+          description: >-
+            Free text; the web form offers fixed topics in Russian (registration, documents,
+            operations, individual exchange terms, withdrawal limit increase, swap limit increase,
+            service error, legal entity, other, and settlement account binding).
+        message:
+          type: string
+    SupportResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: '`OK` on success.'
+          x-wb-inferred: true

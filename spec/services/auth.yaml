@@ -1,0 +1,924 @@
+openapi: 3.1.0
+info:
+  title: Authorization server
+  version: '1'
+  description: |
+    Accounts, sign-in helpers, registration and security settings. Reconstructed from the
+    whitebird.io web application (build By9aTaK4); `POST /oauth/token` is handled by the SDK core.
+
+    Errors use the common body `{"code": int, "status": "MACHINE_CODE", "message": str,
+    "subStatus": str, "fields": [{"fieldName": str, "message": str}]}`. Several endpoints that accept
+    an optional `mfaSecret` (current TOTP code) answer `INVALID_CODE` with message
+    `Secret must not be empty` when the account has 2FA enabled and no code was sent, and
+    `INVALID_CODE` / `Invalid mfa code` when the code is wrong.
+x-wb-service: auth
+servers:
+- url: https://authorization-server.whitebird.io
+paths:
+  /api/v1/client/mfa:
+    post:
+      operationId: authMfaStatus
+      x-wb-resource: auth
+      x-wb-name: mfa_status
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Check whether an account has 2FA enabled
+      description: |
+        Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without
+        the slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve the
+        captcha from `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuthMfaStatusRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthMfaStatus'}
+  /api/v1/captcha/generate:
+    get:
+      operationId: authGenerateCaptcha
+      x-wb-resource: auth
+      x-wb-name: generate_captcha
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Generate a slider captcha
+      description: |
+        Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution is
+        the horizontal offset of the piece (the web slider ranges 0-250) and is sent to
+        `POST /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
+        `base64(JSON.stringify({"sliderPosition": <int>, "requestId": "<requestId>"}))`.
+        A wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
+        captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
+        temporarily locked.
+      parameters:
+      - name: requestId
+        in: query
+        required: true
+        description: Client-generated UUID v4 that identifies this captcha; reuse it in the `captcha` header.
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthCaptcha'}
+  /api/v1/device-fingerprint:
+    post:
+      operationId: authSendFingerprint
+      x-wb-resource: auth
+      x-wb-name: send_fingerprint
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Report the device fingerprint of the current session
+      description: Sent by the web app right after a successful sign-in or registration. The response body is not used.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuthDeviceFingerprint'}
+      responses:
+        '200': {description: OK}
+  /api/v1/geo:
+    get:
+      operationId: authGeo
+      x-wb-resource: auth
+      x-wb-name: geo
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the country of the caller's IP address
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthGeo'}
+  /api/v1/authorize:
+    get:
+      operationId: authAuthorize
+      x-wb-resource: auth
+      x-wb-name: authorize
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      x-wb-response: text
+      summary: Authorize a third-party OAuth client for the signed-in user
+      description: |
+        Backs the web app's `/authorize` page: the page forwards its OAuth query parameters
+        (except `account_id`, `member_id`, `broker_id`) and redirects the browser to the returned
+        URL, appending those three parameters.
+      parameters:
+      - {name: response_type, in: query, schema: {type: string}}
+      - {name: client_id, in: query, schema: {type: string}}
+      - {name: grant_type, in: query, schema: {type: string}}
+      - {name: redirect_uri, in: query, description: Forwarded as-is (standard OAuth parameter, not seen in the bundle)., schema: {type: string}}
+      - {name: scope, in: query, description: Forwarded as-is (standard OAuth parameter, not seen in the bundle)., schema: {type: string}}
+      - {name: state, in: query, description: Forwarded as-is (standard OAuth parameter, not seen in the bundle)., schema: {type: string}}
+      responses:
+        '200':
+          description: Redirect URL
+          content:
+            text/plain:
+              schema: {type: string}
+
+  /api/v1/registration/initiate:
+    post:
+      operationId: registrationInitiate
+      x-wb-resource: registration
+      x-wb-name: initiate
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Start a registration
+      description: |
+        First step of sign-up. Requires a solved slider captcha in the `captcha` header (see
+        `GET /api/v1/captcha/generate`) and, in the web app, a Google reCAPTCHA v3 token
+        (action `registration_client`) in the `recaptcha` header. On success the server emails a
+        code: continue with `verify_email`, then `send_phone_code` / `verify_phone` while the status
+        is `PENDING_PHONE`, then `complete`, then sign in with the password.
+        Errors: `USER_EXISTS` (409), `INVALID_EMAIL`, `INVALID_PASSWORD`, `INVALID_AGREEMENT`,
+        `BAD_REQUEST` (invalid phone), `PHONE_NUMBER_NOT_AVAILABLE` (400), `INVALID_RECAPTCHA`
+        (403), `INVALID_CAPTCHA`.
+      parameters:
+      - name: captcha
+        in: header
+        description: 'Slider captcha solution: base64 of `{"sliderPosition": int, "requestId": uuid}`.'
+        schema: {type: string}
+      - name: recaptcha
+        in: header
+        description: Google reCAPTCHA v3 token.
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationInitiateRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegistrationState'}
+  /api/v1/registration/sdk/initiate:
+    post:
+      operationId: registrationInitiateSdk
+      x-wb-resource: registration
+      x-wb-name: initiate_sdk
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Start a passwordless registration on behalf of a merchant
+      description: |
+        Variant used by the embeddable merchant widget: no password, the client is linked to
+        `merchantId` / `externalClientId`. Same headers, steps and errors as `initiate`; finish with
+        `complete_sdk`.
+      parameters:
+      - name: captcha
+        in: header
+        description: 'Slider captcha solution: base64 of `{"sliderPosition": int, "requestId": uuid}`.'
+        schema: {type: string}
+      - name: recaptcha
+        in: header
+        description: Google reCAPTCHA v3 token.
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationSdkInitiateRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegistrationState'}
+  /api/v1/registration/email/verify:
+    post:
+      operationId: registrationVerifyEmail
+      x-wb-resource: registration
+      x-wb-name: verify_email
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm the registration email with the emailed code
+      description: Wrong codes answer `INVALID_CODE`, `INVALID_EMAIL_CODE` or `BAD_REQUEST`. The code expires after 5 minutes in the web app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationCodeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegistrationState'}
+  /api/v1/registration/email/resend-code:
+    post:
+      operationId: registrationResendEmailCode
+      x-wb-resource: registration
+      x-wb-name: resend_email_code
+      x-wb-auth: none
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Resend the registration email code
+      description: Allowed once a minute; earlier calls answer `EMAIL_CODE_ERROR`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationIdRequest'}
+      responses:
+        '200': {description: OK}
+  /api/v1/registration/phone/send-code:
+    post:
+      operationId: registrationSendPhoneCode
+      x-wb-resource: registration
+      x-wb-name: send_phone_code
+      x-wb-auth: none
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Send the registration SMS code
+      description: Errors `SMS_SENDING_ERROR`, `SMS_CODE_ERROR` (with `subStatus` `TOO_MANY_ATTEMPTS`, `TOO_SOON` or `UNSUPPORTED_COUNTRY`), `BAD_REQUEST` (invalid phone).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationIdRequest'}
+      responses:
+        '200': {description: OK}
+  /api/v1/registration/phone/verify:
+    post:
+      operationId: registrationVerifyPhone
+      x-wb-resource: registration
+      x-wb-name: verify_phone
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm the registration phone with the SMS code
+      description: Wrong codes answer `INVALID_CODE`, `INVALID_SMS_CODE` or `BAD_REQUEST`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationCodeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegistrationState'}
+  /api/v1/registration/complete:
+    post:
+      operationId: registrationComplete
+      x-wb-resource: registration
+      x-wb-name: complete
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Complete a registration
+      description: Call when the registration status is `READY_TO_COMPLETE`; the web app then signs in with the password grant. The response body is not used by the web app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationIdRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {type: object}
+  /api/v1/registration/sdk/complete:
+    post:
+      operationId: registrationCompleteSdk
+      x-wb-resource: registration
+      x-wb-name: complete_sdk
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Complete a merchant-widget registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationIdRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegistrationSdkResult'}
+
+  /api/v1/user/me:
+    get:
+      operationId: userMe
+      x-wb-resource: user
+      x-wb-name: me
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the signed-in user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserProfile'}
+  /api/v1/user/logout:
+    post:
+      operationId: userLogout
+      x-wb-resource: user
+      x-wb-name: logout
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Sign out and revoke the current tokens
+      responses:
+        '200': {description: OK}
+  /api/v1/user/gender:
+    post:
+      operationId: userSetGender
+      x-wb-resource: user
+      x-wb-name: set_gender
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Set the user's gender
+      description: Asked by the crypto card issuance flow when the gender on file must be actualized.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserGenderRequest'}
+      responses:
+        '200': {description: OK}
+
+  /api/v1/user/email/change/send:
+    post:
+      operationId: userEmailSendCode
+      x-wb-resource: user.email
+      x-wb-name: send_code
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Request an email change and send a code to the new address
+      description: |
+        With 2FA enabled the first call (without `mfaSecret`) is refused with `INVALID_CODE` /
+        `Secret must not be empty`; repeat it with the current TOTP code. The refusal may also come
+        as a 200 body whose `status` is not `OK`. Other errors: `EMAIL_CODE_ERROR` (resent too soon),
+        `INVALID_CODE` / `Code has been sent. Try again later`, `EMAIL_CHANGE_NOT_ALLOWED`,
+        `FORBIDDEN`, `USER_EXISTS`, `INVALID_EMAIL`, `BAD_CREDENTIALS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserEmailChangeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserEmailChangeResult'}
+  /api/v1/user/email/change/verify:
+    post:
+      operationId: userEmailVerifyCode
+      x-wb-resource: user.email
+      x-wb-name: verify_code
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm the new email address with the emailed code
+      description: The web app signs the user out after a successful change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserCodeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserEmailChangeConfirmation'}
+  /api/v1/user/code/verify:
+    post:
+      operationId: userEmailConfirm
+      x-wb-resource: user.email
+      x-wb-name: confirm
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm an email address with the code from a confirmation link
+      description: |
+        Legacy link-based email confirmation (`/...?code=` page); on success the user status
+        becomes `EMAIL_VERIFIED`. The web app only checks that the response body is not empty.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserCodeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+
+  /api/v1/user/password/change-and-reauthorize:
+    post:
+      operationId: userPasswordChange
+      x-wb-resource: user.password
+      x-wb-name: change
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Change the password and get new tokens
+      description: |
+        The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS` (wrong
+        old password), `BAD_REQUEST` with `fields[].fieldName = newPassword` and message
+        `INVALID_PASSWORD` (weak new password), `INVALID_CODE` (2FA code missing or wrong).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPasswordChangeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserTokenPair'}
+  /api/v1/user/password/recovery/send:
+    get:
+      operationId: userPasswordSendResetLink
+      x-wb-resource: user.password
+      x-wb-name: send_reset_link
+      x-wb-auth: none
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Email a password reset link
+      description: The link carries the `token` for `reset`.
+      parameters:
+      - {name: email, in: query, required: true, schema: {type: string, format: email}}
+      responses:
+        '200': {description: OK}
+  /api/v1/user/password/recovery:
+    post:
+      operationId: userPasswordReset
+      x-wb-resource: user.password
+      x-wb-name: reset
+      x-wb-auth: none
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Set a new password with a reset token
+      description: |
+        Errors: `INVALID_CODE` with message `Secret must not be empty` (2FA code required),
+        `Invalid mfa code`, or `Code doesn't exist` (token already used); `EXPIRED_CODE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPasswordResetRequest'}
+      responses:
+        '200': {description: OK}
+
+  /api/v1/user/mfa/qr:
+    get:
+      operationId: userMfaQr
+      x-wb-resource: user.mfa
+      x-wb-name: qr
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get a new TOTP secret for 2FA setup
+      description: Each call issues a new secret. Enable 2FA by sending a code generated from it to `verify` with `state=true`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserMfaSecret'}
+  /api/v1/user/mfa/verify:
+    post:
+      operationId: userMfaVerify
+      x-wb-resource: user.mfa
+      x-wb-name: verify
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Enable or disable 2FA
+      description: Send a current TOTP code with `state=true` to enable 2FA (after `qr`) or `state=false` to disable it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserMfaVerifyRequest'}
+      responses:
+        '200': {description: OK}
+
+  /api/v1/user/phone:
+    put:
+      operationId: userPhoneSetNotifications
+      x-wb-resource: user.phone
+      x-wb-name: set_notifications
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Turn SMS notifications on or off
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPhoneNotificationsRequest'}
+      responses:
+        '200': {description: OK}
+  /api/v1/user/phone/phone-number-changed/update:
+    post:
+      operationId: userPhoneChange
+      x-wb-resource: user.phone
+      x-wb-name: change
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Change the phone number without SMS confirmation
+      description: |
+        Used for countries that do not require SMS confirmation of the new number (the web app
+        uses `send_change_code` / `verify_change_code` for the others). With 2FA enabled the first
+        call without `mfaSecret` is refused with `INVALID_CODE` / `Secret must not be empty`.
+        Errors: `INVALID_RECAPTCHA`, `INVALID_CODE` / `Code has been sent. Try again later`,
+        `PHONE_NUMBER_CANNOT_BE_CHANGED`, `PHONE_NUMBER_NOT_AVAILABLE`, `USER_EXISTS`.
+      parameters:
+      - name: recaptcha
+        in: header
+        description: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`).
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPhoneChangeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserPhoneChangeResult'}
+  /api/v1/user/phone/phone-number-changed/send-code:
+    post:
+      operationId: userPhoneSendChangeCode
+      x-wb-resource: user.phone
+      x-wb-name: send_change_code
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Send an SMS code to a new phone number
+      description: |
+        First step of a phone change that needs SMS confirmation; finish with `verify_change_code`.
+        Same 2FA handling and errors as `change`, plus `SMS_SENDING_ERROR`, `SMS_CODE_ERROR`
+        (`subStatus` `TOO_MANY_ATTEMPTS` = daily limit) and `SMS_VERIFICATION_NOT_AVAILABLE`.
+      parameters:
+      - name: recaptcha
+        in: header
+        description: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE` or `SETTINGS_CHANGE_PHONE_MFA`).
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPhoneChangeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v1/user/phone/phone-number-changed/verify-code:
+    post:
+      operationId: userPhoneVerifyChangeCode
+      x-wb-resource: user.phone
+      x-wb-name: verify_change_code
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm a new phone number with the SMS code
+      description: Wrong codes answer `INVALID_CODE`, `INVALID_SMS_CODE` or `BAD_REQUEST`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserPhoneVerifyChangeRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserPhoneChangeResult'}
+  /api/v1/user/phone/phone-confirmation/send-code:
+    post:
+      operationId: userPhoneSendConfirmationCode
+      x-wb-resource: user.phone
+      x-wb-name: send_confirmation_code
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Send an SMS code to confirm the current phone number
+      description: |
+        The web app asks for it before an operation when the exchange client profile has
+        `phoneConfirmationRequired` and the number belongs to a country that requires
+        confirmation. (An API error `PHONE_CONFIRMATION_REQUIRED` is instead shown as "contact
+        support".) The web app sends an empty JSON object. Errors `SMS_SENDING_ERROR`,
+        `SMS_CODE_ERROR` (`subStatus` `TOO_MANY_ATTEMPTS`, `TOO_SOON`).
+      responses:
+        '200': {description: OK}
+  /api/v1/user/phone/phone-confirmation/verify-code:
+    post:
+      operationId: userPhoneVerifyConfirmationCode
+      x-wb-resource: user.phone
+      x-wb-name: verify_confirmation_code
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm the current phone number with the SMS code
+      description: Wrong codes answer `INVALID_SMS_CODE`; `SMS_VERIFICATION_FAILED` means the confirmation is blocked.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserCodeRequest'}
+      responses:
+        '200': {description: OK}
+  /api/v1/user/phone/antifraud-verification/send-code:
+    post:
+      operationId: userAntifraudSendCode
+      x-wb-resource: user.antifraud
+      x-wb-name: send_code
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Send an anti-fraud SMS code to the user's phone
+      description: |
+        Any request can be refused with HTTP 400 and status `SMS_VERIFICATION_REQUIRED`. Send a
+        code with this operation, confirm it with `verify_code`, then repeat the refused request
+        unchanged. The web app sends an empty JSON object, allows 2 resends (30 s apart, codes
+        valid 2 minutes) and 3 wrong codes. `SMS_VERIFICATION_FAILED` means the user is blocked
+        and must contact support; `SMS_SENDING_ERROR` is a delivery failure.
+      responses:
+        '200': {description: OK}
+  /api/v1/user/phone/antifraud-verification/verify-code:
+    post:
+      operationId: userAntifraudVerifyCode
+      x-wb-resource: user.antifraud
+      x-wb-name: verify_code
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Confirm an anti-fraud SMS code
+      description: Wrong codes answer `INVALID_SMS_CODE`; `SMS_VERIFICATION_FAILED` means verification failed for good.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserCodeRequest'}
+      responses:
+        '200': {description: OK}
+
+components:
+  schemas:
+    AuthMfaStatusRequest:
+      type: object
+      required: [username]
+      properties:
+        username: {type: string, description: Account email.}
+    AuthMfaStatus:
+      type: object
+      properties:
+        mfaEnabled: {type: boolean, x-wb-inferred: true}
+    AuthCaptcha:
+      type: object
+      required: [backgroundImage, puzzlePiece, positionY]
+      properties:
+        backgroundImage: {type: string, description: Base64-encoded PNG (290x192) with the cut-out.}
+        puzzlePiece: {type: string, description: Base64-encoded PNG (64x64) of the piece to slide.}
+        positionY: {type: integer, description: Vertical offset of the piece in background pixels.}
+    AuthGeo:
+      type: object
+      required: [country]
+      properties:
+        country: {type: string, description: Country name in English (e.g. `Latvia`).}
+    AuthDeviceFingerprintSource:
+      type: string
+      enum: [WEB]
+    AuthDeviceFingerprint:
+      type: object
+      description: Browser fingerprint as collected by the web app. Numeric screen and time zone values are sent as strings.
+      required: [source]
+      properties:
+        source: {$ref: '#/components/schemas/AuthDeviceFingerprintSource'}
+        browserFingerprint: {type: string, description: FingerprintJS visitor id.}
+        locale: {type: string}
+        timeZone: {type: string, description: '`Date.getTimezoneOffset()` in minutes, as a string.'}
+        screenWidth: {type: string}
+        screenHeight: {type: string}
+        screenColorDepth: {type: string}
+        cpu: {type: integer, description: Logical CPU cores (0 if unknown).}
+        memory: {type: number, description: Device memory in GiB (0 if unknown).}
+        localStorage: {type: boolean}
+        touchSupport: {type: boolean}
+        fontFingerprint: {type: string, description: SHA-256 hex of the detected font list.}
+        webglFingerprint: {type: string}
+        canvasData: {type: string}
+        audioContext: {type: number, description: Audio fingerprint, or -1 (suspended), -2 (not supported), -3 (timeout), -4 (anti-fingerprinting).}
+        platform: {type: string}
+        userAgent: {type: string}
+        webGLData: {$ref: '#/components/schemas/AuthWebGlData'}
+        latitude: {type: string, description: Empty when geolocation is unavailable.}
+        longitude: {type: string}
+        accuracy: {type: string}
+        cpuModel: {type: ['string', 'null']}
+        intlHourCycle: {type: ['string', 'null']}
+        intlNumberSystem: {type: ['string', 'null']}
+        displayDynamicRangeHigh: {type: boolean}
+        storageQuotaBytes: {type: ['integer', 'null'], format: int64}
+        visualViewportExactHeight: {type: ['number', 'null']}
+        mediaCapabilitiesInfo: {$ref: '#/components/schemas/AuthMediaCapabilities'}
+    AuthWebGlData:
+      type: object
+      properties:
+        renderer: {type: string}
+        rendererUnmasked: {type: string}
+        shadingLanguageVersion: {type: string}
+        vendor: {type: string}
+        vendorUnmasked: {type: string}
+        version: {type: string}
+    AuthMediaCapabilities:
+      type: object
+      properties:
+        supported: {type: boolean}
+        smooth: {type: ['boolean', 'null']}
+        powerEfficient: {type: ['boolean', 'null']}
+
+    RegistrationStatus:
+      type: string
+      enum: [PENDING_EMAIL, PENDING_PHONE, READY_TO_COMPLETE]
+    RegistrationState:
+      type: object
+      properties:
+        registrationId: {type: string, x-wb-inferred: true}
+        status:
+          $ref: '#/components/schemas/RegistrationStatus'
+          x-wb-inferred: true
+    RegistrationInitiateRequest:
+      type: object
+      required: [email, password, phone, agreements]
+      properties:
+        email: {type: string, format: email, maxLength: 255}
+        password: {type: string, description: 10-30 characters with a lowercase and an uppercase letter, a digit and a special character.}
+        phone: {type: string, description: Phone number in international format.}
+        agreements: {type: boolean, description: Acceptance of the user agreement and documents (must be true).}
+        promoAgreement: {type: boolean, description: Consent to marketing messages.}
+    RegistrationSdkInitiateRequest:
+      type: object
+      required: [email, phone, agreements, merchantId]
+      properties:
+        email: {type: string, format: email, maxLength: 255}
+        phone: {type: string, description: Phone number in international format.}
+        agreements: {type: boolean}
+        promoAgreement: {type: boolean}
+        externalClientId: {type: string, description: Client id in the merchant's system.}
+        merchantId: {type: string}
+    RegistrationIdRequest:
+      type: object
+      required: [registrationId]
+      properties:
+        registrationId: {type: string}
+    RegistrationCodeRequest:
+      type: object
+      required: [registrationId, code]
+      properties:
+        registrationId: {type: string}
+        code: {type: string}
+    RegistrationSdkResult:
+      type: object
+      properties:
+        clientId: {type: string, x-wb-inferred: true}
+        otpCode: {type: string, x-wb-inferred: true, description: One-time code the merchant passes on to sign the client in.}
+        email: {type: string, x-wb-inferred: true}
+
+    UserStatus:
+      type: string
+      description: Account status; the web app only distinguishes these values.
+      enum: [NEW, EMAIL_VERIFIED]
+    UserRoleName:
+      type: string
+      enum: [USER, MERCHANT, SUBACCOUNT, ADMIN, SUPER_ADMIN, BROKER]
+    UserRole:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/UserRoleName'
+          x-wb-inferred: true
+    UserProfile:
+      type: object
+      properties:
+        email: {type: string, x-wb-inferred: true}
+        phone: {type: string, x-wb-inferred: true, description: Phone number in international format; empty when not set.}
+        userStatus:
+          $ref: '#/components/schemas/UserStatus'
+          x-wb-inferred: true
+        roles:
+          type: array
+          items: {$ref: '#/components/schemas/UserRole'}
+          x-wb-inferred: true
+        mfaEnabled: {type: boolean, x-wb-inferred: true}
+        phoneNotificationsEnabled: {type: boolean, x-wb-inferred: true}
+        offerAgreement: {type: boolean, x-wb-inferred: true, description: Whether the public offer was accepted.}
+    UserGender:
+      type: string
+      enum: [M, F]
+    UserGenderRequest:
+      type: object
+      required: [gender]
+      properties:
+        gender: {$ref: '#/components/schemas/UserGender'}
+    UserCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code: {type: string}
+    UserEmailChangeRequest:
+      type: object
+      required: [email]
+      properties:
+        email: {type: string, format: email, description: New email address (lowercased by the web app).}
+        mfaSecret: {type: string, description: Current TOTP code when 2FA is enabled.}
+    UserEmailChangeResult:
+      type: object
+      properties:
+        status: {type: string, x-wb-inferred: true, description: '`OK` when the code was sent, otherwise an error status such as `INVALID_CODE`.'}
+        message: {type: string, x-wb-inferred: true}
+    UserEmailChangeConfirmation:
+      type: object
+      properties:
+        email: {type: string, x-wb-inferred: true}
+    UserPasswordChangeRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword: {type: string}
+        newPassword: {type: string, description: 10-30 characters with a lowercase and an uppercase letter, a digit and a special character.}
+        mfaSecret: {type: string, description: Current TOTP code when 2FA is enabled (the web app sends an empty string otherwise).}
+    UserTokenPair:
+      type: object
+      description: OAuth token response.
+      properties:
+        access_token: {type: string, x-wb-inferred: true}
+        refresh_token: {type: string, x-wb-inferred: true}
+    UserPasswordResetRequest:
+      type: object
+      required: [token, newPassword, repeatedPassword]
+      properties:
+        token: {type: string, description: Token from the reset link.}
+        newPassword: {type: string}
+        repeatedPassword: {type: string}
+        mfaSecret: {type: string, description: Current TOTP code when 2FA is enabled.}
+    UserMfaSecret:
+      type: object
+      properties:
+        qrCode: {type: string, x-wb-inferred: true, description: QR code image usable as an `img` source (data URL).}
+        secret: {type: string, x-wb-inferred: true, description: Base32 TOTP secret.}
+    UserMfaVerifyRequest:
+      type: object
+      required: [code, state]
+      properties:
+        code: {type: string, description: Current 6-digit TOTP code.}
+        state: {type: boolean, description: '`true` enables 2FA, `false` disables it.'}
+    UserPhoneNotificationsRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: {type: boolean}
+    UserPhoneChangeRequest:
+      type: object
+      required: [countryCode, phoneNumber]
+      properties:
+        countryCode: {type: string, description: ISO 3166-1 alpha-2 country of the number.}
+        phoneNumber: {type: string}
+        mfaSecret: {type: string, description: Current TOTP code when 2FA is enabled.}
+    UserPhoneVerifyChangeRequest:
+      type: object
+      required: [code, phoneNumber]
+      properties:
+        code: {type: string}
+        phoneNumber: {type: string}
+    UserPhoneChangeResult:
+      type: object
+      properties:
+        phone: {type: string, x-wb-inferred: true}
+        phoneNumber: {type: string, x-wb-inferred: true}

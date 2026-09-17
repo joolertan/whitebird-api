@@ -1,0 +1,472 @@
+openapi: 3.1.0
+info:
+  title: API gateway - KYC, actualization and investor qualification
+  version: '1'
+  description: >-
+    The `api` host parts that belong to verification: offer agreement, crypto test results,
+    liveness checks, MSI and PIN identification, client data actualization and investor
+    qualification. Reconstructed from the whitebird.io web app.
+x-wb-service: api
+servers:
+- url: https://api.whitebird.io
+paths:
+  /api/v2/kyc/client/agreed-offer:
+    post:
+      operationId: kycAgreeOffer
+      x-wb-resource: kyc
+      x-wb-name: agree_offer
+      x-wb-source: bundle
+      summary: Accept the public offer
+      description: >-
+        Sent before verification when the user profile has no `offerAgreement` yet. The web app
+        retries a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the client
+        record is still being created.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KycOfferAgreement'
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
+  /api/v2/kyc/client/crypto-test:
+    post:
+      operationId: kycCryptoTestSubmit
+      x-wb-resource: kyc.crypto_test
+      x-wb-name: submit
+      x-wb-source: bundle
+      summary: Submit crypto knowledge test answers
+      description: >-
+        Questions come from `kyc.crypto_test.questions`. The web app then marks the test complete with
+        `POST exchange-core /api/v1/client/testing/complete`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KycCryptoTestResult'
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
+  /api/v2/kyc/liveness/start:
+    post:
+      operationId: kycLivenessStart
+      x-wb-resource: kyc.liveness
+      x-wb-name: start
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Start a liveness check
+      description: >-
+        Requested after an API call fails with 400 `LIVENESS_VERIFICATION_REQUIRED`; once the check
+        passes the web app replays the failed call. With status `PROCESSING` the client opens
+        `iframeUrl` (the PIN provider, origin `https://verification.svort.io`) on this device or shows
+        it as a QR code for another device, then polls `kyc.liveness.status` every 2 seconds.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KycLivenessStartRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycLivenessSession'
+  /api/v2/kyc/liveness/retry:
+    post:
+      operationId: kycLivenessRetry
+      x-wb-resource: kyc.liveness
+      x-wb-name: retry
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Restart a liveness check
+      description: >-
+        Used when the status is `RETRY_NEEDED` or the QR code expired. Statuses
+        `MAX_ATTEMPTS_EXCEEDED` and `LIVENESS_NOT_FOUND` mean no further attempt is possible.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycLivenessSession'
+  /api/v2/kyc/liveness/status:
+    get:
+      operationId: kycLivenessStatus
+      x-wb-resource: kyc.liveness
+      x-wb-name: status
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the liveness check status
+      description: >-
+        Returns the status as a bare string. `PASSED` is success, `PROCESSING` means keep polling,
+        `RETRY_NEEDED` calls for `kyc.liveness.retry`; `EXPIRED`, `FAILED` and `ERROR` end the check.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycLivenessStatus'
+  /api/v2/kyc/msi/authenticate:
+    get:
+      operationId: kycMsiAuthenticate
+      x-wb-resource: kyc.msi
+      x-wb-name: authenticate
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Start identification through MSI
+      description: >-
+        Returns the URL of the Belarusian interbank identification system (MSI) to send the user to.
+        MSI then redirects to `redirectUrl` on success, or to `duplicateUrl`, `failureUrl` or
+        `docExpiredUrl` (the web app passes `?error=DUPLICATE|UNPROCESSED|DOC_EXPIRED` pages).
+      parameters:
+      - name: isUl
+        in: query
+        description: Legal entity identification; the web app always sends `false`.
+        schema:
+          type: boolean
+      - name: redirectUrl
+        in: query
+        schema:
+          type: string
+      - name: duplicateUrl
+        in: query
+        schema:
+          type: string
+      - name: failureUrl
+        in: query
+        schema:
+          type: string
+      - name: docExpiredUrl
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycMsiRedirect'
+  /api/v2/kyc/sdk/link:
+    get:
+      operationId: kycSdkLink
+      x-wb-resource: kyc.sdk
+      x-wb-name: link
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the PIN verification SDK link
+      description: >-
+        Link to the PIN provider's verification iframe for clients with the `PIN` feature. The web
+        app accepts either a bare URL string or an object carrying the URL in `link`, `url`,
+        `iframeUrl`, `accessLink` or `sdkLink` (possibly nested under `data`, `result`, `payload` or
+        `response`); `status: ERROR` means no link. It appends `lang` (and `externalBrowser=true`) to
+        the URL.
+      parameters:
+      - name: externalUserId
+        in: query
+        required: true
+        description: The client's `identity`.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - type: string
+                - $ref: '#/components/schemas/KycSdkLink'
+  /api/v2/qualification:
+    post:
+      operationId: kycQualificationSubmit
+      x-wb-resource: kyc.qualification
+      x-wb-name: submit
+      x-wb-source: bundle
+      summary: Request an investor qualification status
+      description: >-
+        Multipart form: `request` is a JSON `KycQualificationRequest` (the web app sends it as a part
+        with content type `application/json`) and `files` the supporting documents, repeated once per
+        file. Qualified investors tick at least 2 criteria, highly qualified at least one per block
+        (`certifiedExpert`/`experienceInOrganization`/`personalTradingExperience` and
+        `incomeOver300kByn`/`assetsOver600kByn`); at least one file is required. To go back to
+        `UNQUALIFIED_INVESTOR` the web app sends one empty file named `empty`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [request, files]
+              properties:
+                request:
+                  type: string
+                  contentMediaType: application/json
+                  contentSchema:
+                    $ref: '#/components/schemas/KycQualificationRequest'
+                  description: JSON-encoded `KycQualificationRequest`.
+                files:
+                  type: string
+                  format: binary
+                  description: Supporting document; the server accepts the part repeated once per file.
+            encoding:
+              request:
+                contentType: application/json
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
+  /api/v2/qualification/investor-data:
+    get:
+      operationId: kycQualificationInvestorData
+      x-wb-resource: kyc.qualification
+      x-wb-name: investor_data
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the investor qualification status
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycInvestorData'
+  /api/v2/actualization/client/get-actual-data:
+    get:
+      operationId: kycActualizationActualData
+      x-wb-resource: kyc.actualization
+      x-wb-name: actual_data
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the client data on record
+      description: Personal, identity document and address data the client is asked to confirm.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycActualData'
+  /api/v2/actualization/client/get-status:
+    get:
+      operationId: kycActualizationStatus
+      x-wb-resource: kyc.actualization
+      x-wb-name: status
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the client account status
+      description: >-
+        Returns the status as a bare string. A client with status `FROZEN` (exchange core) and
+        `ACTUALIZATION_REQUIRED` here must confirm or update their data before operating.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycActualizationClientStatus'
+  /api/v2/actualization/client/confirm-relevance:
+    post:
+      operationId: kycActualizationConfirm
+      x-wb-resource: kyc.actualization
+      x-wb-name: confirm
+      x-wb-source: bundle
+      summary: Confirm that the client data is still up to date
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
+  /api/v2/actualization/client/is-candidate-for-actualization:
+    get:
+      operationId: kycActualizationIsCandidate
+      x-wb-resource: kyc.actualization
+      x-wb-name: is_candidate
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Check whether the client data is due for actualization
+      description: '`true` while an actualization is pending for the client.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+components:
+  schemas:
+    KycOfferAgreement:
+      type: object
+      description: The web app always sends all three as `true`.
+      required: [notUSTaxPayer, exchangeInPersonalInterests, agreedWithOffer]
+      properties:
+        notUSTaxPayer:
+          type: boolean
+        exchangeInPersonalInterests:
+          type: boolean
+        agreedWithOffer:
+          type: boolean
+    KycCryptoTestResult:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          description: Selected answer id by question id.
+          additionalProperties:
+            type: integer
+    KycLivenessStartRequest:
+      type: object
+      properties:
+        redirectUrl:
+          type: string
+          description: >-
+            Where the provider returns after the check; the web app sends it only for the redirect
+            flow (in-app web views and the Telegram bot).
+    KycLivenessStatus:
+      type: string
+      enum: [PROCESSING, PASSED, RETRY_NEEDED, EXPIRED, FAILED, ERROR, MAX_ATTEMPTS_EXCEEDED, LIVENESS_NOT_FOUND]
+    KycLivenessSession:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/KycLivenessStatus'
+          x-wb-inferred: true
+        iframeUrl:
+          type: string
+          description: Provider page to open (or to show as a QR code) while the status is `PROCESSING`.
+          x-wb-inferred: true
+    KycMsiRedirect:
+      type: object
+      properties:
+        url:
+          type: string
+          description: MSI page to redirect the user to.
+          x-wb-inferred: true
+    KycSdkLink:
+      type: object
+      properties:
+        link:
+          type: string
+          x-wb-inferred: true
+        url:
+          type: string
+          x-wb-inferred: true
+        iframeUrl:
+          type: string
+          x-wb-inferred: true
+        status:
+          type: string
+          x-wb-inferred: true
+    KycInvestorStatus:
+      type: string
+      enum: [UNQUALIFIED_INVESTOR, QUALIFIED_INVESTOR, HIGHLY_QUALIFIED_INVESTOR]
+    KycQualificationRequest:
+      type: object
+      description: >-
+        Content of the `request` part of `POST /api/v2/qualification`. The web app sends every
+        criterion of the requested level, `true` for the ticked ones: `incomeOver80kByn`,
+        `assetsOver150kByn` for `QUALIFIED_INVESTOR`, `incomeOver300kByn`, `assetsOver600kByn` for
+        `HIGHLY_QUALIFIED_INVESTOR`, plus `certifiedExpert`, `experienceInOrganization` and
+        `personalTradingExperience` for both.
+      required: [requestedInvestorStatus]
+      properties:
+        requestedInvestorStatus:
+          $ref: '#/components/schemas/KycInvestorStatus'
+        incomeOver80kByn:
+          type: boolean
+        assetsOver150kByn:
+          type: boolean
+        incomeOver300kByn:
+          type: boolean
+        assetsOver600kByn:
+          type: boolean
+        certifiedExpert:
+          type: boolean
+        experienceInOrganization:
+          type: boolean
+        personalTradingExperience:
+          type: boolean
+    KycInvestorData:
+      type: object
+      properties:
+        investorStatus:
+          $ref: '#/components/schemas/KycInvestorStatus'
+          x-wb-inferred: true
+        awaitingQualification:
+          type: boolean
+          description: A qualification request is under review.
+          x-wb-inferred: true
+    KycActualData:
+      type: object
+      properties:
+        surname:
+          type: string
+          x-wb-inferred: true
+        name:
+          type: string
+          x-wb-inferred: true
+        patronymic:
+          type: string
+          x-wb-inferred: true
+        nationality:
+          type: string
+          description: Space-separated; the web app shows the last word.
+          x-wb-inferred: true
+        identityDocId:
+          type: string
+          x-wb-inferred: true
+        idNum:
+          type: string
+          description: Personal identification number.
+          x-wb-inferred: true
+        validTill:
+          type: string
+          description: Identity document expiry date (ISO 8601).
+          x-wb-inferred: true
+        identityDocDate:
+          type: string
+          description: Identity document issue date (ISO 8601).
+          x-wb-inferred: true
+        identityDocIssuer:
+          type: string
+          x-wb-inferred: true
+        residenceCountry:
+          type: string
+          description: Space-separated; the web app shows the last word.
+          x-wb-inferred: true
+        residenceRegion:
+          type: string
+          x-wb-inferred: true
+        residenceDistrict:
+          type: string
+          x-wb-inferred: true
+        residenceCity:
+          type: string
+          x-wb-inferred: true
+        residencePostcode:
+          type: string
+          x-wb-inferred: true
+        residenceStreet:
+          type: string
+          x-wb-inferred: true
+        residenceHouseAndFlat:
+          type: string
+          x-wb-inferred: true
+    KycActualizationClientStatus:
+      type: string
+      enum: [NEW, IDENTIFIED, ON_VERIFICATION, ON_ADDITIONAL_CHECK, OPENED, PARTIALLY_OPENED, FROZEN, PAUSED, BLOCKED, CLOSED, ACTUALIZATION_REQUIRED]

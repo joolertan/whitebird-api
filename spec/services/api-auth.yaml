@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: API gateway - operation MFA
+  version: '1'
+  description: Operation MFA token on the API gateway. Reconstructed from the whitebird.io web application (build By9aTaK4).
+x-wb-service: api
+servers:
+- url: https://api.whitebird.io
+paths:
+  /api/v2/auth/mfa/merchant/client/token:
+    post:
+      operationId: authCreateMfaToken
+      x-wb-resource: auth
+      x-wb-name: create_mfa_token
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Exchange a TOTP code for an operation MFA token
+      description: |
+        Sensitive operations (in this build: balance withdrawals,
+        `POST /api/v2/exchange/client/balance/{crypto|fiat}/withdrawal`) are refused with
+        `message`/`status` `Operation denied, requires mfa checking` until the request carries an
+        `x-mfa-token` header. Call this with the operation name and a current TOTP code (2FA must
+        be enabled), then repeat the refused request. The web app reads the token from the
+        response body (`mfaToken`, or the body itself when it is a bare string) or from the
+        `x-mfa-token` response header, keeps it in local storage and attaches it to every later
+        request. A wrong code answers status `INVALID_MFA_CODE` or message `Invalid mfa code`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuthMfaTokenRequest'}
+      responses:
+        '200':
+          description: OK
+          headers:
+            x-mfa-token:
+              description: Operation MFA token (alternative to the body field).
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthMfaToken'}
+components:
+  schemas:
+    AuthMfaOperation:
+      type: string
+      description: Operation the token is requested for; only `WITHDRAWAL` is used by the web app.
+      enum: [WITHDRAWAL]
+    AuthMfaTokenRequest:
+      type: object
+      required: [operation, mfaCode]
+      properties:
+        operation: {$ref: '#/components/schemas/AuthMfaOperation'}
+        mfaCode: {type: string, description: Current 6-digit TOTP code.}
+    AuthMfaToken:
+      type: object
+      properties:
+        mfaToken: {type: string, x-wb-inferred: true}
