@@ -144,7 +144,7 @@ class SyncEngine(_Engine):
         files: Mapping[str, FileContent | None] | None = ...,
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
-        cast_to: None = ...,
+        cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> Any: ...
 
@@ -247,7 +247,7 @@ class SyncEngine(_Engine):
         params: Mapping[str, object] | None = ...,
         headers: Mapping[str, str | None] | None = ...,
         authenticated: bool = ...,
-        cast_to: None = ...,
+        cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> EventStream[Any]: ...
 
@@ -371,7 +371,7 @@ class AsyncEngine(_Engine):
         files: Mapping[str, FileContent | None] | None = ...,
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
-        cast_to: None = ...,
+        cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> Any: ...
 
@@ -474,7 +474,7 @@ class AsyncEngine(_Engine):
         params: Mapping[str, object] | None = ...,
         headers: Mapping[str, str | None] | None = ...,
         authenticated: bool = ...,
-        cast_to: None = ...,
+        cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> AsyncEventStream[Any]: ...
 
