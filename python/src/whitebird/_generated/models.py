@@ -6,6 +6,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+from pydantic import Field
+
 from whitebird._models import Date, DateTime, StrEnum, WhitebirdModel
 
 __all__ = [
@@ -20,6 +22,17 @@ __all__ = [
     "AssetFilter",
     "AssistCardBindForm",
     "AssistCardBindType",
+    "AuthCaptcha",
+    "AuthDeviceFingerprint",
+    "AuthDeviceFingerprintSource",
+    "AuthGeo",
+    "AuthMediaCapabilities",
+    "AuthMfaOperation",
+    "AuthMfaStatus",
+    "AuthMfaStatusRequest",
+    "AuthMfaToken",
+    "AuthMfaTokenRequest",
+    "AuthWebGlData",
     "BalanceOrderFilterRequest",
     "BalanceOrderResponse",
     "BalanceOrderResponseAssetType",
@@ -39,6 +52,27 @@ __all__ = [
     "FiatDepositRequest",
     "FiatWithdrawalRequest",
     "FileType",
+    "KycActualData",
+    "KycActualizationClientStatus",
+    "KycCryptoTest",
+    "KycCryptoTestAnswer",
+    "KycCryptoTestQuestion",
+    "KycCryptoTestResult",
+    "KycInvestorData",
+    "KycInvestorStatus",
+    "KycLivenessSession",
+    "KycLivenessStartRequest",
+    "KycLivenessStatus",
+    "KycMsiRedirect",
+    "KycOfferAgreement",
+    "KycPersonalData",
+    "KycProfileClosureConfirmRequest",
+    "KycProvider",
+    "KycQualificationSubmitRequest",
+    "KycSumsubLevelType",
+    "KycSumsubToken",
+    "KycVerification",
+    "KycVerificationRequest",
     "MtsCardBindRequest",
     "MtsCardCountry",
     "MtsQrAmount",
@@ -49,6 +83,13 @@ __all__ = [
     "MtsQrInfoRequest",
     "MtsQrPayment",
     "Network",
+    "NotificationEvent",
+    "NotificationEventType",
+    "NotificationLevel",
+    "NotificationMarkViewedRequest",
+    "NotificationSearchRequest",
+    "NotificationStreamMessage",
+    "NotificationStreamMessageType",
     "OrderUnifiedFilterRequest",
     "OrderUnifiedOperationType",
     "OrderUnifiedResponse",
@@ -64,6 +105,13 @@ __all__ = [
     "OtcOrderStatus",
     "PaymentMethodResponse",
     "ProviderType",
+    "RegistrationCodeRequest",
+    "RegistrationIdRequest",
+    "RegistrationInitiateRequest",
+    "RegistrationSdkInitiateRequest",
+    "RegistrationSdkResult",
+    "RegistrationState",
+    "RegistrationStatus",
     "StatusbankCardDetails",
     "StatusbankCardSystem",
     "StatusbankCardSystems",
@@ -84,6 +132,27 @@ __all__ = [
     "SubaccountResponse",
     "SubaccountStatus",
     "SubaccountType",
+    "SupportResponse",
+    "SupportSendRequest",
+    "UserCodeRequest",
+    "UserEmailChangeConfirmation",
+    "UserEmailChangeRequest",
+    "UserEmailChangeResult",
+    "UserGender",
+    "UserGenderRequest",
+    "UserMfaSecret",
+    "UserMfaVerifyRequest",
+    "UserPasswordChangeRequest",
+    "UserPasswordResetRequest",
+    "UserPhoneChangeRequest",
+    "UserPhoneChangeResult",
+    "UserPhoneNotificationsRequest",
+    "UserPhoneVerifyChangeRequest",
+    "UserProfile",
+    "UserRole",
+    "UserRoleName",
+    "UserStatus",
+    "UserTokenPair",
     "VtbCortiMilliRate",
     "VtbCortiMilliRateRequest",
     "VtbCortiMilliServiceType",
@@ -111,6 +180,18 @@ class AssistCardBindType(StrEnum):
     """
 
     CLIENT = "CLIENT"
+
+
+class AuthDeviceFingerprintSource(StrEnum):
+    """Values of `AuthDeviceFingerprint.source`."""
+
+    WEB = "WEB"
+
+
+class AuthMfaOperation(StrEnum):
+    """Operation the token is requested for; only `WITHDRAWAL` is used by the web app."""
+
+    WITHDRAWAL = "WITHDRAWAL"
 
 
 class BalanceOrderResponseAssetType(StrEnum):
@@ -155,6 +236,57 @@ class FileType(StrEnum):
     XLSX = "XLSX"
 
 
+class KycActualizationClientStatus(StrEnum):
+    """Returned by `client.kyc.actualization.status()`."""
+
+    NEW = "NEW"
+    IDENTIFIED = "IDENTIFIED"
+    ON_VERIFICATION = "ON_VERIFICATION"
+    ON_ADDITIONAL_CHECK = "ON_ADDITIONAL_CHECK"
+    OPENED = "OPENED"
+    PARTIALLY_OPENED = "PARTIALLY_OPENED"
+    FROZEN = "FROZEN"
+    PAUSED = "PAUSED"
+    BLOCKED = "BLOCKED"
+    CLOSED = "CLOSED"
+    ACTUALIZATION_REQUIRED = "ACTUALIZATION_REQUIRED"
+
+
+class KycInvestorStatus(StrEnum):
+    """Values of `KycInvestorData.investor_status`."""
+
+    UNQUALIFIED_INVESTOR = "UNQUALIFIED_INVESTOR"
+    QUALIFIED_INVESTOR = "QUALIFIED_INVESTOR"
+    HIGHLY_QUALIFIED_INVESTOR = "HIGHLY_QUALIFIED_INVESTOR"
+
+
+class KycLivenessStatus(StrEnum):
+    """Returned by `client.kyc.liveness.status()`. Values of `KycLivenessSession.status`."""
+
+    PROCESSING = "PROCESSING"
+    PASSED = "PASSED"
+    RETRY_NEEDED = "RETRY_NEEDED"
+    EXPIRED = "EXPIRED"
+    FAILED = "FAILED"
+    ERROR = "ERROR"
+    MAX_ATTEMPTS_EXCEEDED = "MAX_ATTEMPTS_EXCEEDED"
+    LIVENESS_NOT_FOUND = "LIVENESS_NOT_FOUND"
+
+
+class KycProvider(StrEnum):
+    """Verification provider (from the client's feature flags)."""
+
+    SUMSUB = "SUMSUB"
+    PIN = "PIN"
+
+
+class KycSumsubLevelType(StrEnum):
+    """Values of the `level_type` parameter of `client.kyc.sumsub.token()`."""
+
+    MAIN = "MAIN"
+    LIVENESS = "LIVENESS"
+
+
 class MtsCardCountry(StrEnum):
     """Returned by `client.providers.mts.countries()`. Values of `MtsCardBindRequest.country`."""
 
@@ -177,6 +309,43 @@ class Network(StrEnum):
     SOLANA = "SOLANA"
     TON = "TON"
     TRON = "TRON"
+
+
+class NotificationEventType(StrEnum):
+    """Event type.
+
+    Known values: identification data (IDD) and actualization reminders for individuals and
+    organizations (`ORG_*`), which link to the account settings and cannot be dismissed in the web
+    app, and trading bonus assignment.
+    """
+
+    IDD_EXPIRATION = "IDD_EXPIRATION"
+    ORG_IDD_EXPIRATION = "ORG_IDD_EXPIRATION"
+    IDD_EXPIRED = "IDD_EXPIRED"
+    ORG_IDD_EXPIRED = "ORG_IDD_EXPIRED"
+    ACTUALIZATION_REQUIRED = "ACTUALIZATION_REQUIRED"
+    ORG_ACTUALIZATION_REQUIRED = "ORG_ACTUALIZATION_REQUIRED"
+    ACTUALIZATION_EXPIRED = "ACTUALIZATION_EXPIRED"
+    ORG_ACTUALIZATION_EXPIRED = "ORG_ACTUALIZATION_EXPIRED"
+    TRADING_BONUS_ASSIGNED_EVENT = "TRADING_BONUS_ASSIGNED_EVENT"
+
+
+class NotificationLevel(StrEnum):
+    """`GENERAL` events show the body only; `ERROR` is highlighted."""
+
+    GENERAL = "GENERAL"
+    INFO = "INFO"
+    WARN = "WARN"
+    ERROR = "ERROR"
+
+
+class NotificationStreamMessageType(StrEnum):
+    """Values of `NotificationStreamMessage.type`."""
+
+    ORDER_UPDATE = "ORDER_UPDATE"
+    BALANCE_OPERATION_UPDATE = "BALANCE_OPERATION_UPDATE"
+    APPLICANT_STATUS_UPDATE = "APPLICANT_STATUS_UPDATE"
+    CLIENT_STATUS_UPDATE = "CLIENT_STATUS_UPDATE"
 
 
 class OrderUnifiedOperationType(StrEnum):
@@ -285,6 +454,14 @@ class ProviderType(StrEnum):
     ZUBRPARI = "ZUBRPARI"
 
 
+class RegistrationStatus(StrEnum):
+    """Values of `RegistrationState.status`."""
+
+    PENDING_EMAIL = "PENDING_EMAIL"
+    PENDING_PHONE = "PENDING_PHONE"
+    READY_TO_COMPLETE = "READY_TO_COMPLETE"
+
+
 class StatusbankPaymentSystem(StrEnum):
     """Values of `StatusbankCardSystem.system` and `StatusbankRegisterCardRequest.system`."""
 
@@ -343,6 +520,31 @@ class SubaccountType(StrEnum):
     INDIVIDUAL = "INDIVIDUAL"
     INDIVIDUAL_ENTREPRENEUR = "INDIVIDUAL_ENTREPRENEUR"
     ORGANIZATION = "ORGANIZATION"
+
+
+class UserGender(StrEnum):
+    """Values of `UserGenderRequest.gender`."""
+
+    M = "M"
+    F = "F"
+
+
+class UserRoleName(StrEnum):
+    """Values of `UserRole.name`."""
+
+    USER = "USER"
+    MERCHANT = "MERCHANT"
+    SUBACCOUNT = "SUBACCOUNT"
+    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    BROKER = "BROKER"
+
+
+class UserStatus(StrEnum):
+    """Account status; the web app only distinguishes these values."""
+
+    NEW = "NEW"
+    EMAIL_VERIFIED = "EMAIL_VERIFIED"
 
 
 class VtbCortiMilliServiceType(StrEnum):
@@ -497,6 +699,126 @@ class AssistCardBindForm(WhitebirdModel):
 
     Inferred from the web application; may be missing.
     """
+
+
+class AuthCaptcha(WhitebirdModel):
+    """Returned by `client.auth.generate_captcha()`."""
+
+    background_image: str
+    """Base64-encoded PNG (290x192) with the cut-out."""
+
+    puzzle_piece: str
+    """Base64-encoded PNG (64x64) of the piece to slide."""
+
+    position_y: int
+    """Vertical offset of the piece in background pixels."""
+
+
+class AuthDeviceFingerprint(WhitebirdModel):
+    """Browser fingerprint as collected by the web app.
+
+    Numeric screen and time zone values are sent as strings.
+    """
+
+    source: AuthDeviceFingerprintSource | str
+    browser_fingerprint: str | None = None
+    """FingerprintJS visitor id."""
+
+    locale: str | None = None
+    time_zone: str | None = None
+    """`Date.getTimezoneOffset()` in minutes, as a string."""
+
+    screen_width: str | None = None
+    screen_height: str | None = None
+    screen_color_depth: str | None = None
+    cpu: int | None = None
+    """Logical CPU cores (0 if unknown)."""
+
+    memory: Decimal | None = None
+    """Device memory in GiB (0 if unknown)."""
+
+    local_storage: bool | None = None
+    touch_support: bool | None = None
+    font_fingerprint: str | None = None
+    """SHA-256 hex of the detected font list."""
+
+    webgl_fingerprint: str | None = None
+    canvas_data: str | None = None
+    audio_context: Decimal | None = None
+    """Audio fingerprint."""
+
+    platform: str | None = None
+    user_agent: str | None = None
+    web_gl_data: AuthWebGlData | None = Field(
+        default=None, validation_alias="webGLData", serialization_alias="webGLData"
+    )
+    latitude: str | None = None
+    """Empty when geolocation is unavailable."""
+
+    longitude: str | None = None
+    accuracy: str | None = None
+    cpu_model: str | None = None
+    intl_hour_cycle: str | None = None
+    intl_number_system: str | None = None
+    display_dynamic_range_high: bool | None = None
+    storage_quota_bytes: int | None = None
+    visual_viewport_exact_height: Decimal | None = None
+    media_capabilities_info: AuthMediaCapabilities | None = None
+
+
+class AuthGeo(WhitebirdModel):
+    """Returned by `client.auth.geo()`."""
+
+    country: str
+    """Country name in English (e.g. `Latvia`)."""
+
+
+class AuthMediaCapabilities(WhitebirdModel):
+    """Used in `AuthDeviceFingerprint.media_capabilities_info`."""
+
+    supported: bool | None = None
+    smooth: bool | None = None
+    power_efficient: bool | None = None
+
+
+class AuthMfaStatus(WhitebirdModel):
+    """Returned by `client.auth.mfa_status()`."""
+
+    mfa_enabled: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AuthMfaStatusRequest(WhitebirdModel):
+    """Request body of `client.auth.mfa_status()`."""
+
+    username: str
+    """Account email."""
+
+
+class AuthMfaToken(WhitebirdModel):
+    """Returned by `client.auth.create_mfa_token()`."""
+
+    mfa_token: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AuthMfaTokenRequest(WhitebirdModel):
+    """Request body of `client.auth.create_mfa_token()`."""
+
+    operation: AuthMfaOperation | str
+    mfa_code: str
+    """Current 6-digit TOTP code."""
+
+
+class AuthWebGlData(WhitebirdModel):
+    """Used in `AuthDeviceFingerprint.web_gl_data`."""
+
+    renderer: str | None = None
+    renderer_unmasked: str | None = None
+    shading_language_version: str | None = None
+    vendor: str | None = None
+    vendor_unmasked: str | None = None
+    version: str | None = None
 
 
 class BalanceOrderFilterRequest(WhitebirdModel):
@@ -657,6 +979,342 @@ class FiatWithdrawalRequest(WhitebirdModel):
     amount: Decimal
 
 
+class KycActualData(WhitebirdModel):
+    """Returned by `client.kyc.actualization.actual_data()`."""
+
+    surname: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    patronymic: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    nationality: str | None = None
+    """Space-separated; the web app shows the last word.
+
+    Inferred from the web application; may be missing.
+    """
+
+    identity_doc_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    id_num: str | None = None
+    """Personal identification number. Inferred from the web application; may be missing."""
+
+    valid_till: str | None = None
+    """Identity document expiry date (ISO 8601).
+
+    Inferred from the web application; may be missing.
+    """
+
+    identity_doc_date: str | None = None
+    """Identity document issue date (ISO 8601).
+
+    Inferred from the web application; may be missing.
+    """
+
+    identity_doc_issuer: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_country: str | None = None
+    """Space-separated; the web app shows the last word.
+
+    Inferred from the web application; may be missing.
+    """
+
+    residence_region: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_district: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_city: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_postcode: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_street: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_house_and_flat: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class KycCryptoTest(WhitebirdModel):
+    """Returned by `client.kyc.crypto_test.questions()`."""
+
+    questions: list[KycCryptoTestQuestion] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class KycCryptoTestAnswer(WhitebirdModel):
+    """Used in `KycCryptoTestQuestion.answers`."""
+
+    id: int | None = None
+    """Inferred from the web application; may be missing."""
+
+    title: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    correct: bool | None = None
+    """The web app only lets the client move on after picking the correct answer.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class KycCryptoTestQuestion(WhitebirdModel):
+    """Used in `KycCryptoTest.questions`."""
+
+    id: int | None = None
+    """Inferred from the web application; may be missing."""
+
+    title: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    answers: list[KycCryptoTestAnswer] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class KycCryptoTestResult(WhitebirdModel):
+    """Request body of `client.kyc.crypto_test.submit()`."""
+
+    answers: dict[str, int]
+    """Selected answer id by question id."""
+
+
+class KycInvestorData(WhitebirdModel):
+    """Returned by `client.kyc.qualification.investor_data()`."""
+
+    investor_status: KycInvestorStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    awaiting_qualification: bool | None = None
+    """A qualification request is under review.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class KycLivenessSession(WhitebirdModel):
+    """Returned by `client.kyc.liveness.start()` and `client.kyc.liveness.retry()`."""
+
+    status: KycLivenessStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    iframe_url: str | None = None
+    """Provider page to open (or to show as a QR code) while the status is `PROCESSING`.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class KycLivenessStartRequest(WhitebirdModel):
+    """Request body of `client.kyc.liveness.start()`."""
+
+    redirect_url: str | None = None
+    """Where the provider returns after the check; the web app sends it only for the redirect flow
+    (in-app web views and the Telegram bot).
+    """
+
+
+class KycMsiRedirect(WhitebirdModel):
+    """Returned by `client.kyc.msi.authenticate()`."""
+
+    url: str | None = None
+    """MSI page to redirect the user to. Inferred from the web application; may be missing."""
+
+
+class KycOfferAgreement(WhitebirdModel):
+    """The web app always sends all three as `true`."""
+
+    not_us_tax_payer: bool = Field(
+        validation_alias="notUSTaxPayer", serialization_alias="notUSTaxPayer"
+    )
+    exchange_in_personal_interests: bool
+    agreed_with_offer: bool
+
+
+class KycPersonalData(WhitebirdModel):
+    """Personal data shared with the card issuer; empty values come back as null."""
+
+    client_status: str | None = None
+    """Client verification status (`VERIFIED`, `PENDING`, `NOT_VERIFIED`, ...).
+
+    Inferred from the web application; may be missing.
+    """
+
+    first_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    last_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    first_name_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    last_name_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    patronymic_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_country_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_district_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_region_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_city_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_street_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_house_and_flat_rus: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_post_code: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    identity_doc_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    identity_doc_issuer: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    identity_confirmation_doc_type: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    additional_number: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    email: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    phone_number: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    gender: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    birth_date: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    birth_place: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    nationality: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    doc_issue_date: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    doc_expiration_date: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class KycProfileClosureConfirmRequest(WhitebirdModel):
+    """Request body of `client.kyc.profile_closure.confirm()`."""
+
+    identity: str
+    """Client identity from the e-mail link."""
+
+    token: str
+    """Confirmation token from the e-mail link."""
+
+
+class KycQualificationSubmitRequest(WhitebirdModel):
+    """Request body of `client.kyc.qualification.submit()`."""
+
+    request: str
+    """JSON-encoded `KycQualificationRequest`."""
+
+    files: bytes
+    """Supporting document; the server accepts the part repeated once per file."""
+
+
+class KycSumsubToken(WhitebirdModel):
+    """Returned by `client.kyc.sumsub.token()`."""
+
+    token: str | None = None
+    """SumSub WebSDK access token. Inferred from the web application; may be missing."""
+
+
+class KycVerification(WhitebirdModel):
+    """Verification questionnaire state."""
+
+    provider: KycProvider | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    first_stage_confirmed: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    second_stage_confirmed: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    user_confirmed: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    email_verified: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    country: str | None = None
+    """ISO 3166-1 alpha-2 country code. Inferred from the web application; may be missing."""
+
+    country_flag: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence_permit_in_belarus_present: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    exchange_in_personal_interests: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    not_us_taxpayer: bool | None = Field(
+        default=None, validation_alias="notUSTaxpayer", serialization_alias="notUSTaxpayer"
+    )
+    """Inferred from the web application; may be missing."""
+
+    sdk_oferta: bool | None = None
+    """Public offer accepted in the provider SDK.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class KycVerificationRequest(WhitebirdModel):
+    """Kyc verification request.
+
+    The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (from geo, default
+    `BY`), `countryFlag: false`, `residencePermitInBelarusPresent: true`,
+    `exchangeInPersonalInterests: true`, `notUSTaxpayer: true`, `userConfirmed: false`,
+    `firstStageConfirmed: true`, `secondStageConfirmed: false` and `emailVerified: true`.
+    """
+
+    provider: KycProvider | str | None = None
+    country: str | None = None
+    """ISO 3166-1 alpha-2 country code."""
+
+    country_flag: bool | None = None
+    residence_permit_in_belarus_present: bool | None = None
+    exchange_in_personal_interests: bool | None = None
+    not_us_taxpayer: bool | None = Field(
+        default=None, validation_alias="notUSTaxpayer", serialization_alias="notUSTaxpayer"
+    )
+    user_confirmed: bool | None = None
+    sdk_oferta: bool | None = None
+    first_stage_confirmed: bool | None = None
+    second_stage_confirmed: bool | None = None
+    email_verified: bool | None = None
+
+
 class MtsCardBindRequest(WhitebirdModel):
     """Request body of `client.providers.mts.bind_card()`."""
 
@@ -742,6 +1400,62 @@ class MtsQrPayment(WhitebirdModel):
 
     settlement_amount: MtsQrAmount | None = None
     """Inferred from the web application; may be missing."""
+
+
+class NotificationEvent(WhitebirdModel):
+    """Returned by `client.notifications.search()`."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    type: NotificationEventType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    level: NotificationLevel | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    title: str | None = None
+    """Localised title (not shown for `GENERAL` events).
+
+    Inferred from the web application; may be missing.
+    """
+
+    body: str | None = None
+    """Localised text. Inferred from the web application; may be missing."""
+
+    creation_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class NotificationMarkViewedRequest(WhitebirdModel):
+    """Request body of `client.notifications.mark_viewed()`."""
+
+    events_ids: list[str]
+    """Ids (`NotificationEvent.id`) of the events to mark as viewed."""
+
+
+class NotificationSearchRequest(WhitebirdModel):
+    """Request body of `client.notifications.search()`."""
+
+    viewed: bool | None = None
+    """`false` returns unread events only."""
+
+
+class NotificationStreamMessage(WhitebirdModel):
+    """JSON `data` of one SSE message."""
+
+    type: NotificationStreamMessageType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    created_at: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    payload: Any = None
+    """Depends on `type`: `NotificationOrderUpdate` for `ORDER_UPDATE`,
+    `NotificationBalanceOperationUpdate` for `BALANCE_OPERATION_UPDATE`, a string for
+    `APPLICANT_STATUS_UPDATE`, unknown for `CLIENT_STATUS_UPDATE`. Inferred from the web
+    application; may be missing.
+    """
 
 
 class OrderUnifiedFilterRequest(WhitebirdModel):
@@ -895,6 +1609,88 @@ class PaymentMethodResponse(WhitebirdModel):
     bank: str | None = None
     provider_type: ProviderType | str | None = None
     currency: str | None = None
+
+
+class RegistrationCodeRequest(WhitebirdModel):
+    """Registration code request.
+
+    Request body of `client.registration.verify_email()` and `client.registration.verify_phone()`.
+    """
+
+    registration_id: str
+    code: str
+
+
+class RegistrationIdRequest(WhitebirdModel):
+    """Registration id request.
+
+    Request body of `client.registration.resend_email_code()`,
+    `client.registration.send_phone_code()`, `client.registration.complete()` and 1 more.
+    """
+
+    registration_id: str
+
+
+class RegistrationInitiateRequest(WhitebirdModel):
+    """Request body of `client.registration.initiate()`."""
+
+    email: str
+    password: str
+    """10-30 characters with a lowercase and an uppercase letter."""
+
+    phone: str
+    """Phone number in international format."""
+
+    agreements: bool
+    """Acceptance of the user agreement and documents (must be true)."""
+
+    promo_agreement: bool | None = None
+    """Consent to marketing messages."""
+
+
+class RegistrationSdkInitiateRequest(WhitebirdModel):
+    """Request body of `client.registration.initiate_sdk()`."""
+
+    email: str
+    phone: str
+    """Phone number in international format."""
+
+    agreements: bool
+    promo_agreement: bool | None = None
+    external_client_id: str | None = None
+    """Client id in the merchant's system."""
+
+    merchant_id: str
+
+
+class RegistrationSdkResult(WhitebirdModel):
+    """Returned by `client.registration.complete_sdk()`."""
+
+    client_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    otp_code: str | None = None
+    """One-time code the merchant passes on to sign the client in.
+
+    Inferred from the web application; may be missing.
+    """
+
+    email: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class RegistrationState(WhitebirdModel):
+    """Registration state.
+
+    Returned by `client.registration.initiate()`, `client.registration.initiate_sdk()`,
+    `client.registration.verify_email()` and 1 more.
+    """
+
+    registration_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: RegistrationStatus | str | None = None
+    """Inferred from the web application; may be missing."""
 
 
 class StatusbankCardDetails(WhitebirdModel):
@@ -1129,6 +1925,198 @@ class SubaccountResponse(WhitebirdModel):
     broker_identity: str | None = None
     balances: dict[str, Decimal] | None = None
     status: SubaccountStatus | str | None = None
+
+
+class SupportResponse(WhitebirdModel):
+    """Returned by `client.support.send()`."""
+
+    status: str | None = None
+    """`OK` on success. Inferred from the web application; may be missing."""
+
+
+class SupportSendRequest(WhitebirdModel):
+    """Request body of `client.support.send()`."""
+
+    request: str
+    """JSON-encoded `SupportRequest`."""
+
+    files: bytes | None = None
+    """Attachment; the server accepts the part repeated once per file."""
+
+
+class UserCodeRequest(WhitebirdModel):
+    """User code request.
+
+    Request body of `client.user.antifraud.verify_code()`, `client.user.email.verify_code()`,
+    `client.user.email.confirm()` and 1 more.
+    """
+
+    code: str
+
+
+class UserEmailChangeConfirmation(WhitebirdModel):
+    """Returned by `client.user.email.verify_code()`."""
+
+    email: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class UserEmailChangeRequest(WhitebirdModel):
+    """Request body of `client.user.email.send_code()`."""
+
+    email: str
+    """New email address (lowercased by the web app)."""
+
+    mfa_secret: str | None = None
+    """Current TOTP code when 2FA is enabled."""
+
+
+class UserEmailChangeResult(WhitebirdModel):
+    """Returned by `client.user.email.send_code()`."""
+
+    status: str | None = None
+    """`OK` when the code was sent, otherwise an error status such as `INVALID_CODE`.
+
+    Inferred from the web application; may be missing.
+    """
+
+    message: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class UserGenderRequest(WhitebirdModel):
+    """Request body of `client.user.set_gender()`."""
+
+    gender: UserGender | str
+
+
+class UserMfaSecret(WhitebirdModel):
+    """Returned by `client.user.mfa.qr()`."""
+
+    qr_code: str | None = None
+    """QR code image usable as an `img` source (data URL).
+
+    Inferred from the web application; may be missing.
+    """
+
+    secret: str | None = None
+    """Base32 TOTP secret. Inferred from the web application; may be missing."""
+
+
+class UserMfaVerifyRequest(WhitebirdModel):
+    """Request body of `client.user.mfa.verify()`."""
+
+    code: str
+    """Current 6-digit TOTP code."""
+
+    state: bool
+    """`true` enables 2FA, `false` disables it."""
+
+
+class UserPasswordChangeRequest(WhitebirdModel):
+    """Request body of `client.user.password.change()`."""
+
+    old_password: str
+    new_password: str
+    """10-30 characters with a lowercase and an uppercase letter."""
+
+    mfa_secret: str | None = None
+    """Current TOTP code when 2FA is enabled (the web app sends an empty string otherwise)."""
+
+
+class UserPasswordResetRequest(WhitebirdModel):
+    """Request body of `client.user.password.reset()`."""
+
+    token: str
+    """Token from the reset link."""
+
+    new_password: str
+    repeated_password: str
+    mfa_secret: str | None = None
+    """Current TOTP code when 2FA is enabled."""
+
+
+class UserPhoneChangeRequest(WhitebirdModel):
+    """Request body of `client.user.phone.change()` and `client.user.phone.send_change_code()`."""
+
+    country_code: str
+    """ISO 3166-1 alpha-2 country of the number."""
+
+    phone_number: str
+    mfa_secret: str | None = None
+    """Current TOTP code when 2FA is enabled."""
+
+
+class UserPhoneChangeResult(WhitebirdModel):
+    """Returned by `client.user.phone.change()` and `client.user.phone.verify_change_code()`."""
+
+    phone: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    phone_number: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class UserPhoneNotificationsRequest(WhitebirdModel):
+    """Request body of `client.user.phone.set_notifications()`."""
+
+    enabled: bool
+
+
+class UserPhoneVerifyChangeRequest(WhitebirdModel):
+    """Request body of `client.user.phone.verify_change_code()`."""
+
+    code: str
+    phone_number: str
+
+
+class UserProfile(WhitebirdModel):
+    """Returned by `client.user.me()`."""
+
+    email: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    phone: str | None = None
+    """Phone number in international format; empty when not set.
+
+    Inferred from the web application; may be missing.
+    """
+
+    user_status: UserStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    roles: list[UserRole] | None = None
+    """Inferred from the web application; may be missing."""
+
+    mfa_enabled: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    phone_notifications_enabled: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    offer_agreement: bool | None = None
+    """Whether the public offer was accepted. Inferred from the web application; may be missing."""
+
+
+class UserRole(WhitebirdModel):
+    """Used in `UserProfile.roles`."""
+
+    name: UserRoleName | str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class UserTokenPair(WhitebirdModel):
+    """OAuth token response."""
+
+    access_token: str | None = Field(
+        default=None, validation_alias="access_token", serialization_alias="access_token"
+    )
+    """Inferred from the web application; may be missing."""
+
+    refresh_token: str | None = Field(
+        default=None, validation_alias="refresh_token", serialization_alias="refresh_token"
+    )
+    """Inferred from the web application; may be missing."""
 
 
 class VtbCortiMilliRate(WhitebirdModel):

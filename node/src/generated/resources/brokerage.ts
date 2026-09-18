@@ -33,19 +33,19 @@ import type {
 } from '../models.js';
 
 /** Endpoints under `client.brokerage`. */
-export class Brokerage extends APIResource {
+export class BrokerageResource extends APIResource {
   /** Endpoints under `client.brokerage.balanceOrders`. */
-  readonly balanceOrders = new BrokerageBalanceOrders(this._client);
+  readonly balanceOrders = new BrokerageBalanceOrdersResource(this._client);
   /** Endpoints under `client.brokerage.cryptoAddresses`. */
-  readonly cryptoAddresses = new BrokerageCryptoAddresses(this._client);
+  readonly cryptoAddresses = new BrokerageCryptoAddressesResource(this._client);
   /** Endpoints under `client.brokerage.orders`. */
-  readonly orders = new BrokerageOrders(this._client);
+  readonly orders = new BrokerageOrdersResource(this._client);
   /** Endpoints under `client.brokerage.otcOrders`. */
-  readonly otcOrders = new BrokerageOtcOrders(this._client);
+  readonly otcOrders = new BrokerageOtcOrdersResource(this._client);
   /** Endpoints under `client.brokerage.payments`. */
-  readonly payments = new BrokeragePayments(this._client);
+  readonly payments = new BrokeragePaymentsResource(this._client);
   /** Endpoints under `client.brokerage.subaccounts`. */
-  readonly subaccounts = new BrokerageSubaccounts(this._client);
+  readonly subaccounts = new BrokerageSubaccountsResource(this._client);
 
   /**
    * Get Broker Balances
@@ -63,7 +63,7 @@ export class Brokerage extends APIResource {
 }
 
 /** Endpoints under `client.brokerage.balanceOrders`. */
-export class BrokerageBalanceOrders extends APIResource {
+export class BrokerageBalanceOrdersResource extends APIResource {
   /**
    * Create Crypto Deposit
    *
@@ -223,7 +223,7 @@ export class BrokerageBalanceOrders extends APIResource {
 }
 
 /** Endpoints under `client.brokerage.cryptoAddresses`. */
-export class BrokerageCryptoAddresses extends APIResource {
+export class BrokerageCryptoAddressesResource extends APIResource {
   /**
    * My Crypto Addresses
    *
@@ -299,7 +299,7 @@ export class BrokerageCryptoAddresses extends APIResource {
 }
 
 /** Endpoints under `client.brokerage.orders`. */
-export class BrokerageOrders extends APIResource {
+export class BrokerageOrdersResource extends APIResource {
   /**
    * Get Orders unified (paged)
    *
@@ -354,7 +354,7 @@ export class BrokerageOrders extends APIResource {
 }
 
 /** Endpoints under `client.brokerage.otcOrders`. */
-export class BrokerageOtcOrders extends APIResource {
+export class BrokerageOtcOrdersResource extends APIResource {
   /**
    * Create OTC Order
    *
@@ -440,7 +440,7 @@ export class BrokerageOtcOrders extends APIResource {
 }
 
 /** Endpoints under `client.brokerage.payments`. */
-export class BrokeragePayments extends APIResource {
+export class BrokeragePaymentsResource extends APIResource {
   /**
    * Download invoice
    *
@@ -478,7 +478,7 @@ export class BrokeragePayments extends APIResource {
 }
 
 /** Endpoints under `client.brokerage.subaccounts`. */
-export class BrokerageSubaccounts extends APIResource {
+export class BrokerageSubaccountsResource extends APIResource {
   /**
    * Add Subaccount (Individual)
    *
@@ -621,7 +621,7 @@ export class BrokerageSubaccounts extends APIResource {
   }
 }
 
-/** Parameters of {@link BrokerageBalanceOrders.list}. */
+/** Parameters of {@link BrokerageBalanceOrdersResource.list}. */
 export interface BrokerageBalanceOrdersListParams extends BalanceOrderFilterRequest {
   /** Zero-based page index. */
   page?: number;
@@ -631,7 +631,7 @@ export interface BrokerageBalanceOrdersListParams extends BalanceOrderFilterRequ
   sort?: string[];
 }
 
-/** Parameters of {@link BrokerageOrders.list}. */
+/** Parameters of {@link BrokerageOrdersResource.list}. */
 export interface BrokerageOrdersListParams extends OrderUnifiedFilterRequest {
   /** Zero-based page index. */
   page?: number;
@@ -641,12 +641,12 @@ export interface BrokerageOrdersListParams extends OrderUnifiedFilterRequest {
   sort?: string[];
 }
 
-/** Parameters of {@link BrokerageOrders.downloadReport}. */
+/** Parameters of {@link BrokerageOrdersResource.downloadReport}. */
 export interface BrokerageOrdersDownloadReportParams extends OrderUnifiedFilterRequest {
   fileType: FileType;
 }
 
-/** Parameters of {@link BrokerageOtcOrders.list}. */
+/** Parameters of {@link BrokerageOtcOrdersResource.list}. */
 export interface BrokerageOtcOrdersListParams extends OtcOrderFilterRequest {
   /** Zero-based page index. */
   page?: number;
@@ -656,7 +656,7 @@ export interface BrokerageOtcOrdersListParams extends OtcOrderFilterRequest {
   sort?: string[];
 }
 
-/** Parameters of {@link BrokerageSubaccounts.list}. */
+/** Parameters of {@link BrokerageSubaccountsResource.list}. */
 export interface BrokerageSubaccountsListParams {
   /** Zero-based page index. */
   page?: number;

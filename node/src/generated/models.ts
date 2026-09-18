@@ -26,6 +26,21 @@ export const AssistCardBindType = {
   CLIENT: 'CLIENT',
 } as const;
 
+export type AuthDeviceFingerprintSource = 'WEB' | (string & {});
+
+/** Known values of {@link AuthDeviceFingerprintSource}; others may appear as the API evolves. */
+export const AuthDeviceFingerprintSource = {
+  WEB: 'WEB',
+} as const;
+
+/** Operation the token is requested for; only `WITHDRAWAL` is used by the web app. */
+export type AuthMfaOperation = 'WITHDRAWAL' | (string & {});
+
+/** Known values of {@link AuthMfaOperation}; others may appear as the API evolves. */
+export const AuthMfaOperation = {
+  WITHDRAWAL: 'WITHDRAWAL',
+} as const;
+
 export type BalanceOrderResponseAssetType = 'FIAT' | 'CRYPTO' | (string & {});
 
 /** Known values of {@link BalanceOrderResponseAssetType}; others may appear as the API evolves. */
@@ -81,6 +96,88 @@ export const FileType = {
   XLSX: 'XLSX',
 } as const;
 
+export type KycActualizationClientStatus =
+  | 'NEW'
+  | 'IDENTIFIED'
+  | 'ON_VERIFICATION'
+  | 'ON_ADDITIONAL_CHECK'
+  | 'OPENED'
+  | 'PARTIALLY_OPENED'
+  | 'FROZEN'
+  | 'PAUSED'
+  | 'BLOCKED'
+  | 'CLOSED'
+  | 'ACTUALIZATION_REQUIRED'
+  | (string & {});
+
+/** Known values of {@link KycActualizationClientStatus}; others may appear as the API evolves. */
+export const KycActualizationClientStatus = {
+  NEW: 'NEW',
+  IDENTIFIED: 'IDENTIFIED',
+  ON_VERIFICATION: 'ON_VERIFICATION',
+  ON_ADDITIONAL_CHECK: 'ON_ADDITIONAL_CHECK',
+  OPENED: 'OPENED',
+  PARTIALLY_OPENED: 'PARTIALLY_OPENED',
+  FROZEN: 'FROZEN',
+  PAUSED: 'PAUSED',
+  BLOCKED: 'BLOCKED',
+  CLOSED: 'CLOSED',
+  ACTUALIZATION_REQUIRED: 'ACTUALIZATION_REQUIRED',
+} as const;
+
+export type KycInvestorStatus =
+  | 'UNQUALIFIED_INVESTOR'
+  | 'QUALIFIED_INVESTOR'
+  | 'HIGHLY_QUALIFIED_INVESTOR'
+  | (string & {});
+
+/** Known values of {@link KycInvestorStatus}; others may appear as the API evolves. */
+export const KycInvestorStatus = {
+  UNQUALIFIED_INVESTOR: 'UNQUALIFIED_INVESTOR',
+  QUALIFIED_INVESTOR: 'QUALIFIED_INVESTOR',
+  HIGHLY_QUALIFIED_INVESTOR: 'HIGHLY_QUALIFIED_INVESTOR',
+} as const;
+
+export type KycLivenessStatus =
+  | 'PROCESSING'
+  | 'PASSED'
+  | 'RETRY_NEEDED'
+  | 'EXPIRED'
+  | 'FAILED'
+  | 'ERROR'
+  | 'MAX_ATTEMPTS_EXCEEDED'
+  | 'LIVENESS_NOT_FOUND'
+  | (string & {});
+
+/** Known values of {@link KycLivenessStatus}; others may appear as the API evolves. */
+export const KycLivenessStatus = {
+  PROCESSING: 'PROCESSING',
+  PASSED: 'PASSED',
+  RETRY_NEEDED: 'RETRY_NEEDED',
+  EXPIRED: 'EXPIRED',
+  FAILED: 'FAILED',
+  ERROR: 'ERROR',
+  MAX_ATTEMPTS_EXCEEDED: 'MAX_ATTEMPTS_EXCEEDED',
+  LIVENESS_NOT_FOUND: 'LIVENESS_NOT_FOUND',
+} as const;
+
+/** Verification provider (from the client's feature flags). */
+export type KycProvider = 'SUMSUB' | 'PIN' | (string & {});
+
+/** Known values of {@link KycProvider}; others may appear as the API evolves. */
+export const KycProvider = {
+  SUMSUB: 'SUMSUB',
+  PIN: 'PIN',
+} as const;
+
+export type KycSumsubLevelType = 'MAIN' | 'LIVENESS' | (string & {});
+
+/** Known values of {@link KycSumsubLevelType}; others may appear as the API evolves. */
+export const KycSumsubLevelType = {
+  MAIN: 'MAIN',
+  LIVENESS: 'LIVENESS',
+} as const;
+
 export type MtsCardCountry = 'RUSSIA' | 'KYRGYZSTAN' | 'KAZAKHSTAN' | 'UZBEKISTAN' | (string & {});
 
 /** Known values of {@link MtsCardCountry}; others may appear as the API evolves. */
@@ -101,6 +198,62 @@ export const Network = {
   SOLANA: 'SOLANA',
   TON: 'TON',
   TRON: 'TRON',
+} as const;
+
+/**
+ * Event type. Known values: identification data (IDD) and actualization reminders for
+ * individuals and organizations (`ORG_*`), which link to the account settings and cannot be
+ * dismissed in the web app, and trading bonus assignment.
+ */
+export type NotificationEventType =
+  | 'IDD_EXPIRATION'
+  | 'ORG_IDD_EXPIRATION'
+  | 'IDD_EXPIRED'
+  | 'ORG_IDD_EXPIRED'
+  | 'ACTUALIZATION_REQUIRED'
+  | 'ORG_ACTUALIZATION_REQUIRED'
+  | 'ACTUALIZATION_EXPIRED'
+  | 'ORG_ACTUALIZATION_EXPIRED'
+  | 'TRADING_BONUS_ASSIGNED_EVENT'
+  | (string & {});
+
+/** Known values of {@link NotificationEventType}; others may appear as the API evolves. */
+export const NotificationEventType = {
+  IDD_EXPIRATION: 'IDD_EXPIRATION',
+  ORG_IDD_EXPIRATION: 'ORG_IDD_EXPIRATION',
+  IDD_EXPIRED: 'IDD_EXPIRED',
+  ORG_IDD_EXPIRED: 'ORG_IDD_EXPIRED',
+  ACTUALIZATION_REQUIRED: 'ACTUALIZATION_REQUIRED',
+  ORG_ACTUALIZATION_REQUIRED: 'ORG_ACTUALIZATION_REQUIRED',
+  ACTUALIZATION_EXPIRED: 'ACTUALIZATION_EXPIRED',
+  ORG_ACTUALIZATION_EXPIRED: 'ORG_ACTUALIZATION_EXPIRED',
+  TRADING_BONUS_ASSIGNED_EVENT: 'TRADING_BONUS_ASSIGNED_EVENT',
+} as const;
+
+/** `GENERAL` events show the body only; `ERROR` is highlighted. */
+export type NotificationLevel = 'GENERAL' | 'INFO' | 'WARN' | 'ERROR' | (string & {});
+
+/** Known values of {@link NotificationLevel}; others may appear as the API evolves. */
+export const NotificationLevel = {
+  GENERAL: 'GENERAL',
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+} as const;
+
+export type NotificationStreamMessageType =
+  | 'ORDER_UPDATE'
+  | 'BALANCE_OPERATION_UPDATE'
+  | 'APPLICANT_STATUS_UPDATE'
+  | 'CLIENT_STATUS_UPDATE'
+  | (string & {});
+
+/** Known values of {@link NotificationStreamMessageType}; others may appear as the API evolves. */
+export const NotificationStreamMessageType = {
+  ORDER_UPDATE: 'ORDER_UPDATE',
+  BALANCE_OPERATION_UPDATE: 'BALANCE_OPERATION_UPDATE',
+  APPLICANT_STATUS_UPDATE: 'APPLICANT_STATUS_UPDATE',
+  CLIENT_STATUS_UPDATE: 'CLIENT_STATUS_UPDATE',
 } as const;
 
 export type OrderUnifiedOperationType = 'DEPOSIT' | 'OTC_EXCHANGE' | 'WITHDRAWAL' | (string & {});
@@ -272,6 +425,19 @@ export const ProviderType = {
   ZUBRPARI: 'ZUBRPARI',
 } as const;
 
+export type RegistrationStatus =
+  | 'PENDING_EMAIL'
+  | 'PENDING_PHONE'
+  | 'READY_TO_COMPLETE'
+  | (string & {});
+
+/** Known values of {@link RegistrationStatus}; others may appear as the API evolves. */
+export const RegistrationStatus = {
+  PENDING_EMAIL: 'PENDING_EMAIL',
+  PENDING_PHONE: 'PENDING_PHONE',
+  READY_TO_COMPLETE: 'READY_TO_COMPLETE',
+} as const;
+
 export type StatusbankPaymentSystem = 'MASTERCARD' | 'VISA' | 'BELKART' | (string & {});
 
 /** Known values of {@link StatusbankPaymentSystem}; others may appear as the API evolves. */
@@ -355,6 +521,42 @@ export const SubaccountType = {
   INDIVIDUAL: 'INDIVIDUAL',
   INDIVIDUAL_ENTREPRENEUR: 'INDIVIDUAL_ENTREPRENEUR',
   ORGANIZATION: 'ORGANIZATION',
+} as const;
+
+export type UserGender = 'M' | 'F' | (string & {});
+
+/** Known values of {@link UserGender}; others may appear as the API evolves. */
+export const UserGender = {
+  M: 'M',
+  F: 'F',
+} as const;
+
+export type UserRoleName =
+  | 'USER'
+  | 'MERCHANT'
+  | 'SUBACCOUNT'
+  | 'ADMIN'
+  | 'SUPER_ADMIN'
+  | 'BROKER'
+  | (string & {});
+
+/** Known values of {@link UserRoleName}; others may appear as the API evolves. */
+export const UserRoleName = {
+  USER: 'USER',
+  MERCHANT: 'MERCHANT',
+  SUBACCOUNT: 'SUBACCOUNT',
+  ADMIN: 'ADMIN',
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  BROKER: 'BROKER',
+} as const;
+
+/** Account status; the web app only distinguishes these values. */
+export type UserStatus = 'NEW' | 'EMAIL_VERIFIED' | (string & {});
+
+/** Known values of {@link UserStatus}; others may appear as the API evolves. */
+export const UserStatus = {
+  NEW: 'NEW',
+  EMAIL_VERIFIED: 'EMAIL_VERIFIED',
 } as const;
 
 export type VtbCortiMilliServiceType = 'EXCHANGE' | (string & {});
@@ -490,6 +692,98 @@ export interface AssistCardBindForm {
   iFrame?: string;
 }
 
+export interface AuthCaptcha {
+  /** Base64-encoded PNG (290x192) with the cut-out. */
+  backgroundImage: string;
+  /** Base64-encoded PNG (64x64) of the piece to slide. */
+  puzzlePiece: string;
+  /** Vertical offset of the piece in background pixels. */
+  positionY: number;
+}
+
+/**
+ * Browser fingerprint as collected by the web app. Numeric screen and time zone values are sent as
+ * strings.
+ */
+export interface AuthDeviceFingerprint {
+  source: AuthDeviceFingerprintSource;
+  /** FingerprintJS visitor id. */
+  browserFingerprint?: string;
+  locale?: string;
+  /** `Date.getTimezoneOffset()` in minutes, as a string. */
+  timeZone?: string;
+  screenWidth?: string;
+  screenHeight?: string;
+  screenColorDepth?: string;
+  /** Logical CPU cores (0 if unknown). */
+  cpu?: number;
+  /** Device memory in GiB (0 if unknown). */
+  memory?: number;
+  localStorage?: boolean;
+  touchSupport?: boolean;
+  /** SHA-256 hex of the detected font list. */
+  fontFingerprint?: string;
+  webglFingerprint?: string;
+  canvasData?: string;
+  /** Audio fingerprint */
+  audioContext?: number;
+  platform?: string;
+  userAgent?: string;
+  webGLData?: AuthWebGlData;
+  /** Empty when geolocation is unavailable. */
+  latitude?: string;
+  longitude?: string;
+  accuracy?: string;
+  cpuModel?: string | null;
+  intlHourCycle?: string | null;
+  intlNumberSystem?: string | null;
+  displayDynamicRangeHigh?: boolean;
+  storageQuotaBytes?: number | null;
+  visualViewportExactHeight?: number | null;
+  mediaCapabilitiesInfo?: AuthMediaCapabilities;
+}
+
+export interface AuthGeo {
+  /** Country name in English (e.g. `Latvia`). */
+  country: string;
+}
+
+export interface AuthMediaCapabilities {
+  supported?: boolean;
+  smooth?: boolean | null;
+  powerEfficient?: boolean | null;
+}
+
+export interface AuthMfaStatus {
+  /** Inferred from the web application, not observed in API responses. */
+  mfaEnabled?: boolean;
+}
+
+export interface AuthMfaStatusRequest {
+  /** Account email. */
+  username: string;
+}
+
+export interface AuthMfaToken {
+  /** Inferred from the web application, not observed in API responses. */
+  mfaToken?: string;
+}
+
+export interface AuthMfaTokenRequest {
+  operation: AuthMfaOperation;
+  /** Current 6-digit TOTP code. */
+  mfaCode: string;
+}
+
+export interface AuthWebGlData {
+  renderer?: string;
+  rendererUnmasked?: string;
+  shadingLanguageVersion?: string;
+  vendor?: string;
+  vendorUnmasked?: string;
+  version?: string;
+}
+
 export interface BalanceOrderFilterRequest {
   uuid?: string;
   status?: BalanceOrderStatus;
@@ -601,6 +895,262 @@ export interface FiatWithdrawalRequest {
   amount: number;
 }
 
+export interface KycActualData {
+  /** Inferred from the web application, not observed in API responses. */
+  surname?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  name?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  patronymic?: string;
+  /**
+   * Space-separated; the web app shows the last word.
+   * Inferred from the web application, not observed in API responses.
+   */
+  nationality?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  identityDocId?: string;
+  /**
+   * Personal identification number.
+   * Inferred from the web application, not observed in API responses.
+   */
+  idNum?: string;
+  /**
+   * Identity document expiry date (ISO 8601).
+   * Inferred from the web application, not observed in API responses.
+   */
+  validTill?: string;
+  /**
+   * Identity document issue date (ISO 8601).
+   * Inferred from the web application, not observed in API responses.
+   */
+  identityDocDate?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  identityDocIssuer?: string;
+  /**
+   * Space-separated; the web app shows the last word.
+   * Inferred from the web application, not observed in API responses.
+   */
+  residenceCountry?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceRegion?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceDistrict?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceCity?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  residencePostcode?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceStreet?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceHouseAndFlat?: string;
+}
+
+export interface KycCryptoTest {
+  /** Inferred from the web application, not observed in API responses. */
+  questions?: KycCryptoTestQuestion[];
+}
+
+export interface KycCryptoTestAnswer {
+  /** Inferred from the web application, not observed in API responses. */
+  id?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  title?: string;
+  /**
+   * The web app only lets the client move on after picking the correct answer.
+   * Inferred from the web application, not observed in API responses.
+   */
+  correct?: boolean;
+}
+
+export interface KycCryptoTestQuestion {
+  /** Inferred from the web application, not observed in API responses. */
+  id?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  title?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  answers?: KycCryptoTestAnswer[];
+}
+
+export interface KycCryptoTestResult {
+  /** Selected answer id by question id. */
+  answers: Record<string, number>;
+}
+
+export interface KycInvestorData {
+  /** Inferred from the web application, not observed in API responses. */
+  investorStatus?: KycInvestorStatus;
+  /**
+   * A qualification request is under review.
+   * Inferred from the web application, not observed in API responses.
+   */
+  awaitingQualification?: boolean;
+}
+
+export interface KycLivenessSession {
+  /** Inferred from the web application, not observed in API responses. */
+  status?: KycLivenessStatus;
+  /**
+   * Provider page to open (or to show as a QR code) while the status is `PROCESSING`.
+   * Inferred from the web application, not observed in API responses.
+   */
+  iframeUrl?: string;
+}
+
+export interface KycLivenessStartRequest {
+  /**
+   * Where the provider returns after the check; the web app sends it only for the redirect flow
+   * (in-app web views and the Telegram bot).
+   */
+  redirectUrl?: string;
+}
+
+export interface KycMsiRedirect {
+  /**
+   * MSI page to redirect the user to.
+   * Inferred from the web application, not observed in API responses.
+   */
+  url?: string;
+}
+
+/** The web app always sends all three as `true`. */
+export interface KycOfferAgreement {
+  notUSTaxPayer: boolean;
+  exchangeInPersonalInterests: boolean;
+  agreedWithOffer: boolean;
+}
+
+/** Personal data shared with the card issuer; empty values come back as null. */
+export interface KycPersonalData {
+  /**
+   * Client verification status (`VERIFIED`, `PENDING`, `NOT_VERIFIED`, ...).
+   * Inferred from the web application, not observed in API responses.
+   */
+  clientStatus?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  firstName?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  lastName?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  firstNameRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  lastNameRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  patronymicRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceCountryRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceDistrictRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceRegionRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceCityRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceStreetRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residenceHouseAndFlatRus?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  residencePostCode?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  identityDocId?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  identityDocIssuer?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  identityConfirmationDocType?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  additionalNumber?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  email?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  phoneNumber?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  gender?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  birthDate?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  birthPlace?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  nationality?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  docIssueDate?: string | null;
+  /** Inferred from the web application, not observed in API responses. */
+  docExpirationDate?: string | null;
+}
+
+export interface KycProfileClosureConfirmRequest {
+  /** Client identity from the e-mail link. */
+  identity: string;
+  /** Confirmation token from the e-mail link. */
+  token: string;
+}
+
+export interface KycQualificationSubmitRequest {
+  /** JSON-encoded `KycQualificationRequest`. */
+  request: string;
+  /** Supporting document; the server accepts the part repeated once per file. */
+  files: Blob;
+}
+
+export interface KycSumsubToken {
+  /**
+   * SumSub WebSDK access token.
+   * Inferred from the web application, not observed in API responses.
+   */
+  token?: string;
+}
+
+/** Verification questionnaire state. */
+export interface KycVerification {
+  /** Inferred from the web application, not observed in API responses. */
+  provider?: KycProvider;
+  /** Inferred from the web application, not observed in API responses. */
+  firstStageConfirmed?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  secondStageConfirmed?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  userConfirmed?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  emailVerified?: boolean;
+  /**
+   * ISO 3166-1 alpha-2 country code.
+   * Inferred from the web application, not observed in API responses.
+   */
+  country?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  countryFlag?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  residencePermitInBelarusPresent?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  exchangeInPersonalInterests?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  notUSTaxpayer?: boolean;
+  /**
+   * Public offer accepted in the provider SDK.
+   * Inferred from the web application, not observed in API responses.
+   */
+  sdkOferta?: boolean;
+}
+
+/**
+ * The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (from geo, default
+ * `BY`), `countryFlag: false`, `residencePermitInBelarusPresent: true`,
+ * `exchangeInPersonalInterests: true`, `notUSTaxpayer: true`, `userConfirmed: false`,
+ * `firstStageConfirmed: true`, `secondStageConfirmed: false` and `emailVerified: true`.
+ */
+export interface KycVerificationRequest {
+  provider?: KycProvider;
+  /** ISO 3166-1 alpha-2 country code. */
+  country?: string;
+  countryFlag?: boolean;
+  residencePermitInBelarusPresent?: boolean;
+  exchangeInPersonalInterests?: boolean;
+  notUSTaxpayer?: boolean;
+  userConfirmed?: boolean;
+  sdkOferta?: boolean;
+  firstStageConfirmed?: boolean;
+  secondStageConfirmed?: boolean;
+  emailVerified?: boolean;
+}
+
 export interface MtsCardBindRequest {
   /** Card number, digits only (the web app requires 16 digits). */
   cardNumber: string;
@@ -667,6 +1217,52 @@ export interface MtsQrPayment {
   amount?: MtsQrAmount;
   /** Inferred from the web application, not observed in API responses. */
   settlementAmount?: MtsQrAmount;
+}
+
+export interface NotificationEvent {
+  /** Inferred from the web application, not observed in API responses. */
+  id?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  type?: NotificationEventType;
+  /** Inferred from the web application, not observed in API responses. */
+  level?: NotificationLevel;
+  /**
+   * Localised title (not shown for `GENERAL` events).
+   * Inferred from the web application, not observed in API responses.
+   */
+  title?: string;
+  /**
+   * Localised text.
+   * Inferred from the web application, not observed in API responses.
+   */
+  body?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  creationDate?: string;
+}
+
+export interface NotificationMarkViewedRequest {
+  /** Ids (`NotificationEvent.id`) of the events to mark as viewed. */
+  eventsIds: string[];
+}
+
+export interface NotificationSearchRequest {
+  /** `false` returns unread events only. */
+  viewed?: boolean;
+}
+
+/** JSON `data` of one SSE message. */
+export interface NotificationStreamMessage {
+  /** Inferred from the web application, not observed in API responses. */
+  type?: NotificationStreamMessageType;
+  /** Inferred from the web application, not observed in API responses. */
+  createdAt?: string;
+  /**
+   * Depends on `type`: `NotificationOrderUpdate` for `ORDER_UPDATE`,
+   * `NotificationBalanceOperationUpdate` for `BALANCE_OPERATION_UPDATE`, a string for
+   * `APPLICANT_STATUS_UPDATE`, unknown for `CLIENT_STATUS_UPDATE`.
+   * Inferred from the web application, not observed in API responses.
+   */
+  payload?: unknown;
 }
 
 export interface OrderUnifiedFilterRequest {
@@ -785,6 +1381,57 @@ export interface PaymentMethodResponse {
   bank?: string;
   providerType?: ProviderType;
   currency?: string;
+}
+
+export interface RegistrationCodeRequest {
+  registrationId: string;
+  code: string;
+}
+
+export interface RegistrationIdRequest {
+  registrationId: string;
+}
+
+export interface RegistrationInitiateRequest {
+  email: string;
+  /** 10-30 characters with a lowercase and an uppercase letter */
+  password: string;
+  /** Phone number in international format. */
+  phone: string;
+  /** Acceptance of the user agreement and documents (must be true). */
+  agreements: boolean;
+  /** Consent to marketing messages. */
+  promoAgreement?: boolean;
+}
+
+export interface RegistrationSdkInitiateRequest {
+  email: string;
+  /** Phone number in international format. */
+  phone: string;
+  agreements: boolean;
+  promoAgreement?: boolean;
+  /** Client id in the merchant's system. */
+  externalClientId?: string;
+  merchantId: string;
+}
+
+export interface RegistrationSdkResult {
+  /** Inferred from the web application, not observed in API responses. */
+  clientId?: string;
+  /**
+   * One-time code the merchant passes on to sign the client in.
+   * Inferred from the web application, not observed in API responses.
+   */
+  otpCode?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  email?: string;
+}
+
+export interface RegistrationState {
+  /** Inferred from the web application, not observed in API responses. */
+  registrationId?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  status?: RegistrationStatus;
 }
 
 export interface StatusbankCardDetails {
@@ -971,6 +1618,148 @@ export interface SubaccountResponse {
   brokerIdentity?: string;
   balances?: Record<string, number>;
   status?: SubaccountStatus;
+}
+
+export interface SupportResponse {
+  /**
+   * `OK` on success.
+   * Inferred from the web application, not observed in API responses.
+   */
+  status?: string;
+}
+
+export interface SupportSendRequest {
+  /** JSON-encoded `SupportRequest`. */
+  request: string;
+  /** Attachment; the server accepts the part repeated once per file. */
+  files?: Blob;
+}
+
+export interface UserCodeRequest {
+  code: string;
+}
+
+export interface UserEmailChangeConfirmation {
+  /** Inferred from the web application, not observed in API responses. */
+  email?: string;
+}
+
+export interface UserEmailChangeRequest {
+  /** New email address (lowercased by the web app). */
+  email: string;
+  /** Current TOTP code when 2FA is enabled. */
+  mfaSecret?: string;
+}
+
+export interface UserEmailChangeResult {
+  /**
+   * `OK` when the code was sent, otherwise an error status such as `INVALID_CODE`.
+   * Inferred from the web application, not observed in API responses.
+   */
+  status?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  message?: string;
+}
+
+export interface UserGenderRequest {
+  gender: UserGender;
+}
+
+export interface UserMfaSecret {
+  /**
+   * QR code image usable as an `img` source (data URL).
+   * Inferred from the web application, not observed in API responses.
+   */
+  qrCode?: string;
+  /**
+   * Base32 TOTP secret.
+   * Inferred from the web application, not observed in API responses.
+   */
+  secret?: string;
+}
+
+export interface UserMfaVerifyRequest {
+  /** Current 6-digit TOTP code. */
+  code: string;
+  /** `true` enables 2FA, `false` disables it. */
+  state: boolean;
+}
+
+export interface UserPasswordChangeRequest {
+  oldPassword: string;
+  /** 10-30 characters with a lowercase and an uppercase letter */
+  newPassword: string;
+  /** Current TOTP code when 2FA is enabled (the web app sends an empty string otherwise). */
+  mfaSecret?: string;
+}
+
+export interface UserPasswordResetRequest {
+  /** Token from the reset link. */
+  token: string;
+  newPassword: string;
+  repeatedPassword: string;
+  /** Current TOTP code when 2FA is enabled. */
+  mfaSecret?: string;
+}
+
+export interface UserPhoneChangeRequest {
+  /** ISO 3166-1 alpha-2 country of the number. */
+  countryCode: string;
+  phoneNumber: string;
+  /** Current TOTP code when 2FA is enabled. */
+  mfaSecret?: string;
+}
+
+export interface UserPhoneChangeResult {
+  /** Inferred from the web application, not observed in API responses. */
+  phone?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  phoneNumber?: string;
+}
+
+export interface UserPhoneNotificationsRequest {
+  enabled: boolean;
+}
+
+export interface UserPhoneVerifyChangeRequest {
+  code: string;
+  phoneNumber: string;
+}
+
+export interface UserProfile {
+  /** Inferred from the web application, not observed in API responses. */
+  email?: string;
+  /**
+   * Phone number in international format; empty when not set.
+   * Inferred from the web application, not observed in API responses.
+   */
+  phone?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  userStatus?: UserStatus;
+  /** Inferred from the web application, not observed in API responses. */
+  roles?: UserRole[];
+  /** Inferred from the web application, not observed in API responses. */
+  mfaEnabled?: boolean;
+  /** Inferred from the web application, not observed in API responses. */
+  phoneNotificationsEnabled?: boolean;
+  /**
+   * Whether the public offer was accepted.
+   * Inferred from the web application, not observed in API responses.
+   */
+  offerAgreement?: boolean;
+}
+
+export interface UserRole {
+  /** Inferred from the web application, not observed in API responses. */
+  name?: UserRoleName;
+}
+
+/** OAuth token response. */
+export interface UserTokenPair {
+  /** Inferred from the web application, not observed in API responses. */
+  access_token?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  refresh_token?: string;
 }
 
 export interface VtbCortiMilliRate {

@@ -6,8 +6,20 @@ from __future__ import annotations
 from functools import cached_property
 
 from whitebird._engine import AsyncEngine, SyncEngine
+from whitebird._generated.resources.auth import AsyncAuthResource, AuthResource
 from whitebird._generated.resources.brokerage import AsyncBrokerageResource, BrokerageResource
+from whitebird._generated.resources.kyc import AsyncKycResource, KycResource
+from whitebird._generated.resources.notifications import (
+    AsyncNotificationsResource,
+    NotificationsResource,
+)
 from whitebird._generated.resources.providers import AsyncProvidersResource, ProvidersResource
+from whitebird._generated.resources.registration import (
+    AsyncRegistrationResource,
+    RegistrationResource,
+)
+from whitebird._generated.resources.support import AsyncSupportResource, SupportResource
+from whitebird._generated.resources.user import AsyncUserResource, UserResource
 
 
 class Resources:
@@ -16,14 +28,44 @@ class Resources:
     _engine: SyncEngine
 
     @cached_property
+    def auth(self) -> AuthResource:
+        """Operations of `client.auth`."""
+        return AuthResource(self._engine)
+
+    @cached_property
     def brokerage(self) -> BrokerageResource:
         """Operations of `client.brokerage`."""
         return BrokerageResource(self._engine)
 
     @cached_property
+    def kyc(self) -> KycResource:
+        """Operations of `client.kyc`."""
+        return KycResource(self._engine)
+
+    @cached_property
+    def notifications(self) -> NotificationsResource:
+        """Operations of `client.notifications`."""
+        return NotificationsResource(self._engine)
+
+    @cached_property
     def providers(self) -> ProvidersResource:
         """Operations of `client.providers`."""
         return ProvidersResource(self._engine)
+
+    @cached_property
+    def registration(self) -> RegistrationResource:
+        """Operations of `client.registration`."""
+        return RegistrationResource(self._engine)
+
+    @cached_property
+    def support(self) -> SupportResource:
+        """Operations of `client.support`."""
+        return SupportResource(self._engine)
+
+    @cached_property
+    def user(self) -> UserResource:
+        """Operations of `client.user`."""
+        return UserResource(self._engine)
 
 
 class AsyncResources:
@@ -32,11 +74,41 @@ class AsyncResources:
     _engine: AsyncEngine
 
     @cached_property
+    def auth(self) -> AsyncAuthResource:
+        """Operations of `client.auth`."""
+        return AsyncAuthResource(self._engine)
+
+    @cached_property
     def brokerage(self) -> AsyncBrokerageResource:
         """Operations of `client.brokerage`."""
         return AsyncBrokerageResource(self._engine)
 
     @cached_property
+    def kyc(self) -> AsyncKycResource:
+        """Operations of `client.kyc`."""
+        return AsyncKycResource(self._engine)
+
+    @cached_property
+    def notifications(self) -> AsyncNotificationsResource:
+        """Operations of `client.notifications`."""
+        return AsyncNotificationsResource(self._engine)
+
+    @cached_property
     def providers(self) -> AsyncProvidersResource:
         """Operations of `client.providers`."""
         return AsyncProvidersResource(self._engine)
+
+    @cached_property
+    def registration(self) -> AsyncRegistrationResource:
+        """Operations of `client.registration`."""
+        return AsyncRegistrationResource(self._engine)
+
+    @cached_property
+    def support(self) -> AsyncSupportResource:
+        """Operations of `client.support`."""
+        return AsyncSupportResource(self._engine)
+
+    @cached_property
+    def user(self) -> AsyncUserResource:
+        """Operations of `client.user`."""
+        return AsyncUserResource(self._engine)

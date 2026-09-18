@@ -97,6 +97,51 @@ type AssistCardBindForm struct {
 	IFrame string `json:"iFrame,omitzero"`
 }
 
+// AuthCaptcha is returned by [AuthResource.GenerateCaptcha].
+type AuthCaptcha struct {
+	// Base64-encoded PNG (290x192) with the cut-out.
+	BackgroundImage string `json:"backgroundImage"`
+	// Base64-encoded PNG (64x64) of the piece to slide.
+	PuzzlePiece string `json:"puzzlePiece"`
+	// Vertical offset of the piece in background pixels.
+	PositionY int `json:"positionY"`
+}
+
+// AuthGeo is returned by [AuthResource.Geo].
+type AuthGeo struct {
+	// Country name in English (e.g. `Latvia`).
+	Country string `json:"country"`
+}
+
+// AuthMediaCapabilities is used in [AuthSendFingerprintParams].
+type AuthMediaCapabilities struct {
+	Supported      *bool `json:"supported,omitzero"`
+	Smooth         *bool `json:"smooth,omitzero"`
+	PowerEfficient *bool `json:"powerEfficient,omitzero"`
+}
+
+// AuthMFAStatus is returned by [AuthResource.MFAStatus].
+type AuthMFAStatus struct {
+	// Inferred from the web application; not yet observed in responses.
+	MFAEnabled bool `json:"mfaEnabled,omitzero"`
+}
+
+// AuthMFAToken is returned by [AuthResource.CreateMFAToken].
+type AuthMFAToken struct {
+	// Inferred from the web application; not yet observed in responses.
+	MFAToken string `json:"mfaToken,omitzero"`
+}
+
+// AuthWebGlData is used in [AuthSendFingerprintParams].
+type AuthWebGlData struct {
+	Renderer               *string `json:"renderer,omitzero"`
+	RendererUnmasked       *string `json:"rendererUnmasked,omitzero"`
+	ShadingLanguageVersion *string `json:"shadingLanguageVersion,omitzero"`
+	Vendor                 *string `json:"vendor,omitzero"`
+	VendorUnmasked         *string `json:"vendorUnmasked,omitzero"`
+	Version                *string `json:"version,omitzero"`
+}
+
 // BalanceOrderResponse is returned by [BrokerageBalanceOrdersResource.CreateCryptoDeposit],
 // [BrokerageBalanceOrdersResource.CreateCryptoWithdrawal],
 // [BrokerageBalanceOrdersResource.ConfirmCryptoWithdrawal],
@@ -160,6 +205,192 @@ type DownloadTokenResponse struct {
 	Token string `json:"token,omitzero"`
 }
 
+// KYCActualData is returned by [KYCActualizationResource.ActualData].
+type KYCActualData struct {
+	// Inferred from the web application; not yet observed in responses.
+	Surname string `json:"surname,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Patronymic string `json:"patronymic,omitzero"`
+	// Space-separated; the web app shows the last word. Inferred from the web application; not yet
+	// observed in responses.
+	Nationality string `json:"nationality,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IdentityDocID string `json:"identityDocId,omitzero"`
+	// Personal identification number. Inferred from the web application; not yet observed in
+	// responses.
+	IDNum string `json:"idNum,omitzero"`
+	// Identity document expiry date (ISO 8601). Inferred from the web application; not yet observed in
+	// responses.
+	ValidTill string `json:"validTill,omitzero"`
+	// Identity document issue date (ISO 8601). Inferred from the web application; not yet observed in
+	// responses.
+	IdentityDocDate string `json:"identityDocDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IdentityDocIssuer string `json:"identityDocIssuer,omitzero"`
+	// Space-separated; the web app shows the last word. Inferred from the web application; not yet
+	// observed in responses.
+	ResidenceCountry string `json:"residenceCountry,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceRegion string `json:"residenceRegion,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceDistrict string `json:"residenceDistrict,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceCity string `json:"residenceCity,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidencePostcode string `json:"residencePostcode,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceStreet string `json:"residenceStreet,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceHouseAndFlat string `json:"residenceHouseAndFlat,omitzero"`
+}
+
+// KYCCryptoTest is returned by [KYCCryptoTestResource.Questions].
+type KYCCryptoTest struct {
+	// Inferred from the web application; not yet observed in responses.
+	Questions []KYCCryptoTestQuestion `json:"questions,omitzero"`
+}
+
+// KYCCryptoTestAnswer is used in [KYCCryptoTestQuestion].
+type KYCCryptoTestAnswer struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID int `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Title string `json:"title,omitzero"`
+	// The web app only lets the client move on after picking the correct answer. Inferred from the web
+	// application; not yet observed in responses.
+	Correct bool `json:"correct,omitzero"`
+}
+
+// KYCCryptoTestQuestion is used in [KYCCryptoTest].
+type KYCCryptoTestQuestion struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID int `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Title string `json:"title,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Answers []KYCCryptoTestAnswer `json:"answers,omitzero"`
+}
+
+// KYCInvestorData is returned by [KYCQualificationResource.InvestorData].
+type KYCInvestorData struct {
+	// Inferred from the web application; not yet observed in responses.
+	InvestorStatus KYCInvestorStatus `json:"investorStatus,omitzero"`
+	// A qualification request is under review. Inferred from the web application; not yet observed in
+	// responses.
+	AwaitingQualification bool `json:"awaitingQualification,omitzero"`
+}
+
+// KYCLivenessSession is returned by [KYCLivenessResource.Start] and [KYCLivenessResource.Retry].
+type KYCLivenessSession struct {
+	// Inferred from the web application; not yet observed in responses.
+	Status KYCLivenessStatus `json:"status,omitzero"`
+	// Provider page to open (or to show as a QR code) while the status is `PROCESSING`. Inferred from
+	// the web application; not yet observed in responses.
+	IframeURL string `json:"iframeUrl,omitzero"`
+}
+
+// KYCMsiRedirect is returned by [KYCMsiResource.Authenticate].
+type KYCMsiRedirect struct {
+	// MSI page to redirect the user to. Inferred from the web application; not yet observed in
+	// responses.
+	URL string `json:"url,omitzero"`
+}
+
+// KYCPersonalData is returned by [KYCPersonalDataResource.Validate].
+//
+// Personal data shared with the card issuer; empty values come back as null.
+type KYCPersonalData struct {
+	// Client verification status (`VERIFIED`, `PENDING`, `NOT_VERIFIED`, ...). Inferred from the web
+	// application; not yet observed in responses.
+	ClientStatus string `json:"clientStatus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FirstName string `json:"firstName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	LastName string `json:"lastName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FirstNameRus string `json:"firstNameRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	LastNameRus string `json:"lastNameRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PatronymicRus string `json:"patronymicRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceCountryRus string `json:"residenceCountryRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceDistrictRus string `json:"residenceDistrictRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceRegionRus string `json:"residenceRegionRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceCityRus string `json:"residenceCityRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceStreetRus string `json:"residenceStreetRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidenceHouseAndFlatRus string `json:"residenceHouseAndFlatRus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidencePostCode string `json:"residencePostCode,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IdentityDocID string `json:"identityDocId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IdentityDocIssuer string `json:"identityDocIssuer,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IdentityConfirmationDocType string `json:"identityConfirmationDocType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AdditionalNumber string `json:"additionalNumber,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Email string `json:"email,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PhoneNumber string `json:"phoneNumber,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Gender string `json:"gender,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	BirthDate string `json:"birthDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	BirthPlace string `json:"birthPlace,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Nationality string `json:"nationality,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	DocIssueDate string `json:"docIssueDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	DocExpirationDate string `json:"docExpirationDate,omitzero"`
+}
+
+// KYCSumsubToken is returned by [KYCSumsubResource.Token].
+type KYCSumsubToken struct {
+	// SumSub WebSDK access token. Inferred from the web application; not yet observed in responses.
+	Token string `json:"token,omitzero"`
+}
+
+// KYCVerification is returned by [KYCResource.Get] and [KYCResource.Submit].
+//
+// Verification questionnaire state.
+type KYCVerification struct {
+	// Inferred from the web application; not yet observed in responses.
+	Provider KYCProvider `json:"provider,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FirstStageConfirmed bool `json:"firstStageConfirmed,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	SecondStageConfirmed bool `json:"secondStageConfirmed,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	UserConfirmed bool `json:"userConfirmed,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmailVerified bool `json:"emailVerified,omitzero"`
+	// ISO 3166-1 alpha-2 country code. Inferred from the web application; not yet observed in
+	// responses.
+	Country string `json:"country,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CountryFlag bool `json:"countryFlag,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ResidencePermitInBelarusPresent bool `json:"residencePermitInBelarusPresent,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExchangeInPersonalInterests bool `json:"exchangeInPersonalInterests,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	NotUsTaxpayer bool `json:"notUSTaxpayer,omitzero"`
+	// Public offer accepted in the provider SDK. Inferred from the web application; not yet observed
+	// in responses.
+	SdkOferta bool `json:"sdkOferta,omitzero"`
+}
+
 // MtsQRAmount is used in [MtsQRPayment].
 type MtsQRAmount struct {
 	// Inferred from the web application; not yet observed in responses.
@@ -206,6 +437,38 @@ type MtsQRPayment struct {
 	Amount *MtsQRAmount `json:"amount,omitzero"`
 	// Inferred from the web application; not yet observed in responses.
 	SettlementAmount *MtsQRAmount `json:"settlementAmount,omitzero"`
+}
+
+// NotificationEvent is returned by [NotificationsResource.Search].
+type NotificationEvent struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type NotificationEventType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Level NotificationLevel `json:"level,omitzero"`
+	// Localised title (not shown for `GENERAL` events). Inferred from the web application; not yet
+	// observed in responses.
+	Title string `json:"title,omitzero"`
+	// Localised text. Inferred from the web application; not yet observed in responses.
+	Body string `json:"body,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
+}
+
+// NotificationStreamMessage is returned by [NotificationsResource.Stream].
+//
+// JSON `data` of one SSE message.
+type NotificationStreamMessage struct {
+	// Inferred from the web application; not yet observed in responses.
+	Type NotificationStreamMessageType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreatedAt Time `json:"createdAt,omitzero"`
+	// Depends on `type`: `NotificationOrderUpdate` for `ORDER_UPDATE`,
+	// `NotificationBalanceOperationUpdate` for `BALANCE_OPERATION_UPDATE`, a string for
+	// `APPLICANT_STATUS_UPDATE`, unknown for `CLIENT_STATUS_UPDATE`. Inferred from the web
+	// application; not yet observed in responses.
+	Payload any `json:"payload,omitzero"`
 }
 
 // OrderUnifiedResponse is returned by [BrokerageOrdersResource.List].
@@ -269,6 +532,27 @@ type PaymentMethodResponse struct {
 	Bank         string       `json:"bank,omitzero"`
 	ProviderType ProviderType `json:"providerType,omitzero"`
 	Currency     string       `json:"currency,omitzero"`
+}
+
+// RegistrationSdkResult is returned by [RegistrationResource.CompleteSdk].
+type RegistrationSdkResult struct {
+	// Inferred from the web application; not yet observed in responses.
+	ClientID string `json:"clientId,omitzero"`
+	// One-time code the merchant passes on to sign the client in. Inferred from the web application;
+	// not yet observed in responses.
+	OTPCode string `json:"otpCode,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Email string `json:"email,omitzero"`
+}
+
+// RegistrationState is returned by [RegistrationResource.Initiate],
+// [RegistrationResource.InitiateSdk], [RegistrationResource.VerifyEmail] and
+// [RegistrationResource.VerifyPhone].
+type RegistrationState struct {
+	// Inferred from the web application; not yet observed in responses.
+	RegistrationID string `json:"registrationId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status RegistrationStatus `json:"status,omitzero"`
 }
 
 // StatusbankCardDetails is returned by [ProvidersStatusbankResource.CardDetails].
@@ -394,6 +678,81 @@ type SubaccountResponse struct {
 	BrokerIdentity string             `json:"brokerIdentity,omitzero"`
 	Balances       map[string]Decimal `json:"balances,omitzero"`
 	Status         SubaccountStatus   `json:"status,omitzero"`
+}
+
+// SupportResponse is returned by [SupportResource.Send].
+type SupportResponse struct {
+	// `OK` on success. Inferred from the web application; not yet observed in responses.
+	Status string `json:"status,omitzero"`
+}
+
+// UserEmailChangeConfirmation is returned by [UserEmailResource.VerifyCode].
+type UserEmailChangeConfirmation struct {
+	// Inferred from the web application; not yet observed in responses.
+	Email string `json:"email,omitzero"`
+}
+
+// UserEmailChangeResult is returned by [UserEmailResource.SendCode].
+type UserEmailChangeResult struct {
+	// `OK` when the code was sent, otherwise an error status such as `INVALID_CODE`. Inferred from the
+	// web application; not yet observed in responses.
+	Status string `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Message string `json:"message,omitzero"`
+}
+
+// UserMFASecret is returned by [UserMFAResource.QR].
+type UserMFASecret struct {
+	// QR code image usable as an `img` source (data URL). Inferred from the web application; not yet
+	// observed in responses.
+	QRCode string `json:"qrCode,omitzero"`
+	// Base32 TOTP secret. Inferred from the web application; not yet observed in responses.
+	Secret string `json:"secret,omitzero"`
+}
+
+// UserPhoneChangeResult is returned by [UserPhoneResource.Change] and
+// [UserPhoneResource.VerifyChangeCode].
+type UserPhoneChangeResult struct {
+	// Inferred from the web application; not yet observed in responses.
+	Phone string `json:"phone,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PhoneNumber string `json:"phoneNumber,omitzero"`
+}
+
+// UserProfile is returned by [UserResource.Me].
+type UserProfile struct {
+	// Inferred from the web application; not yet observed in responses.
+	Email string `json:"email,omitzero"`
+	// Phone number in international format; empty when not set. Inferred from the web application; not
+	// yet observed in responses.
+	Phone string `json:"phone,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	UserStatus UserStatus `json:"userStatus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Roles []UserRole `json:"roles,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	MFAEnabled bool `json:"mfaEnabled,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PhoneNotificationsEnabled bool `json:"phoneNotificationsEnabled,omitzero"`
+	// Whether the public offer was accepted. Inferred from the web application; not yet observed in
+	// responses.
+	OfferAgreement bool `json:"offerAgreement,omitzero"`
+}
+
+// UserRole is used in [UserProfile].
+type UserRole struct {
+	// Inferred from the web application; not yet observed in responses.
+	Name UserRoleName `json:"name,omitzero"`
+}
+
+// UserTokenPair is returned by [UserPasswordResource.Change].
+//
+// OAuth token response.
+type UserTokenPair struct {
+	// Inferred from the web application; not yet observed in responses.
+	AccessToken string `json:"access_token,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	RefreshToken string `json:"refresh_token,omitzero"`
 }
 
 // VtbCortiMilliRate is returned by [ProvidersVtbCortiMilliResource.Rate].

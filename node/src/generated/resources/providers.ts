@@ -30,27 +30,27 @@ import type {
 } from '../models.js';
 
 /** Endpoints under `client.providers`. */
-export class Providers extends APIResource {
+export class ProvidersResource extends APIResource {
   /** Endpoints under `client.providers.alfa`. */
-  readonly alfa = new ProvidersAlfa(this._client);
+  readonly alfa = new ProvidersAlfaResource(this._client);
   /** Endpoints under `client.providers.assist`. */
-  readonly assist = new ProvidersAssist(this._client);
+  readonly assist = new ProvidersAssistResource(this._client);
   /** Endpoints under `client.providers.bepaid`. */
-  readonly bepaid = new ProvidersBepaid(this._client);
+  readonly bepaid = new ProvidersBepaidResource(this._client);
   /** Endpoints under `client.providers.carusell`. */
-  readonly carusell = new ProvidersCarusell(this._client);
+  readonly carusell = new ProvidersCarusellResource(this._client);
   /** Endpoints under `client.providers.mts`. */
-  readonly mts = new ProvidersMts(this._client);
+  readonly mts = new ProvidersMtsResource(this._client);
   /** Endpoints under `client.providers.statusbank`. */
-  readonly statusbank = new ProvidersStatusbank(this._client);
+  readonly statusbank = new ProvidersStatusbankResource(this._client);
   /** Endpoints under `client.providers.vtb`. */
-  readonly vtb = new ProvidersVtb(this._client);
+  readonly vtb = new ProvidersVtbResource(this._client);
 }
 
 /** Endpoints under `client.providers.alfa`. */
-export class ProvidersAlfa extends APIResource {
+export class ProvidersAlfaResource extends APIResource {
   /** Endpoints under `client.providers.alfa.cryptoCard`. */
-  readonly cryptoCard = new ProvidersAlfaCryptoCard(this._client);
+  readonly cryptoCard = new ProvidersAlfaCryptoCardResource(this._client);
 
   /**
    * Start binding an Alfa-Bank card
@@ -120,7 +120,7 @@ export class ProvidersAlfa extends APIResource {
 }
 
 /** Endpoints under `client.providers.alfa.cryptoCard`. */
-export class ProvidersAlfaCryptoCard extends APIResource {
+export class ProvidersAlfaCryptoCardResource extends APIResource {
   /**
    * Get the status of the client's Alfa crypto card
    *
@@ -199,7 +199,7 @@ export class ProvidersAlfaCryptoCard extends APIResource {
 }
 
 /** Endpoints under `client.providers.assist`. */
-export class ProvidersAssist extends APIResource {
+export class ProvidersAssistResource extends APIResource {
   /**
    * Start binding a card through Assist
    *
@@ -273,7 +273,7 @@ export class ProvidersAssist extends APIResource {
 }
 
 /** Endpoints under `client.providers.bepaid`. */
-export class ProvidersBepaid extends APIResource {
+export class ProvidersBepaidResource extends APIResource {
   /**
    * Get a bePaid card binding URL
    *
@@ -297,7 +297,7 @@ export class ProvidersBepaid extends APIResource {
 }
 
 /** Endpoints under `client.providers.carusell`. */
-export class ProvidersCarusell extends APIResource {
+export class ProvidersCarusellResource extends APIResource {
   /**
    * List SBP banks
    *
@@ -317,9 +317,9 @@ export class ProvidersCarusell extends APIResource {
 }
 
 /** Endpoints under `client.providers.mts`. */
-export class ProvidersMts extends APIResource {
+export class ProvidersMtsResource extends APIResource {
   /** Endpoints under `client.providers.mts.qr`. */
-  readonly qr = new ProvidersMtsQr(this._client);
+  readonly qr = new ProvidersMtsQrResource(this._client);
 
   /**
    * Bind a card by number
@@ -399,7 +399,7 @@ export class ProvidersMts extends APIResource {
 }
 
 /** Endpoints under `client.providers.mts.qr`. */
-export class ProvidersMtsQr extends APIResource {
+export class ProvidersMtsQrResource extends APIResource {
   /**
    * Decode an SBP QR code
    *
@@ -448,7 +448,7 @@ export class ProvidersMtsQr extends APIResource {
 }
 
 /** Endpoints under `client.providers.statusbank`. */
-export class ProvidersStatusbank extends APIResource {
+export class ProvidersStatusbankResource extends APIResource {
   /**
    * List available StatusBank card types
    *
@@ -549,13 +549,13 @@ export class ProvidersStatusbank extends APIResource {
 }
 
 /** Endpoints under `client.providers.vtb`. */
-export class ProvidersVtb extends APIResource {
+export class ProvidersVtbResource extends APIResource {
   /** Endpoints under `client.providers.vtb.cortiMilli`. */
-  readonly cortiMilli = new ProvidersVtbCortiMilli(this._client);
+  readonly cortiMilli = new ProvidersVtbCortiMilliResource(this._client);
 }
 
 /** Endpoints under `client.providers.vtb.cortiMilli`. */
-export class ProvidersVtbCortiMilli extends APIResource {
+export class ProvidersVtbCortiMilliResource extends APIResource {
   /**
    * Get the RUB to TJS rate for a Corti Milli card
    *
@@ -574,13 +574,13 @@ export class ProvidersVtbCortiMilli extends APIResource {
   }
 }
 
-/** Parameters of {@link ProvidersAlfa.payment}. */
+/** Parameters of {@link ProvidersAlfaResource.payment}. */
 export interface ProvidersAlfaPaymentParams {
   /** Alfa-Bank gateway order id (`mdOrder` from the payment link). */
   alfaOrderId: string;
 }
 
-/** Parameters of {@link ProvidersAssist.cardBindForm}. */
+/** Parameters of {@link ProvidersAssistResource.cardBindForm}. */
 export interface ProvidersAssistCardBindFormParams {
   /** Binding owner type; the web app always sends `CLIENT`. */
   type?: AssistCardBindType;
@@ -588,7 +588,7 @@ export interface ProvidersAssistCardBindFormParams {
   returnUrl: string;
 }
 
-/** Parameters of {@link ProvidersAssist.cardBindUrl}. */
+/** Parameters of {@link ProvidersAssistResource.cardBindUrl}. */
 export interface ProvidersAssistCardBindUrlParams {
   /** Binding owner type; the web app always sends `CLIENT`. */
   type?: AssistCardBindType;
@@ -596,13 +596,13 @@ export interface ProvidersAssistCardBindUrlParams {
   returnUrl: string;
 }
 
-/** Parameters of {@link ProvidersBepaid.cardBindUrl}. */
+/** Parameters of {@link ProvidersBepaidResource.cardBindUrl}. */
 export interface ProvidersBepaidCardBindUrlParams {
   /** Where bePaid sends the browser after the binding. */
   returnUrl: string;
 }
 
-/** Parameters of {@link ProvidersMts.bindCard}. */
+/** Parameters of {@link ProvidersMtsResource.bindCard}. */
 export interface ProvidersMtsBindCardParams extends MtsCardBindRequest {
   /**
    * Access token to authenticate with instead of the `Authorization` header. The web app's

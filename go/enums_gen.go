@@ -25,6 +25,24 @@ const (
 	AssistCardBindTypeClient AssistCardBindType = "CLIENT"
 )
 
+// AuthDeviceFingerprintSource is used in [AuthSendFingerprintParams].
+type AuthDeviceFingerprintSource string
+
+// Known values of [AuthDeviceFingerprintSource].
+const (
+	AuthDeviceFingerprintSourceWeb AuthDeviceFingerprintSource = "WEB"
+)
+
+// AuthMFAOperation is used in [AuthCreateMFATokenParams].
+//
+// Operation the token is requested for; only `WITHDRAWAL` is used by the web app.
+type AuthMFAOperation string
+
+// Known values of [AuthMFAOperation].
+const (
+	AuthMFAOperationWithdrawal AuthMFAOperation = "WITHDRAWAL"
+)
+
 // BalanceOrderResponseAssetType is used in [BalanceOrderResponse].
 type BalanceOrderResponseAssetType string
 
@@ -77,6 +95,69 @@ const (
 	FileTypeXLSX FileType = "XLSX"
 )
 
+// KYCActualizationClientStatus is returned by [KYCActualizationResource.Status].
+type KYCActualizationClientStatus string
+
+// Known values of [KYCActualizationClientStatus].
+const (
+	KYCActualizationClientStatusNew                   KYCActualizationClientStatus = "NEW"
+	KYCActualizationClientStatusIdentified            KYCActualizationClientStatus = "IDENTIFIED"
+	KYCActualizationClientStatusOnVerification        KYCActualizationClientStatus = "ON_VERIFICATION"
+	KYCActualizationClientStatusOnAdditionalCheck     KYCActualizationClientStatus = "ON_ADDITIONAL_CHECK"
+	KYCActualizationClientStatusOpened                KYCActualizationClientStatus = "OPENED"
+	KYCActualizationClientStatusPartiallyOpened       KYCActualizationClientStatus = "PARTIALLY_OPENED"
+	KYCActualizationClientStatusFrozen                KYCActualizationClientStatus = "FROZEN"
+	KYCActualizationClientStatusPaused                KYCActualizationClientStatus = "PAUSED"
+	KYCActualizationClientStatusBlocked               KYCActualizationClientStatus = "BLOCKED"
+	KYCActualizationClientStatusClosed                KYCActualizationClientStatus = "CLOSED"
+	KYCActualizationClientStatusActualizationRequired KYCActualizationClientStatus = "ACTUALIZATION_REQUIRED"
+)
+
+// KYCInvestorStatus is used in [KYCInvestorData].
+type KYCInvestorStatus string
+
+// Known values of [KYCInvestorStatus].
+const (
+	KYCInvestorStatusUnqualifiedInvestor     KYCInvestorStatus = "UNQUALIFIED_INVESTOR"
+	KYCInvestorStatusQualifiedInvestor       KYCInvestorStatus = "QUALIFIED_INVESTOR"
+	KYCInvestorStatusHighlyQualifiedInvestor KYCInvestorStatus = "HIGHLY_QUALIFIED_INVESTOR"
+)
+
+// KYCLivenessStatus is returned by [KYCLivenessResource.Status].
+type KYCLivenessStatus string
+
+// Known values of [KYCLivenessStatus].
+const (
+	KYCLivenessStatusProcessing          KYCLivenessStatus = "PROCESSING"
+	KYCLivenessStatusPassed              KYCLivenessStatus = "PASSED"
+	KYCLivenessStatusRetryNeeded         KYCLivenessStatus = "RETRY_NEEDED"
+	KYCLivenessStatusExpired             KYCLivenessStatus = "EXPIRED"
+	KYCLivenessStatusFailed              KYCLivenessStatus = "FAILED"
+	KYCLivenessStatusError               KYCLivenessStatus = "ERROR"
+	KYCLivenessStatusMaxAttemptsExceeded KYCLivenessStatus = "MAX_ATTEMPTS_EXCEEDED"
+	KYCLivenessStatusLivenessNotFound    KYCLivenessStatus = "LIVENESS_NOT_FOUND"
+)
+
+// KYCProvider is used in [KYCGetParams], [KYCSubmitParams] and [KYCVerification].
+//
+// Verification provider (from the client's feature flags).
+type KYCProvider string
+
+// Known values of [KYCProvider].
+const (
+	KYCProviderSumsub KYCProvider = "SUMSUB"
+	KYCProviderPin    KYCProvider = "PIN"
+)
+
+// KYCSumsubLevelType is used in [KYCSumsubTokenParams].
+type KYCSumsubLevelType string
+
+// Known values of [KYCSumsubLevelType].
+const (
+	KYCSumsubLevelTypeMain     KYCSumsubLevelType = "MAIN"
+	KYCSumsubLevelTypeLiveness KYCSumsubLevelType = "LIVENESS"
+)
+
 // MtsCardCountry is returned by [ProvidersMtsResource.Countries].
 type MtsCardCountry string
 
@@ -101,6 +182,50 @@ const (
 	NetworkSolana   Network = "SOLANA"
 	NetworkTon      Network = "TON"
 	NetworkTron     Network = "TRON"
+)
+
+// NotificationEventType is used in [NotificationEvent].
+//
+// Event type. Known values: identification data (IDD) and actualization reminders for individuals
+// and organizations (`ORG_*`), which link to the account settings and cannot be dismissed in the
+// web app, and trading bonus assignment.
+type NotificationEventType string
+
+// Known values of [NotificationEventType].
+const (
+	NotificationEventTypeIddExpiration             NotificationEventType = "IDD_EXPIRATION"
+	NotificationEventTypeOrgIddExpiration          NotificationEventType = "ORG_IDD_EXPIRATION"
+	NotificationEventTypeIddExpired                NotificationEventType = "IDD_EXPIRED"
+	NotificationEventTypeOrgIddExpired             NotificationEventType = "ORG_IDD_EXPIRED"
+	NotificationEventTypeActualizationRequired     NotificationEventType = "ACTUALIZATION_REQUIRED"
+	NotificationEventTypeOrgActualizationRequired  NotificationEventType = "ORG_ACTUALIZATION_REQUIRED"
+	NotificationEventTypeActualizationExpired      NotificationEventType = "ACTUALIZATION_EXPIRED"
+	NotificationEventTypeOrgActualizationExpired   NotificationEventType = "ORG_ACTUALIZATION_EXPIRED"
+	NotificationEventTypeTradingBonusAssignedEvent NotificationEventType = "TRADING_BONUS_ASSIGNED_EVENT"
+)
+
+// NotificationLevel is used in [NotificationEvent].
+//
+// `GENERAL` events show the body only; `ERROR` is highlighted.
+type NotificationLevel string
+
+// Known values of [NotificationLevel].
+const (
+	NotificationLevelGeneral NotificationLevel = "GENERAL"
+	NotificationLevelInfo    NotificationLevel = "INFO"
+	NotificationLevelWarn    NotificationLevel = "WARN"
+	NotificationLevelError   NotificationLevel = "ERROR"
+)
+
+// NotificationStreamMessageType is used in [NotificationStreamMessage].
+type NotificationStreamMessageType string
+
+// Known values of [NotificationStreamMessageType].
+const (
+	NotificationStreamMessageTypeOrderUpdate            NotificationStreamMessageType = "ORDER_UPDATE"
+	NotificationStreamMessageTypeBalanceOperationUpdate NotificationStreamMessageType = "BALANCE_OPERATION_UPDATE"
+	NotificationStreamMessageTypeApplicantStatusUpdate  NotificationStreamMessageType = "APPLICANT_STATUS_UPDATE"
+	NotificationStreamMessageTypeClientStatusUpdate     NotificationStreamMessageType = "CLIENT_STATUS_UPDATE"
 )
 
 // OrderUnifiedOperationType is used in [BrokerageOrdersListParams],
@@ -217,6 +342,16 @@ const (
 	ProviderTypeZubrpari         ProviderType = "ZUBRPARI"
 )
 
+// RegistrationStatus is used in [RegistrationState].
+type RegistrationStatus string
+
+// Known values of [RegistrationStatus].
+const (
+	RegistrationStatusPendingEmail    RegistrationStatus = "PENDING_EMAIL"
+	RegistrationStatusPendingPhone    RegistrationStatus = "PENDING_PHONE"
+	RegistrationStatusReadyToComplete RegistrationStatus = "READY_TO_COMPLETE"
+)
+
 // StatusbankPaymentSystem is used in [ProvidersStatusbankRegisterCardParams] and
 // [StatusbankCardSystem].
 type StatusbankPaymentSystem string
@@ -285,6 +420,39 @@ const (
 	SubaccountTypeIndividual             SubaccountType = "INDIVIDUAL"
 	SubaccountTypeIndividualEntrepreneur SubaccountType = "INDIVIDUAL_ENTREPRENEUR"
 	SubaccountTypeOrganization           SubaccountType = "ORGANIZATION"
+)
+
+// UserGender is used in [UserSetGenderParams].
+type UserGender string
+
+// Known values of [UserGender].
+const (
+	UserGenderM UserGender = "M"
+	UserGenderF UserGender = "F"
+)
+
+// UserRoleName is used in [UserRole].
+type UserRoleName string
+
+// Known values of [UserRoleName].
+const (
+	UserRoleNameUser       UserRoleName = "USER"
+	UserRoleNameMerchant   UserRoleName = "MERCHANT"
+	UserRoleNameSubaccount UserRoleName = "SUBACCOUNT"
+	UserRoleNameAdmin      UserRoleName = "ADMIN"
+	UserRoleNameSuperAdmin UserRoleName = "SUPER_ADMIN"
+	UserRoleNameBroker     UserRoleName = "BROKER"
+)
+
+// UserStatus is used in [UserProfile].
+//
+// Account status; the web app only distinguishes these values.
+type UserStatus string
+
+// Known values of [UserStatus].
+const (
+	UserStatusNew           UserStatus = "NEW"
+	UserStatusEmailVerified UserStatus = "EMAIL_VERIFIED"
 )
 
 // VtbCortiMilliServiceType is used in [ProvidersVtbCortiMilliRateParams].

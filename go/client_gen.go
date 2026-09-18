@@ -5,13 +5,20 @@ package whitebird
 // Client is a client for the Whitebird API, created with [NewClient]. Its fields group the
 // operations by resource, following the layout of the API. A Client is safe for concurrent use.
 type Client struct {
-	Brokerage *BrokerageResource
-	Providers *ProvidersResource
+	Auth          *AuthResource
+	Brokerage     *BrokerageResource
+	KYC           *KYCResource
+	Notifications *NotificationsResource
+	Providers     *ProvidersResource
+	Registration  *RegistrationResource
+	Support       *SupportResource
+	User          *UserResource
 
 	core *core
 }
 
 func (c *Client) initResources() {
+	c.Auth = &AuthResource{core: c.core}
 	c.Brokerage = &BrokerageResource{
 		BalanceOrders:   &BrokerageBalanceOrdersResource{core: c.core},
 		CryptoAddresses: &BrokerageCryptoAddressesResource{core: c.core},
@@ -21,6 +28,19 @@ func (c *Client) initResources() {
 		Subaccounts:     &BrokerageSubaccountsResource{core: c.core},
 		core:            c.core,
 	}
+	c.KYC = &KYCResource{
+		Actualization:  &KYCActualizationResource{core: c.core},
+		CryptoTest:     &KYCCryptoTestResource{core: c.core},
+		Liveness:       &KYCLivenessResource{core: c.core},
+		Msi:            &KYCMsiResource{core: c.core},
+		PersonalData:   &KYCPersonalDataResource{core: c.core},
+		ProfileClosure: &KYCProfileClosureResource{core: c.core},
+		Qualification:  &KYCQualificationResource{core: c.core},
+		Sdk:            &KYCSdkResource{core: c.core},
+		Sumsub:         &KYCSumsubResource{core: c.core},
+		core:           c.core,
+	}
+	c.Notifications = &NotificationsResource{core: c.core}
 	c.Providers = &ProvidersResource{
 		Alfa: &ProvidersAlfaResource{
 			CryptoCard: &ProvidersAlfaCryptoCardResource{core: c.core},
@@ -37,5 +57,15 @@ func (c *Client) initResources() {
 		Vtb: &ProvidersVtbResource{
 			CortiMilli: &ProvidersVtbCortiMilliResource{core: c.core},
 		},
+	}
+	c.Registration = &RegistrationResource{core: c.core}
+	c.Support = &SupportResource{core: c.core}
+	c.User = &UserResource{
+		Antifraud: &UserAntifraudResource{core: c.core},
+		Email:     &UserEmailResource{core: c.core},
+		MFA:       &UserMFAResource{core: c.core},
+		Password:  &UserPasswordResource{core: c.core},
+		Phone:     &UserPhoneResource{core: c.core},
+		core:      c.core,
 	}
 }
