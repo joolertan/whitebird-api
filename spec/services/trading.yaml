@@ -1,0 +1,37 @@
+openapi: 3.1.0
+info:
+  title: Trading API
+  version: '1'
+  description: Trading service of the Whitebird trading terminal. The web app only uses it to top
+    up the demo account.
+x-wb-service: trading
+servers:
+- url: https://trading-service.whitebird.io
+paths:
+  /api/v1/demo/balance/deposit:
+    post:
+      operationId: tradingDemoDeposit
+      x-wb-resource: trading.demo
+      x-wb-name: deposit
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Top up the demo account
+      description: Credits virtual funds to the trading account. Meant for the demo environment
+        (`trading-demo-service`); a deposit limit applies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TradingDemoDepositRequest'}
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    TradingDemoDepositRequest:
+      type: object
+      required: [asset, amount]
+      properties:
+        asset: {type: string, description: Coin to credit; the web app always sends `USDT`.}
+        amount: {type: number, format: decimal, description: Amount to credit, at most 1 000 000 000.}

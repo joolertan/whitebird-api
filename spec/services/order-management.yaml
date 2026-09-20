@@ -1,0 +1,493 @@
+openapi: 3.1.0
+info:
+  title: Order management API
+  version: '1'
+  description: >-
+    Spot orders, executions and account statistics of the Whitebird trading terminal. Most
+    responses use the Bybit-style envelope `{"retCode": 0, "retMsg": "OK", "result": ...}` (the
+    schemas below describe `result`); the order history page is a plain Spring Data page and the
+    operations report is a PDF. Business errors carry these `retCode` values: 1 market order
+    quantity too high, 2 limit order quantity too high, 3 insufficient balance, 4 order value too
+    low, 5 take-profit price too high, 6 stop-loss price too low, 7 take-profit price too low, 8
+    stop-loss price too high, 9 order price too high, 10 sell limit price too low, 11 order price
+    too low, 12 order not found, 13 too many quantity decimals, 14 too many price decimals, 15
+    order not changed, 16 rate limit exceeded, 17 invalid request, 18 internal error, 20 order
+    modification not supported, 21 TP/SL disabled, 22 take-profit above market, 23 stop-loss below
+    market, 24 take-profit below market, 25 stop-loss above market. Orders can also be placed,
+    amended and cancelled over the `/ws/trade` WebSocket with the same payloads.
+x-wb-service: order_management
+servers:
+- url: https://order-management-service.whitebird.io
+paths:
+  /api/v1/orders:
+    post:
+      operationId: tradingOrdersCreate
+      x-wb-resource: trading.orders
+      x-wb-name: create
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Place an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TradingOrderCreateRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TradingOrderAck'}
+    put:
+      operationId: tradingOrdersAmend
+      x-wb-resource: trading.orders
+      x-wb-name: amend
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Amend an open order
+      description: Changes price, quantity or the attached take-profit / stop-loss. Send
+        `takeProfit` or `stopLoss` as `"0"` to remove it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TradingOrderAmendRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TradingOrderAck'}
+    delete:
+      operationId: tradingOrdersCancel
+      x-wb-resource: trading.orders
+      x-wb-name: cancel
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Cancel an order
+      parameters:
+      - name: id
+        in: query
+        required: true
+        description: Order id.
+        schema: {type: string}
+      - name: symbol
+        in: query
+        required: true
+        description: Instrument symbol without separator, e.g. `BTCUSDT`.
+        schema: {type: string}
+      - name: category
+        in: query
+        schema:
+          $ref: '#/components/schemas/TradingCategory'
+          default: spot
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TradingOrderAck'}
+  /api/v1/orders/active:
+    get:
+      operationId: tradingOrdersActive
+      x-wb-resource: trading.orders
+      x-wb-name: active
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List open orders
+      parameters:
+      - name: symbol
+        in: query
+        description: Only orders of this instrument, e.g. `BTCUSDT`.
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/TradingOrder'}
+  /api/v1/orders/history:
+    get:
+      operationId: tradingOrdersHistory
+      x-wb-resource: trading.orders
+      x-wb-name: history
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List closed orders in a time range
+      parameters:
+      - name: symbol
+        in: query
+        schema: {type: string}
+      - name: orderId
+        in: query
+        schema: {type: string}
+      - name: orderLinkId
+        in: query
+        schema: {type: string}
+      - name: orderStatus
+        in: query
+        schema: {type: string}
+      - name: startTime
+        in: query
+        description: Epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: endTime
+        in: query
+        description: Epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: limit
+        in: query
+        schema: {type: integer}
+      - name: cursor
+        in: query
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/TradingOrder'}
+  /api/v1/orders/history/page:
+    get:
+      operationId: tradingOrdersList
+      x-wb-resource: trading.orders
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List order history page by page
+      parameters:
+      - name: symbol
+        in: query
+        schema: {type: string}
+      - name: startTime
+        in: query
+        description: Epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: endTime
+        in: query
+        description: Epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: page
+        in: query
+        schema: {type: integer, default: 0}
+      - name: size
+        in: query
+        schema: {type: integer, default: 30}
+      - name: sortBy
+        in: query
+        description: Sort field; the web terminal uses `exchangeTime`.
+        schema: {type: string}
+      - name: sortDir
+        in: query
+        schema: {$ref: '#/components/schemas/TradingSortDirection'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TradingOrderRecordPage'}
+  /api/v1/executions:
+    get:
+      operationId: tradingExecutionsList
+      x-wb-resource: trading.executions
+      x-wb-name: list
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List trade executions
+      parameters:
+      - name: symbol
+        in: query
+        schema: {type: string}
+      - name: startTime
+        in: query
+        description: Epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: endTime
+        in: query
+        description: Epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: limit
+        in: query
+        description: The web app asks for 1000.
+        schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/TradingExecution'}
+  /api/v1/accounts/fee-rate:
+    get:
+      operationId: tradingAccountFeeRate
+      x-wb-resource: trading.account
+      x-wb-name: fee_rate
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the fee rates for an instrument
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TradingFeeRate'}
+  /api/v1/portfolio/statistics:
+    get:
+      operationId: tradingAccountPortfolioStatistics
+      x-wb-resource: trading.account
+      x-wb-name: portfolio_statistics
+      x-wb-envelope: retcode
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the portfolio value history
+      parameters:
+      - name: period
+        in: query
+        schema: {$ref: '#/components/schemas/TradingPortfolioPeriod'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TradingPortfolioStatistics'}
+  /api/v1/operations/report:
+    post:
+      operationId: tradingReportsOperations
+      x-wb-resource: trading.reports
+      x-wb-name: operations
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Download the spot operations report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TradingOperationsReportRequest'}
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+components:
+  schemas:
+    TradingCategory:
+      type: string
+      enum: [spot]
+    TradingOrderSide:
+      type: string
+      enum: [Buy, Sell]
+    TradingOrderType:
+      type: string
+      enum: [Limit, Market]
+    TradingTimeInForce:
+      type: string
+      enum: [GTC, PostOnly, IOC, FOK]
+    TradingOrderStatus:
+      type: string
+      description: 'Native order status. The web terminal maps them to Bybit terms: CREATED and
+        PLACED are New, PROCESSING is PartiallyFilled, CLOSED is Filled.'
+      enum: [CREATED, PLACED, PROCESSING, CANCELLED, REJECTED, CLOSED, TRIGGERED, UNTRIGGERED, UNKNOWN]
+    TradingOrderRecordSide:
+      type: string
+      enum: [BUY, SELL]
+    TradingOrderRecordType:
+      type: string
+      enum: [LIMIT, MARKET]
+    TradingSortDirection:
+      type: string
+      enum: [ASC, DESC]
+    TradingPortfolioPeriod:
+      type: string
+      enum: ['24H', '1W', '1M', '1Y']
+    TradingReportFormat:
+      type: string
+      enum: [PDF]
+    TradingOrderCreateRequest:
+      type: object
+      required: [symbol, side, type, qty]
+      properties:
+        symbol: {type: string, description: 'Symbol without separator, e.g. `BTCUSDT`.'}
+        side: {$ref: '#/components/schemas/TradingOrderSide'}
+        type: {$ref: '#/components/schemas/TradingOrderType'}
+        qty:
+          type: string
+          description: Quantity in the base coin. For market buys it is the amount to spend in the
+            quote coin.
+        price: {type: string, description: Limit price; leave out for market orders.}
+        timeInForce:
+          $ref: '#/components/schemas/TradingTimeInForce'
+          description: The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders.
+        orderLinkId: {type: string, description: Client order id.}
+        takeProfit: {type: string, description: Take-profit trigger price.}
+        stopLoss: {type: string, description: Stop-loss trigger price.}
+        tpslMode: {type: string}
+        tpOrderType: {$ref: '#/components/schemas/TradingOrderType'}
+        slOrderType: {$ref: '#/components/schemas/TradingOrderType'}
+        tpLimitPrice: {type: string, description: Limit price of the take-profit order when `tpOrderType` is `Limit`.}
+        slLimitPrice: {type: string, description: Limit price of the stop-loss order when `slOrderType` is `Limit`.}
+        category:
+          $ref: '#/components/schemas/TradingCategory'
+          default: spot
+    TradingOrderAmendRequest:
+      type: object
+      required: [id, symbol]
+      properties:
+        id: {type: string, description: Order id.}
+        symbol: {type: string}
+        qty: {type: string}
+        price: {type: string}
+        takeProfit: {type: string, description: New take-profit trigger price; `"0"` removes it.}
+        stopLoss: {type: string, description: New stop-loss trigger price; `"0"` removes it.}
+        tpslMode: {type: string}
+        tpOrderType: {$ref: '#/components/schemas/TradingOrderType'}
+        slOrderType: {$ref: '#/components/schemas/TradingOrderType'}
+        tpLimitPrice: {type: string}
+        slLimitPrice: {type: string}
+        category:
+          $ref: '#/components/schemas/TradingCategory'
+          default: spot
+    TradingOrderAck:
+      type: object
+      properties:
+        orderId: {type: string, x-wb-inferred: true}
+    TradingOrder:
+      type: object
+      description: Order in the Bybit-like shape shared by the REST lists and the `order` WebSocket topic.
+      properties:
+        id: {type: string, x-wb-inferred: true}
+        orderLinkId: {type: string, x-wb-inferred: true}
+        symbol: {type: string, x-wb-inferred: true}
+        category: {type: string, x-wb-inferred: true}
+        side: {$ref: '#/components/schemas/TradingOrderSide', x-wb-inferred: true}
+        type: {$ref: '#/components/schemas/TradingOrderType', x-wb-inferred: true}
+        status:
+          $ref: '#/components/schemas/TradingOrderStatus'
+          x-wb-inferred: true
+          description: Closed-order history may report Bybit-style values (`Cancelled`, `Filled`, ...).
+        price: {type: string, x-wb-inferred: true}
+        qty: {type: string, x-wb-inferred: true}
+        leavesQty: {type: string, x-wb-inferred: true}
+        leavesValue: {type: string, x-wb-inferred: true}
+        cumExecQty: {type: string, x-wb-inferred: true}
+        cumExecValue: {type: string, x-wb-inferred: true}
+        avgPrice: {type: string, x-wb-inferred: true}
+        totalFee: {type: number, format: decimal, x-wb-inferred: true}
+        timeInForce: {$ref: '#/components/schemas/TradingTimeInForce', x-wb-inferred: true}
+        takeProfit: {type: string, x-wb-inferred: true}
+        stopLoss: {type: string, x-wb-inferred: true}
+        tpLimitPrice: {type: string, x-wb-inferred: true}
+        slLimitPrice: {type: string, x-wb-inferred: true}
+        tpOrderType: {type: string, x-wb-inferred: true}
+        slOrderType: {type: string, x-wb-inferred: true}
+        stopOrderType: {type: string, x-wb-inferred: true}
+        createdTime: {type: string, x-wb-inferred: true, description: Epoch milliseconds.}
+        updatedTime: {type: string, x-wb-inferred: true, description: Epoch milliseconds.}
+    TradingOrderRecord:
+      type: object
+      description: Order as stored by the order management service (history page).
+      properties:
+        id: {type: string, x-wb-inferred: true}
+        externalId: {type: string, x-wb-inferred: true, description: Client order id.}
+        symbol: {type: string, x-wb-inferred: true}
+        category: {type: string, x-wb-inferred: true}
+        side: {$ref: '#/components/schemas/TradingOrderRecordSide', x-wb-inferred: true}
+        type: {$ref: '#/components/schemas/TradingOrderRecordType', x-wb-inferred: true}
+        status: {$ref: '#/components/schemas/TradingOrderStatus', x-wb-inferred: true}
+        timeInForce: {$ref: '#/components/schemas/TradingTimeInForce', x-wb-inferred: true}
+        price: {type: number, format: decimal, x-wb-inferred: true}
+        avgPrice: {type: number, format: decimal, x-wb-inferred: true}
+        origQty: {type: number, format: decimal, x-wb-inferred: true}
+        executedQty: {type: number, format: decimal, x-wb-inferred: true}
+        remainingQty: {type: number, format: decimal, x-wb-inferred: true}
+        cumulativeQuoteQty: {type: number, format: decimal, x-wb-inferred: true}
+        totalFee: {type: number, format: decimal, x-wb-inferred: true}
+        takeProfit: {type: number, format: decimal, x-wb-inferred: true}
+        stopLoss: {type: number, format: decimal, x-wb-inferred: true}
+        errorCode: {type: string, x-wb-inferred: true, description: Rejection reason.}
+        exchangeTime: {type: integer, format: int64, x-wb-inferred: true, description: Creation time, epoch milliseconds.}
+        exchangeUpdateTime: {type: integer, format: int64, x-wb-inferred: true, description: Last update time, epoch milliseconds.}
+    TradingOrderRecordPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/TradingOrderRecord'}
+        totalElements: {type: integer, format: int64}
+        totalPages: {type: integer}
+        number: {type: integer}
+        size: {type: integer}
+        last: {type: boolean}
+    TradingExecution:
+      type: object
+      description: Fill of an order; also pushed on the `execution` WebSocket topic.
+      properties:
+        id: {type: string, x-wb-inferred: true, description: Execution id.}
+        orderId: {type: string, x-wb-inferred: true}
+        symbol: {type: string, x-wb-inferred: true}
+        category: {type: string, x-wb-inferred: true}
+        side: {$ref: '#/components/schemas/TradingOrderSide', x-wb-inferred: true}
+        type: {$ref: '#/components/schemas/TradingOrderType', x-wb-inferred: true}
+        execPrice: {type: string, x-wb-inferred: true}
+        execQty: {type: string, x-wb-inferred: true}
+        execValue: {type: string, x-wb-inferred: true, description: Value in the quote coin.}
+        execFee: {type: number, format: decimal, x-wb-inferred: true}
+        totalFee: {type: number, format: decimal, x-wb-inferred: true}
+        fee: {type: number, format: decimal, x-wb-inferred: true}
+        execTime: {type: string, x-wb-inferred: true, description: Epoch milliseconds.}
+    TradingFeeRate:
+      type: object
+      properties:
+        symbol: {type: string, x-wb-inferred: true}
+        takerFeeRate: {type: number, format: decimal, x-wb-inferred: true, description: Percent, e.g. 0.1 for 0.1 %.}
+        makerFeeRate: {type: number, format: decimal, x-wb-inferred: true, description: Percent.}
+        rateType: {type: string, x-wb-inferred: true, description: Fee tier, e.g. `SA1`.}
+    TradingPortfolioStatistics:
+      type: object
+      properties:
+        points:
+          type: array
+          x-wb-inferred: true
+          items: {$ref: '#/components/schemas/TradingPortfolioPoint'}
+    TradingPortfolioPoint:
+      type: object
+      properties:
+        timestamp: {type: integer, format: int64, x-wb-inferred: true, description: Epoch milliseconds.}
+        value: {type: number, format: decimal, x-wb-inferred: true, description: Portfolio value.}
+    TradingOperationsReportRequest:
+      type: object
+      required: [startTime, endTime]
+      properties:
+        startTime: {type: integer, format: int64, description: Epoch milliseconds.}
+        endTime: {type: integer, format: int64, description: Epoch milliseconds.}
+        format:
+          $ref: '#/components/schemas/TradingReportFormat'
+          default: PDF

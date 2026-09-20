@@ -1,0 +1,185 @@
+openapi: 3.1.0
+info:
+  title: Market data API
+  version: '1'
+  description: >-
+    Public spot market data of the Whitebird trading terminal. Successful responses use the
+    Bybit-style envelope `{"retCode": 0, "retMsg": "OK", "result": ...}`; the schemas below describe
+    `result`. Errors are plain HTTP errors with a `{"message": str, "code": int}` body (for example
+    400 `{"message": "Missing parameter: symbol", "code": 0}`). Real-time tickers, trades, order
+    book updates and candles are only available over the `/ws/market` WebSocket.
+x-wb-service: market_data
+servers:
+- url: https://market-data-service.whitebird.io
+paths:
+  /api/v1/market/instruments:
+    get:
+      operationId: marketInstruments
+      x-wb-resource: market
+      x-wb-name: instruments
+      x-wb-auth: none
+      x-wb-envelope: retcode
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: List spot instruments
+      description: Returns every listed instrument with its trading limits. The full list is always
+        returned; there is no symbol filter.
+      parameters:
+      - name: category
+        in: query
+        schema: {$ref: '#/components/schemas/MarketCategory'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/MarketInstrument'}
+  /api/v1/market/orderbook:
+    get:
+      operationId: marketOrderbook
+      x-wb-resource: market
+      x-wb-name: orderbook
+      x-wb-auth: none
+      x-wb-envelope: retcode
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Get an order book snapshot
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        description: Instrument symbol without separator, e.g. `BTCUSDT`.
+        schema: {type: string}
+      - name: limit
+        in: query
+        description: Number of price levels per side (500 observed to work).
+        schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MarketOrderbook'}
+  /api/v1/market/kline:
+    get:
+      operationId: marketKlines
+      x-wb-resource: market
+      x-wb-name: klines
+      x-wb-auth: none
+      x-wb-envelope: retcode
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Get candles
+      description: Returns candles in ascending order starting at `start`, at most `limit` of them.
+        Without `start` the series begins at the oldest available candle, even when `end` is given,
+        so pass `start` to get recent data.
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        description: Instrument symbol without separator, e.g. `BTCUSDT`.
+        schema: {type: string}
+      - name: interval
+        in: query
+        required: true
+        description: Candle interval. The Bybit spellings (`1`, `60`, `D`, ...) are accepted too.
+        schema: {$ref: '#/components/schemas/MarketKlineInterval'}
+      - name: start
+        in: query
+        description: Start of the range, epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: end
+        in: query
+        description: End of the range, epoch milliseconds.
+        schema: {type: integer, format: int64}
+      - name: limit
+        in: query
+        description: Maximum number of candles. The web terminal asks for 3500.
+        schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/MarketKline'}
+components:
+  schemas:
+    MarketCategory:
+      type: string
+      enum: [spot]
+    MarketKlineInterval:
+      type: string
+      description: Interval as sent by the web terminal; candles report it in Bybit form (`1h` comes
+        back as `60`, `1D` as `D`).
+      enum: ['1m', '5m', '15m', '30m', '1h', '4h', '6h', '12h', '1D', '1W', '1M']
+    MarketInstrument:
+      type: object
+      required: [category, symbol, baseCoin, quoteCoin, status, basePrecision, quotePrecision,
+        minOrderQty, maxOrderQty, maxMarketOrderQty, maxLimitOrderQty, minOrderAmt, maxOrderAmt,
+        tickSize]
+      properties:
+        category: {type: string, description: Always `spot` so far.}
+        symbol: {type: string, description: 'Symbol without separator, e.g. `BTCUSDT`.'}
+        baseCoin: {type: string}
+        quoteCoin: {type: string}
+        status: {type: string, description: Trading status; `tradable` is the only value seen.}
+        basePrecision:
+          type: string
+          description: Number of decimal places of the quantity, e.g. `"3"` for a step of 0.001.
+        quotePrecision:
+          type: string
+          description: Number of decimal places of quote amounts.
+        minOrderQty: {type: string, description: Minimum order quantity in the base coin.}
+        maxOrderQty: {type: [string, 'null'], description: Maximum order quantity in the base coin.}
+        maxMarketOrderQty: {type: string, description: Maximum market order quantity in the base coin.}
+        maxLimitOrderQty: {type: [string, 'null'], description: Maximum limit order quantity in the base coin.}
+        minOrderAmt: {type: string, description: Minimum order value in the quote coin.}
+        maxOrderAmt: {type: string, description: Maximum order value in the quote coin.}
+        tickSize: {type: string, description: Price step.}
+        assetClass: {type: string, x-wb-inferred: true}
+        name: {type: string, x-wb-inferred: true}
+        description: {type: string, x-wb-inferred: true}
+        iconUrl: {type: string, x-wb-inferred: true}
+    MarketOrderbook:
+      type: object
+      required: [symbol, type, bids, asks, timestamp, id]
+      properties:
+        symbol: {type: string}
+        type: {type: string, description: Always `snapshot`.}
+        bids:
+          type: array
+          description: Bid levels as `[price, size]` string pairs, best (highest) price first.
+          items:
+            type: array
+            items: {type: string}
+        asks:
+          type: array
+          description: Ask levels as `[price, size]` string pairs, best (lowest) price first.
+          items:
+            type: array
+            items: {type: string}
+        timestamp: {type: integer, format: int64, description: Epoch milliseconds.}
+        id:
+          type: string
+          description: Update id of the book; same sequence as `u` in WebSocket order book messages.
+    MarketKline:
+      type: object
+      required: [start, end, interval, open, high, low, close, volume, turnover, confirm, timestamp]
+      properties:
+        start: {type: integer, format: int64, description: Candle open time, epoch milliseconds.}
+        end: {type: integer, format: int64, description: Candle close time, epoch milliseconds.}
+        interval: {type: string, description: 'Bybit-style interval: `1`, `5`, `60`, `240`, `D`, `W`, `M`, ...'}
+        open: {type: string}
+        high: {type: string}
+        low: {type: string}
+        close: {type: string}
+        volume:
+          type: string
+          description: Volume in the base coin. In older history (2025) volume and turnover are swapped.
+        turnover: {type: string, description: Volume in the quote coin.}
+        confirm: {type: boolean, description: Whether the candle is closed.}
+        timestamp: {type: integer, format: int64, description: Last update time, epoch milliseconds.}
