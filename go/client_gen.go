@@ -8,10 +8,12 @@ type Client struct {
 	Auth          *AuthResource
 	Brokerage     *BrokerageResource
 	KYC           *KYCResource
+	Market        *MarketResource
 	Notifications *NotificationsResource
 	Providers     *ProvidersResource
 	Registration  *RegistrationResource
 	Support       *SupportResource
+	Trading       *TradingResource
 	User          *UserResource
 
 	core *core
@@ -40,6 +42,7 @@ func (c *Client) initResources() {
 		Sumsub:         &KYCSumsubResource{core: c.core},
 		core:           c.core,
 	}
+	c.Market = &MarketResource{core: c.core}
 	c.Notifications = &NotificationsResource{core: c.core}
 	c.Providers = &ProvidersResource{
 		Alfa: &ProvidersAlfaResource{
@@ -60,6 +63,13 @@ func (c *Client) initResources() {
 	}
 	c.Registration = &RegistrationResource{core: c.core}
 	c.Support = &SupportResource{core: c.core}
+	c.Trading = &TradingResource{
+		Account:    &TradingAccountResource{core: c.core},
+		Demo:       &TradingDemoResource{core: c.core},
+		Executions: &TradingExecutionsResource{core: c.core},
+		Orders:     &TradingOrdersResource{core: c.core},
+		Reports:    &TradingReportsResource{core: c.core},
+	}
 	c.User = &UserResource{
 		Antifraud: &UserAntifraudResource{core: c.core},
 		Email:     &UserEmailResource{core: c.core},

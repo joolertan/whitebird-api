@@ -158,6 +158,35 @@ const (
 	KYCSumsubLevelTypeLiveness KYCSumsubLevelType = "LIVENESS"
 )
 
+// MarketCategory is used in [MarketInstrumentsParams].
+type MarketCategory string
+
+// Known values of [MarketCategory].
+const (
+	MarketCategorySpot MarketCategory = "spot"
+)
+
+// MarketKlineInterval is used in [MarketKlinesParams].
+//
+// Interval as sent by the web terminal; candles report it in Bybit form (`1h` comes back as `60`,
+// `1D` as `D`).
+type MarketKlineInterval string
+
+// Known values of [MarketKlineInterval].
+const (
+	MarketKlineInterval1M      MarketKlineInterval = "1m"
+	MarketKlineInterval5M      MarketKlineInterval = "5m"
+	MarketKlineInterval15M     MarketKlineInterval = "15m"
+	MarketKlineInterval30M     MarketKlineInterval = "30m"
+	MarketKlineInterval1H      MarketKlineInterval = "1h"
+	MarketKlineInterval4H      MarketKlineInterval = "4h"
+	MarketKlineInterval6H      MarketKlineInterval = "6h"
+	MarketKlineInterval12H     MarketKlineInterval = "12h"
+	MarketKlineInterval1D      MarketKlineInterval = "1D"
+	MarketKlineInterval1W      MarketKlineInterval = "1W"
+	MarketKlineIntervalValue10 MarketKlineInterval = "1M"
+)
+
 // MtsCardCountry is returned by [ProvidersMtsResource.Countries].
 type MtsCardCountry string
 
@@ -420,6 +449,111 @@ const (
 	SubaccountTypeIndividual             SubaccountType = "INDIVIDUAL"
 	SubaccountTypeIndividualEntrepreneur SubaccountType = "INDIVIDUAL_ENTREPRENEUR"
 	SubaccountTypeOrganization           SubaccountType = "ORGANIZATION"
+)
+
+// TradingCategory is used in [TradingOrdersAmendParams], [TradingOrdersCreateParams] and
+// [TradingOrdersCancelParams].
+type TradingCategory string
+
+// Known values of [TradingCategory].
+const (
+	TradingCategorySpot TradingCategory = "spot"
+)
+
+// TradingOrderRecordSide is used in [TradingOrderRecord].
+type TradingOrderRecordSide string
+
+// Known values of [TradingOrderRecordSide].
+const (
+	TradingOrderRecordSideBuy  TradingOrderRecordSide = "BUY"
+	TradingOrderRecordSideSell TradingOrderRecordSide = "SELL"
+)
+
+// TradingOrderRecordType is used in [TradingOrderRecord].
+type TradingOrderRecordType string
+
+// Known values of [TradingOrderRecordType].
+const (
+	TradingOrderRecordTypeLimit  TradingOrderRecordType = "LIMIT"
+	TradingOrderRecordTypeMarket TradingOrderRecordType = "MARKET"
+)
+
+// TradingOrderSide is used in [TradingOrdersCreateParams], [TradingExecution] and [TradingOrder].
+type TradingOrderSide string
+
+// Known values of [TradingOrderSide].
+const (
+	TradingOrderSideBuy  TradingOrderSide = "Buy"
+	TradingOrderSideSell TradingOrderSide = "Sell"
+)
+
+// TradingOrderStatus is used in [TradingOrder] and [TradingOrderRecord].
+//
+// Native order status. The web terminal maps them to Bybit terms: CREATED and PLACED are New,
+// PROCESSING is PartiallyFilled, CLOSED is Filled.
+type TradingOrderStatus string
+
+// Known values of [TradingOrderStatus].
+const (
+	TradingOrderStatusCreated     TradingOrderStatus = "CREATED"
+	TradingOrderStatusPlaced      TradingOrderStatus = "PLACED"
+	TradingOrderStatusProcessing  TradingOrderStatus = "PROCESSING"
+	TradingOrderStatusCancelled   TradingOrderStatus = "CANCELLED"
+	TradingOrderStatusRejected    TradingOrderStatus = "REJECTED"
+	TradingOrderStatusClosed      TradingOrderStatus = "CLOSED"
+	TradingOrderStatusTriggered   TradingOrderStatus = "TRIGGERED"
+	TradingOrderStatusUntriggered TradingOrderStatus = "UNTRIGGERED"
+	TradingOrderStatusUnknown     TradingOrderStatus = "UNKNOWN"
+)
+
+// TradingOrderType is used in [TradingOrdersAmendParams], [TradingOrdersCreateParams],
+// [TradingExecution] and [TradingOrder].
+type TradingOrderType string
+
+// Known values of [TradingOrderType].
+const (
+	TradingOrderTypeLimit  TradingOrderType = "Limit"
+	TradingOrderTypeMarket TradingOrderType = "Market"
+)
+
+// TradingPortfolioPeriod is used in [TradingAccountPortfolioStatisticsParams].
+type TradingPortfolioPeriod string
+
+// Known values of [TradingPortfolioPeriod].
+const (
+	TradingPortfolioPeriod24H TradingPortfolioPeriod = "24H"
+	TradingPortfolioPeriod1W  TradingPortfolioPeriod = "1W"
+	TradingPortfolioPeriod1M  TradingPortfolioPeriod = "1M"
+	TradingPortfolioPeriod1Y  TradingPortfolioPeriod = "1Y"
+)
+
+// TradingReportFormat is used in [TradingReportsOperationsParams].
+type TradingReportFormat string
+
+// Known values of [TradingReportFormat].
+const (
+	TradingReportFormatPDF TradingReportFormat = "PDF"
+)
+
+// TradingSortDirection is used in [TradingOrdersListParams].
+type TradingSortDirection string
+
+// Known values of [TradingSortDirection].
+const (
+	TradingSortDirectionAsc  TradingSortDirection = "ASC"
+	TradingSortDirectionDesc TradingSortDirection = "DESC"
+)
+
+// TradingTimeInForce is used in [TradingOrdersCreateParams], [TradingOrder] and
+// [TradingOrderRecord].
+type TradingTimeInForce string
+
+// Known values of [TradingTimeInForce].
+const (
+	TradingTimeInForceGtc      TradingTimeInForce = "GTC"
+	TradingTimeInForcePostOnly TradingTimeInForce = "PostOnly"
+	TradingTimeInForceIoc      TradingTimeInForce = "IOC"
+	TradingTimeInForceFok      TradingTimeInForce = "FOK"
 )
 
 // UserGender is used in [UserSetGenderParams].

@@ -391,6 +391,81 @@ type KYCVerification struct {
 	SdkOferta bool `json:"sdkOferta,omitzero"`
 }
 
+// MarketInstrument is returned by [MarketResource.Instruments].
+type MarketInstrument struct {
+	// Always `spot` so far.
+	Category string `json:"category"`
+	// Symbol without separator, e.g. `BTCUSDT`.
+	Symbol    string `json:"symbol"`
+	BaseCoin  string `json:"baseCoin"`
+	QuoteCoin string `json:"quoteCoin"`
+	// Trading status; `tradable` is the only value seen.
+	Status string `json:"status"`
+	// Number of decimal places of the quantity, e.g. `"3"` for a step of 0.001.
+	BasePrecision string `json:"basePrecision"`
+	// Number of decimal places of quote amounts.
+	QuotePrecision string `json:"quotePrecision"`
+	// Minimum order quantity in the base coin.
+	MinOrderQty string `json:"minOrderQty"`
+	// Maximum order quantity in the base coin.
+	MaxOrderQty string `json:"maxOrderQty"`
+	// Maximum market order quantity in the base coin.
+	MaxMarketOrderQty string `json:"maxMarketOrderQty"`
+	// Maximum limit order quantity in the base coin.
+	MaxLimitOrderQty string `json:"maxLimitOrderQty"`
+	// Minimum order value in the quote coin.
+	MinOrderAmt string `json:"minOrderAmt"`
+	// Maximum order value in the quote coin.
+	MaxOrderAmt string `json:"maxOrderAmt"`
+	// Price step.
+	TickSize string `json:"tickSize"`
+	// Inferred from the web application; not yet observed in responses.
+	AssetClass string `json:"assetClass,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Description string `json:"description,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IconURL string `json:"iconUrl,omitzero"`
+}
+
+// MarketKline is returned by [MarketResource.Klines].
+type MarketKline struct {
+	// Candle open time.
+	Start int64 `json:"start"`
+	// Candle close time.
+	End int64 `json:"end"`
+	// Bybit-style interval: `1`, `5`, `60`, `240`, `D`, `W`, `M`, ...
+	Interval string `json:"interval"`
+	Open     string `json:"open"`
+	High     string `json:"high"`
+	Low      string `json:"low"`
+	Close    string `json:"close"`
+	// Volume in the base coin. In older history (2025) volume and turnover are swapped.
+	Volume string `json:"volume"`
+	// Volume in the quote coin.
+	Turnover string `json:"turnover"`
+	// Whether the candle is closed.
+	Confirm bool `json:"confirm"`
+	// Last update time.
+	Timestamp int64 `json:"timestamp"`
+}
+
+// MarketOrderbook is returned by [MarketResource.Orderbook].
+type MarketOrderbook struct {
+	Symbol string `json:"symbol"`
+	// Always `snapshot`.
+	Type string `json:"type"`
+	// Bid levels as `[price, size]` string pairs, best (highest) price first.
+	Bids [][]string `json:"bids"`
+	// Ask levels as `[price, size]` string pairs, best (lowest) price first.
+	Asks [][]string `json:"asks"`
+	// Epoch milliseconds.
+	Timestamp int64 `json:"timestamp"`
+	// Update id of the book; same sequence as `u` in WebSocket order book messages.
+	ID string `json:"id"`
+}
+
 // MtsQRAmount is used in [MtsQRPayment].
 type MtsQRAmount struct {
 	// Inferred from the web application; not yet observed in responses.
@@ -684,6 +759,174 @@ type SubaccountResponse struct {
 type SupportResponse struct {
 	// `OK` on success. Inferred from the web application; not yet observed in responses.
 	Status string `json:"status,omitzero"`
+}
+
+// TradingExecution is returned by [TradingExecutionsResource.List].
+//
+// Fill of an order; also pushed on the `execution` WebSocket topic.
+type TradingExecution struct {
+	// Execution id. Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	OrderID string `json:"orderId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Symbol string `json:"symbol,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Category string `json:"category,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Side TradingOrderSide `json:"side,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type TradingOrderType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExecPrice string `json:"execPrice,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExecQty string `json:"execQty,omitzero"`
+	// Value in the quote coin. Inferred from the web application; not yet observed in responses.
+	ExecValue string `json:"execValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExecFee Decimal `json:"execFee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TotalFee Decimal `json:"totalFee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Fee Decimal `json:"fee,omitzero"`
+	// Epoch milliseconds. Inferred from the web application; not yet observed in responses.
+	ExecTime string `json:"execTime,omitzero"`
+}
+
+// TradingFeeRate is returned by [TradingAccountResource.FeeRate].
+type TradingFeeRate struct {
+	// Inferred from the web application; not yet observed in responses.
+	Symbol string `json:"symbol,omitzero"`
+	// Percent. Inferred from the web application; not yet observed in responses.
+	TakerFeeRate Decimal `json:"takerFeeRate,omitzero"`
+	// Percent. Inferred from the web application; not yet observed in responses.
+	MakerFeeRate Decimal `json:"makerFeeRate,omitzero"`
+	// Fee tier. Inferred from the web application; not yet observed in responses.
+	RateType string `json:"rateType,omitzero"`
+}
+
+// TradingOrder is returned by [TradingOrdersResource.Active] and [TradingOrdersResource.History].
+//
+// Order in the Bybit-like shape shared by the REST lists and the `order` WebSocket topic.
+type TradingOrder struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	OrderLinkID string `json:"orderLinkId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Symbol string `json:"symbol,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Category string `json:"category,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Side TradingOrderSide `json:"side,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type TradingOrderType `json:"type,omitzero"`
+	// Closed-order history may report Bybit-style values (`Cancelled`, `Filled`, ...). Inferred from
+	// the web application; not yet observed in responses.
+	Status TradingOrderStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Price string `json:"price,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Qty string `json:"qty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	LeavesQty string `json:"leavesQty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	LeavesValue string `json:"leavesValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CumExecQty string `json:"cumExecQty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CumExecValue string `json:"cumExecValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AvgPrice string `json:"avgPrice,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TotalFee Decimal `json:"totalFee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TimeInForce TradingTimeInForce `json:"timeInForce,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TakeProfit string `json:"takeProfit,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	StopLoss string `json:"stopLoss,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TpLimitPrice string `json:"tpLimitPrice,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	SlLimitPrice string `json:"slLimitPrice,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TpOrderType string `json:"tpOrderType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	SlOrderType string `json:"slOrderType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	StopOrderType string `json:"stopOrderType,omitzero"`
+	// Epoch milliseconds. Inferred from the web application; not yet observed in responses.
+	CreatedTime string `json:"createdTime,omitzero"`
+	// Epoch milliseconds. Inferred from the web application; not yet observed in responses.
+	UpdatedTime string `json:"updatedTime,omitzero"`
+}
+
+// TradingOrderAck is returned by [TradingOrdersResource.Amend], [TradingOrdersResource.Create] and
+// [TradingOrdersResource.Cancel].
+type TradingOrderAck struct {
+	// Inferred from the web application; not yet observed in responses.
+	OrderID string `json:"orderId,omitzero"`
+}
+
+// TradingOrderRecord is returned by [TradingOrdersResource.List].
+//
+// Order as stored by the order management service (history page).
+type TradingOrderRecord struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Client order id. Inferred from the web application; not yet observed in responses.
+	ExternalID string `json:"externalId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Symbol string `json:"symbol,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Category string `json:"category,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Side TradingOrderRecordSide `json:"side,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type TradingOrderRecordType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status TradingOrderStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TimeInForce TradingTimeInForce `json:"timeInForce,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Price Decimal `json:"price,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AvgPrice Decimal `json:"avgPrice,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	OrigQty Decimal `json:"origQty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExecutedQty Decimal `json:"executedQty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	RemainingQty Decimal `json:"remainingQty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CumulativeQuoteQty Decimal `json:"cumulativeQuoteQty,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TotalFee Decimal `json:"totalFee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TakeProfit Decimal `json:"takeProfit,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	StopLoss Decimal `json:"stopLoss,omitzero"`
+	// Rejection reason. Inferred from the web application; not yet observed in responses.
+	ErrorCode string `json:"errorCode,omitzero"`
+	// Creation time. Inferred from the web application; not yet observed in responses.
+	ExchangeTime int64 `json:"exchangeTime,omitzero"`
+	// Last update time. Inferred from the web application; not yet observed in responses.
+	ExchangeUpdateTime int64 `json:"exchangeUpdateTime,omitzero"`
+}
+
+// TradingPortfolioPoint is used in [TradingPortfolioStatistics].
+type TradingPortfolioPoint struct {
+	// Epoch milliseconds. Inferred from the web application; not yet observed in responses.
+	Timestamp int64 `json:"timestamp,omitzero"`
+	// Portfolio value. Inferred from the web application; not yet observed in responses.
+	Value Decimal `json:"value,omitzero"`
+}
+
+// TradingPortfolioStatistics is returned by [TradingAccountResource.PortfolioStatistics].
+type TradingPortfolioStatistics struct {
+	// Inferred from the web application; not yet observed in responses.
+	Points []TradingPortfolioPoint `json:"points,omitzero"`
 }
 
 // UserEmailChangeConfirmation is returned by [UserEmailResource.VerifyCode].

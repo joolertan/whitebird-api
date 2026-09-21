@@ -4,20 +4,24 @@ import { APIResource } from '../resource.js';
 import { AuthResource } from './resources/auth.js';
 import { BrokerageResource } from './resources/brokerage.js';
 import { KycResource } from './resources/kyc.js';
+import { MarketResource } from './resources/market.js';
 import { NotificationsResource } from './resources/notifications.js';
 import { ProvidersResource } from './resources/providers.js';
 import { RegistrationResource } from './resources/registration.js';
 import { SupportResource } from './resources/support.js';
+import { TradingResource } from './resources/trading.js';
 import { UserResource } from './resources/user.js';
 
 export * from './models.js';
 export * from './resources/auth.js';
 export * from './resources/brokerage.js';
 export * from './resources/kyc.js';
+export * from './resources/market.js';
 export * from './resources/notifications.js';
 export * from './resources/providers.js';
 export * from './resources/registration.js';
 export * from './resources/support.js';
+export * from './resources/trading.js';
 export * from './resources/user.js';
 export * from './services.js';
 
@@ -29,6 +33,8 @@ export class Resources extends APIResource {
   readonly brokerage = new BrokerageResource(this._client);
   /** Endpoints under `client.kyc`. */
   readonly kyc = new KycResource(this._client);
+  /** Endpoints under `client.market`. */
+  readonly market = new MarketResource(this._client);
   /** Endpoints under `client.notifications`. */
   readonly notifications = new NotificationsResource(this._client);
   /** Endpoints under `client.providers`. */
@@ -37,6 +43,8 @@ export class Resources extends APIResource {
   readonly registration = new RegistrationResource(this._client);
   /** Endpoints under `client.support`. */
   readonly support = new SupportResource(this._client);
+  /** Endpoints under `client.trading`. */
+  readonly trading = new TradingResource(this._client);
   /** Endpoints under `client.user`. */
   readonly user = new UserResource(this._client);
 }

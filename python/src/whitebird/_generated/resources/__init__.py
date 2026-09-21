@@ -9,6 +9,7 @@ from whitebird._engine import AsyncEngine, SyncEngine
 from whitebird._generated.resources.auth import AsyncAuthResource, AuthResource
 from whitebird._generated.resources.brokerage import AsyncBrokerageResource, BrokerageResource
 from whitebird._generated.resources.kyc import AsyncKycResource, KycResource
+from whitebird._generated.resources.market import AsyncMarketResource, MarketResource
 from whitebird._generated.resources.notifications import (
     AsyncNotificationsResource,
     NotificationsResource,
@@ -19,6 +20,7 @@ from whitebird._generated.resources.registration import (
     RegistrationResource,
 )
 from whitebird._generated.resources.support import AsyncSupportResource, SupportResource
+from whitebird._generated.resources.trading import AsyncTradingResource, TradingResource
 from whitebird._generated.resources.user import AsyncUserResource, UserResource
 
 
@@ -43,6 +45,11 @@ class Resources:
         return KycResource(self._engine)
 
     @cached_property
+    def market(self) -> MarketResource:
+        """Operations of `client.market`."""
+        return MarketResource(self._engine)
+
+    @cached_property
     def notifications(self) -> NotificationsResource:
         """Operations of `client.notifications`."""
         return NotificationsResource(self._engine)
@@ -61,6 +68,11 @@ class Resources:
     def support(self) -> SupportResource:
         """Operations of `client.support`."""
         return SupportResource(self._engine)
+
+    @cached_property
+    def trading(self) -> TradingResource:
+        """Operations of `client.trading`."""
+        return TradingResource(self._engine)
 
     @cached_property
     def user(self) -> UserResource:
@@ -89,6 +101,11 @@ class AsyncResources:
         return AsyncKycResource(self._engine)
 
     @cached_property
+    def market(self) -> AsyncMarketResource:
+        """Operations of `client.market`."""
+        return AsyncMarketResource(self._engine)
+
+    @cached_property
     def notifications(self) -> AsyncNotificationsResource:
         """Operations of `client.notifications`."""
         return AsyncNotificationsResource(self._engine)
@@ -107,6 +124,11 @@ class AsyncResources:
     def support(self) -> AsyncSupportResource:
         """Operations of `client.support`."""
         return AsyncSupportResource(self._engine)
+
+    @cached_property
+    def trading(self) -> AsyncTradingResource:
+        """Operations of `client.trading`."""
+        return AsyncTradingResource(self._engine)
 
     @cached_property
     def user(self) -> AsyncUserResource:

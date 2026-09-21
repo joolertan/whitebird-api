@@ -178,6 +178,46 @@ export const KycSumsubLevelType = {
   LIVENESS: 'LIVENESS',
 } as const;
 
+export type MarketCategory = 'spot' | (string & {});
+
+/** Known values of {@link MarketCategory}; others may appear as the API evolves. */
+export const MarketCategory = {
+  SPOT: 'spot',
+} as const;
+
+/**
+ * Interval as sent by the web terminal; candles report it in Bybit form (`1h` comes back as `60`,
+ * `1D` as `D`).
+ */
+export type MarketKlineInterval =
+  | '1m'
+  | '5m'
+  | '15m'
+  | '30m'
+  | '1h'
+  | '4h'
+  | '6h'
+  | '12h'
+  | '1D'
+  | '1W'
+  | '1M'
+  | (string & {});
+
+/** Known values of {@link MarketKlineInterval}; others may appear as the API evolves. */
+export const MarketKlineInterval = {
+  N1M: '1m',
+  N5M: '5m',
+  N15M: '15m',
+  N30M: '30m',
+  N1H: '1h',
+  N4H: '4h',
+  N6H: '6h',
+  N12H: '12h',
+  N1_D: '1D',
+  N1_W: '1W',
+  N1_M: '1M',
+} as const;
+
 export type MtsCardCountry = 'RUSSIA' | 'KYRGYZSTAN' | 'KAZAKHSTAN' | 'UZBEKISTAN' | (string & {});
 
 /** Known values of {@link MtsCardCountry}; others may appear as the API evolves. */
@@ -521,6 +561,109 @@ export const SubaccountType = {
   INDIVIDUAL: 'INDIVIDUAL',
   INDIVIDUAL_ENTREPRENEUR: 'INDIVIDUAL_ENTREPRENEUR',
   ORGANIZATION: 'ORGANIZATION',
+} as const;
+
+export type TradingCategory = 'spot' | (string & {});
+
+/** Known values of {@link TradingCategory}; others may appear as the API evolves. */
+export const TradingCategory = {
+  SPOT: 'spot',
+} as const;
+
+export type TradingOrderRecordSide = 'BUY' | 'SELL' | (string & {});
+
+/** Known values of {@link TradingOrderRecordSide}; others may appear as the API evolves. */
+export const TradingOrderRecordSide = {
+  BUY: 'BUY',
+  SELL: 'SELL',
+} as const;
+
+export type TradingOrderRecordType = 'LIMIT' | 'MARKET' | (string & {});
+
+/** Known values of {@link TradingOrderRecordType}; others may appear as the API evolves. */
+export const TradingOrderRecordType = {
+  LIMIT: 'LIMIT',
+  MARKET: 'MARKET',
+} as const;
+
+export type TradingOrderSide = 'Buy' | 'Sell' | (string & {});
+
+/** Known values of {@link TradingOrderSide}; others may appear as the API evolves. */
+export const TradingOrderSide = {
+  BUY: 'Buy',
+  SELL: 'Sell',
+} as const;
+
+/**
+ * Native order status. The web terminal maps them to Bybit terms: CREATED and PLACED are New,
+ * PROCESSING is PartiallyFilled, CLOSED is Filled.
+ */
+export type TradingOrderStatus =
+  | 'CREATED'
+  | 'PLACED'
+  | 'PROCESSING'
+  | 'CANCELLED'
+  | 'REJECTED'
+  | 'CLOSED'
+  | 'TRIGGERED'
+  | 'UNTRIGGERED'
+  | 'UNKNOWN'
+  | (string & {});
+
+/** Known values of {@link TradingOrderStatus}; others may appear as the API evolves. */
+export const TradingOrderStatus = {
+  CREATED: 'CREATED',
+  PLACED: 'PLACED',
+  PROCESSING: 'PROCESSING',
+  CANCELLED: 'CANCELLED',
+  REJECTED: 'REJECTED',
+  CLOSED: 'CLOSED',
+  TRIGGERED: 'TRIGGERED',
+  UNTRIGGERED: 'UNTRIGGERED',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export type TradingOrderType = 'Limit' | 'Market' | (string & {});
+
+/** Known values of {@link TradingOrderType}; others may appear as the API evolves. */
+export const TradingOrderType = {
+  LIMIT: 'Limit',
+  MARKET: 'Market',
+} as const;
+
+export type TradingPortfolioPeriod = '24H' | '1W' | '1M' | '1Y' | (string & {});
+
+/** Known values of {@link TradingPortfolioPeriod}; others may appear as the API evolves. */
+export const TradingPortfolioPeriod = {
+  N24_H: '24H',
+  N1_W: '1W',
+  N1_M: '1M',
+  N1_Y: '1Y',
+} as const;
+
+export type TradingReportFormat = 'PDF' | (string & {});
+
+/** Known values of {@link TradingReportFormat}; others may appear as the API evolves. */
+export const TradingReportFormat = {
+  PDF: 'PDF',
+} as const;
+
+export type TradingSortDirection = 'ASC' | 'DESC' | (string & {});
+
+/** Known values of {@link TradingSortDirection}; others may appear as the API evolves. */
+export const TradingSortDirection = {
+  ASC: 'ASC',
+  DESC: 'DESC',
+} as const;
+
+export type TradingTimeInForce = 'GTC' | 'PostOnly' | 'IOC' | 'FOK' | (string & {});
+
+/** Known values of {@link TradingTimeInForce}; others may appear as the API evolves. */
+export const TradingTimeInForce = {
+  GTC: 'GTC',
+  POST_ONLY: 'PostOnly',
+  IOC: 'IOC',
+  FOK: 'FOK',
 } as const;
 
 export type UserGender = 'M' | 'F' | (string & {});
@@ -1151,6 +1294,78 @@ export interface KycVerificationRequest {
   emailVerified?: boolean;
 }
 
+export interface MarketInstrument {
+  /** Always `spot` so far. */
+  category: string;
+  /** Symbol without separator, e.g. `BTCUSDT`. */
+  symbol: string;
+  baseCoin: string;
+  quoteCoin: string;
+  /** Trading status; `tradable` is the only value seen. */
+  status: string;
+  /** Number of decimal places of the quantity, e.g. `"3"` for a step of 0.001. */
+  basePrecision: string;
+  /** Number of decimal places of quote amounts. */
+  quotePrecision: string;
+  /** Minimum order quantity in the base coin. */
+  minOrderQty: string;
+  /** Maximum order quantity in the base coin. */
+  maxOrderQty: string | null;
+  /** Maximum market order quantity in the base coin. */
+  maxMarketOrderQty: string;
+  /** Maximum limit order quantity in the base coin. */
+  maxLimitOrderQty: string | null;
+  /** Minimum order value in the quote coin. */
+  minOrderAmt: string;
+  /** Maximum order value in the quote coin. */
+  maxOrderAmt: string;
+  /** Price step. */
+  tickSize: string;
+  /** Inferred from the web application, not observed in API responses. */
+  assetClass?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  name?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  description?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  iconUrl?: string;
+}
+
+export interface MarketKline {
+  /** Candle open time */
+  start: number;
+  /** Candle close time */
+  end: number;
+  /** Bybit-style interval: `1`, `5`, `60`, `240`, `D`, `W`, `M`, ... */
+  interval: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  /** Volume in the base coin. In older history (2025) volume and turnover are swapped. */
+  volume: string;
+  /** Volume in the quote coin. */
+  turnover: string;
+  /** Whether the candle is closed. */
+  confirm: boolean;
+  /** Last update time */
+  timestamp: number;
+}
+
+export interface MarketOrderbook {
+  symbol: string;
+  /** Always `snapshot`. */
+  type: string;
+  /** Bid levels as `[price, size]` string pairs, best (highest) price first. */
+  bids: string[][];
+  /** Ask levels as `[price, size]` string pairs, best (lowest) price first. */
+  asks: string[][];
+  /** Epoch milliseconds. */
+  timestamp: number;
+  /** Update id of the book; same sequence as `u` in WebSocket order book messages. */
+  id: string;
+}
+
 export interface MtsCardBindRequest {
   /** Card number, digits only (the web app requires 16 digits). */
   cardNumber: string;
@@ -1633,6 +1848,267 @@ export interface SupportSendRequest {
   request: string;
   /** Attachment; the server accepts the part repeated once per file. */
   files?: Blob;
+}
+
+export interface TradingDemoDepositRequest {
+  /** Coin to credit; the web app always sends `USDT`. */
+  asset: string;
+  /** Amount to credit */
+  amount: number;
+}
+
+/** Fill of an order; also pushed on the `execution` WebSocket topic. */
+export interface TradingExecution {
+  /**
+   * Execution id.
+   * Inferred from the web application, not observed in API responses.
+   */
+  id?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  orderId?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  symbol?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  category?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  side?: TradingOrderSide;
+  /** Inferred from the web application, not observed in API responses. */
+  type?: TradingOrderType;
+  /** Inferred from the web application, not observed in API responses. */
+  execPrice?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  execQty?: string;
+  /**
+   * Value in the quote coin.
+   * Inferred from the web application, not observed in API responses.
+   */
+  execValue?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  execFee?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  totalFee?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  fee?: number;
+  /**
+   * Epoch milliseconds.
+   * Inferred from the web application, not observed in API responses.
+   */
+  execTime?: string;
+}
+
+export interface TradingFeeRate {
+  /** Inferred from the web application, not observed in API responses. */
+  symbol?: string;
+  /**
+   * Percent
+   * Inferred from the web application, not observed in API responses.
+   */
+  takerFeeRate?: number;
+  /**
+   * Percent.
+   * Inferred from the web application, not observed in API responses.
+   */
+  makerFeeRate?: number;
+  /**
+   * Fee tier
+   * Inferred from the web application, not observed in API responses.
+   */
+  rateType?: string;
+}
+
+export interface TradingOperationsReportRequest {
+  /** Epoch milliseconds. */
+  startTime: number;
+  /** Epoch milliseconds. */
+  endTime: number;
+  format?: TradingReportFormat;
+}
+
+/** Order in the Bybit-like shape shared by the REST lists and the `order` WebSocket topic. */
+export interface TradingOrder {
+  /** Inferred from the web application, not observed in API responses. */
+  id?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  orderLinkId?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  symbol?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  category?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  side?: TradingOrderSide;
+  /** Inferred from the web application, not observed in API responses. */
+  type?: TradingOrderType;
+  /**
+   * Closed-order history may report Bybit-style values (`Cancelled`, `Filled`, ...).
+   * Inferred from the web application, not observed in API responses.
+   */
+  status?: TradingOrderStatus;
+  /** Inferred from the web application, not observed in API responses. */
+  price?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  qty?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  leavesQty?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  leavesValue?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  cumExecQty?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  cumExecValue?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  avgPrice?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  totalFee?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  timeInForce?: TradingTimeInForce;
+  /** Inferred from the web application, not observed in API responses. */
+  takeProfit?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  stopLoss?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  tpLimitPrice?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  slLimitPrice?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  tpOrderType?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  slOrderType?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  stopOrderType?: string;
+  /**
+   * Epoch milliseconds.
+   * Inferred from the web application, not observed in API responses.
+   */
+  createdTime?: string;
+  /**
+   * Epoch milliseconds.
+   * Inferred from the web application, not observed in API responses.
+   */
+  updatedTime?: string;
+}
+
+export interface TradingOrderAck {
+  /** Inferred from the web application, not observed in API responses. */
+  orderId?: string;
+}
+
+export interface TradingOrderAmendRequest {
+  /** Order id. */
+  id: string;
+  symbol: string;
+  qty?: string;
+  price?: string;
+  /** New take-profit trigger price; `"0"` removes it. */
+  takeProfit?: string;
+  /** New stop-loss trigger price; `"0"` removes it. */
+  stopLoss?: string;
+  tpslMode?: string;
+  tpOrderType?: TradingOrderType;
+  slOrderType?: TradingOrderType;
+  tpLimitPrice?: string;
+  slLimitPrice?: string;
+  category?: TradingCategory;
+}
+
+export interface TradingOrderCreateRequest {
+  /** Symbol without separator, e.g. `BTCUSDT`. */
+  symbol: string;
+  side: TradingOrderSide;
+  type: TradingOrderType;
+  /** Quantity in the base coin. For market buys it is the amount to spend in the quote coin. */
+  qty: string;
+  /** Limit price; leave out for market orders. */
+  price?: string;
+  /** The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders. */
+  timeInForce?: TradingTimeInForce;
+  /** Client order id. */
+  orderLinkId?: string;
+  /** Take-profit trigger price. */
+  takeProfit?: string;
+  /** Stop-loss trigger price. */
+  stopLoss?: string;
+  tpslMode?: string;
+  tpOrderType?: TradingOrderType;
+  slOrderType?: TradingOrderType;
+  /** Limit price of the take-profit order when `tpOrderType` is `Limit`. */
+  tpLimitPrice?: string;
+  /** Limit price of the stop-loss order when `slOrderType` is `Limit`. */
+  slLimitPrice?: string;
+  category?: TradingCategory;
+}
+
+/** Order as stored by the order management service (history page). */
+export interface TradingOrderRecord {
+  /** Inferred from the web application, not observed in API responses. */
+  id?: string;
+  /**
+   * Client order id.
+   * Inferred from the web application, not observed in API responses.
+   */
+  externalId?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  symbol?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  category?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  side?: TradingOrderRecordSide;
+  /** Inferred from the web application, not observed in API responses. */
+  type?: TradingOrderRecordType;
+  /** Inferred from the web application, not observed in API responses. */
+  status?: TradingOrderStatus;
+  /** Inferred from the web application, not observed in API responses. */
+  timeInForce?: TradingTimeInForce;
+  /** Inferred from the web application, not observed in API responses. */
+  price?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  avgPrice?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  origQty?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  executedQty?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  remainingQty?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  cumulativeQuoteQty?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  totalFee?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  takeProfit?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  stopLoss?: number;
+  /**
+   * Rejection reason.
+   * Inferred from the web application, not observed in API responses.
+   */
+  errorCode?: string;
+  /**
+   * Creation time
+   * Inferred from the web application, not observed in API responses.
+   */
+  exchangeTime?: number;
+  /**
+   * Last update time
+   * Inferred from the web application, not observed in API responses.
+   */
+  exchangeUpdateTime?: number;
+}
+
+export interface TradingPortfolioPoint {
+  /**
+   * Epoch milliseconds.
+   * Inferred from the web application, not observed in API responses.
+   */
+  timestamp?: number;
+  /**
+   * Portfolio value.
+   * Inferred from the web application, not observed in API responses.
+   */
+  value?: number;
+}
+
+export interface TradingPortfolioStatistics {
+  /** Inferred from the web application, not observed in API responses. */
+  points?: TradingPortfolioPoint[];
 }
 
 export interface UserCodeRequest {

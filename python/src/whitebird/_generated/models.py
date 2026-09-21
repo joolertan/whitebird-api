@@ -73,6 +73,11 @@ __all__ = [
     "KycSumsubToken",
     "KycVerification",
     "KycVerificationRequest",
+    "MarketCategory",
+    "MarketInstrument",
+    "MarketKline",
+    "MarketKlineInterval",
+    "MarketOrderbook",
     "MtsCardBindRequest",
     "MtsCardCountry",
     "MtsQrAmount",
@@ -134,6 +139,27 @@ __all__ = [
     "SubaccountType",
     "SupportResponse",
     "SupportSendRequest",
+    "TradingCategory",
+    "TradingDemoDepositRequest",
+    "TradingExecution",
+    "TradingFeeRate",
+    "TradingOperationsReportRequest",
+    "TradingOrder",
+    "TradingOrderAck",
+    "TradingOrderAmendRequest",
+    "TradingOrderCreateRequest",
+    "TradingOrderRecord",
+    "TradingOrderRecordSide",
+    "TradingOrderRecordType",
+    "TradingOrderSide",
+    "TradingOrderStatus",
+    "TradingOrderType",
+    "TradingPortfolioPeriod",
+    "TradingPortfolioPoint",
+    "TradingPortfolioStatistics",
+    "TradingReportFormat",
+    "TradingSortDirection",
+    "TradingTimeInForce",
     "UserCodeRequest",
     "UserEmailChangeConfirmation",
     "UserEmailChangeRequest",
@@ -285,6 +311,32 @@ class KycSumsubLevelType(StrEnum):
 
     MAIN = "MAIN"
     LIVENESS = "LIVENESS"
+
+
+class MarketCategory(StrEnum):
+    """Values of the `category` parameter of `client.market.instruments()`."""
+
+    SPOT = "spot"
+
+
+class MarketKlineInterval(StrEnum):
+    """Market kline interval.
+
+    Interval as sent by the web terminal; candles report it in Bybit form (`1h` comes back as `60`,
+    `1D` as `D`).
+    """
+
+    VALUE_1M = "1m"
+    VALUE_5M = "5m"
+    VALUE_15M = "15m"
+    VALUE_30M = "30m"
+    VALUE_1H = "1h"
+    VALUE_4H = "4h"
+    VALUE_6H = "6h"
+    VALUE_12H = "12h"
+    VALUE_1_D = "1D"
+    VALUE_1_W = "1W"
+    VALUE_1_M = "1M"
 
 
 class MtsCardCountry(StrEnum):
@@ -520,6 +572,104 @@ class SubaccountType(StrEnum):
     INDIVIDUAL = "INDIVIDUAL"
     INDIVIDUAL_ENTREPRENEUR = "INDIVIDUAL_ENTREPRENEUR"
     ORGANIZATION = "ORGANIZATION"
+
+
+class TradingCategory(StrEnum):
+    """Trading category.
+
+    Values of `TradingOrderAmendRequest.category`, `TradingOrderCreateRequest.category` and the
+    `category` parameter of `client.trading.orders.cancel()`.
+    """
+
+    SPOT = "spot"
+
+
+class TradingOrderRecordSide(StrEnum):
+    """Values of `TradingOrderRecord.side`."""
+
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class TradingOrderRecordType(StrEnum):
+    """Values of `TradingOrderRecord.type`."""
+
+    LIMIT = "LIMIT"
+    MARKET = "MARKET"
+
+
+class TradingOrderSide(StrEnum):
+    """Trading order side.
+
+    Values of `TradingExecution.side`, `TradingOrder.side` and `TradingOrderCreateRequest.side`.
+    """
+
+    BUY = "Buy"
+    SELL = "Sell"
+
+
+class TradingOrderStatus(StrEnum):
+    """Native order status.
+
+    The web terminal maps them to Bybit terms: CREATED and PLACED are New, PROCESSING is
+    PartiallyFilled, CLOSED is Filled.
+    """
+
+    CREATED = "CREATED"
+    PLACED = "PLACED"
+    PROCESSING = "PROCESSING"
+    CANCELLED = "CANCELLED"
+    REJECTED = "REJECTED"
+    CLOSED = "CLOSED"
+    TRIGGERED = "TRIGGERED"
+    UNTRIGGERED = "UNTRIGGERED"
+    UNKNOWN = "UNKNOWN"
+
+
+class TradingOrderType(StrEnum):
+    """Trading order type.
+
+    Values of `TradingExecution.type`, `TradingOrder.type`, `TradingOrderAmendRequest.tp_order_type`
+    and 4 more.
+    """
+
+    LIMIT = "Limit"
+    MARKET = "Market"
+
+
+class TradingPortfolioPeriod(StrEnum):
+    """Values of the `period` parameter of `client.trading.account.portfolio_statistics()`."""
+
+    VALUE_24_H = "24H"
+    VALUE_1_W = "1W"
+    VALUE_1_M = "1M"
+    VALUE_1_Y = "1Y"
+
+
+class TradingReportFormat(StrEnum):
+    """Values of `TradingOperationsReportRequest.format`."""
+
+    PDF = "PDF"
+
+
+class TradingSortDirection(StrEnum):
+    """Values of the `sort_dir` parameter of `client.trading.orders.list()`."""
+
+    ASC = "ASC"
+    DESC = "DESC"
+
+
+class TradingTimeInForce(StrEnum):
+    """Trading time in force.
+
+    Values of `TradingOrder.time_in_force`, `TradingOrderCreateRequest.time_in_force` and
+    `TradingOrderRecord.time_in_force`.
+    """
+
+    GTC = "GTC"
+    POST_ONLY = "PostOnly"
+    IOC = "IOC"
+    FOK = "FOK"
 
 
 class UserGender(StrEnum):
@@ -1315,6 +1465,109 @@ class KycVerificationRequest(WhitebirdModel):
     email_verified: bool | None = None
 
 
+class MarketInstrument(WhitebirdModel):
+    """Returned by `client.market.instruments()`."""
+
+    category: str
+    """Always `spot` so far."""
+
+    symbol: str
+    """Symbol without separator, e.g. `BTCUSDT`."""
+
+    base_coin: str
+    quote_coin: str
+    status: str
+    """Trading status; `tradable` is the only value seen."""
+
+    base_precision: str
+    """Number of decimal places of the quantity, e.g. `"3"` for a step of 0.001."""
+
+    quote_precision: str
+    """Number of decimal places of quote amounts."""
+
+    min_order_qty: str
+    """Minimum order quantity in the base coin."""
+
+    max_order_qty: str | None
+    """Maximum order quantity in the base coin."""
+
+    max_market_order_qty: str
+    """Maximum market order quantity in the base coin."""
+
+    max_limit_order_qty: str | None
+    """Maximum limit order quantity in the base coin."""
+
+    min_order_amt: str
+    """Minimum order value in the quote coin."""
+
+    max_order_amt: str
+    """Maximum order value in the quote coin."""
+
+    tick_size: str
+    """Price step."""
+
+    asset_class: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    description: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    icon_url: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MarketKline(WhitebirdModel):
+    """Returned by `client.market.klines()`."""
+
+    start: int
+    """Candle open time."""
+
+    end: int
+    """Candle close time."""
+
+    interval: str
+    """Bybit-style interval: `1`, `5`, `60`, `240`, `D`, `W`, `M`, ..."""
+
+    open: str
+    high: str
+    low: str
+    close: str
+    volume: str
+    """Volume in the base coin. In older history (2025) volume and turnover are swapped."""
+
+    turnover: str
+    """Volume in the quote coin."""
+
+    confirm: bool
+    """Whether the candle is closed."""
+
+    timestamp: int
+    """Last update time."""
+
+
+class MarketOrderbook(WhitebirdModel):
+    """Returned by `client.market.orderbook()`."""
+
+    symbol: str
+    type: str
+    """Always `snapshot`."""
+
+    bids: list[list[str]]
+    """Bid levels as `[price, size]` string pairs, best (highest) price first."""
+
+    asks: list[list[str]]
+    """Ask levels as `[price, size]` string pairs, best (lowest) price first."""
+
+    timestamp: int
+    """Epoch milliseconds."""
+
+    id: str
+    """Update id of the book; same sequence as `u` in WebSocket order book messages."""
+
+
 class MtsCardBindRequest(WhitebirdModel):
     """Request body of `client.providers.mts.bind_card()`."""
 
@@ -1942,6 +2195,322 @@ class SupportSendRequest(WhitebirdModel):
 
     files: bytes | None = None
     """Attachment; the server accepts the part repeated once per file."""
+
+
+class TradingDemoDepositRequest(WhitebirdModel):
+    """Request body of `client.trading.demo.deposit()`."""
+
+    asset: str
+    """Coin to credit; the web app always sends `USDT`."""
+
+    amount: Decimal
+    """Amount to credit."""
+
+
+class TradingExecution(WhitebirdModel):
+    """Fill of an order; also pushed on the `execution` WebSocket topic."""
+
+    id: str | None = None
+    """Execution id. Inferred from the web application; may be missing."""
+
+    order_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    symbol: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    category: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    side: TradingOrderSide | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    type: TradingOrderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    exec_price: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    exec_qty: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    exec_value: str | None = None
+    """Value in the quote coin. Inferred from the web application; may be missing."""
+
+    exec_fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    total_fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    exec_time: str | None = None
+    """Epoch milliseconds. Inferred from the web application; may be missing."""
+
+
+class TradingFeeRate(WhitebirdModel):
+    """Returned by `client.trading.account.fee_rate()`."""
+
+    symbol: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    taker_fee_rate: Decimal | None = None
+    """Percent Inferred from the web application; may be missing."""
+
+    maker_fee_rate: Decimal | None = None
+    """Percent. Inferred from the web application; may be missing."""
+
+    rate_type: str | None = None
+    """Fee tier Inferred from the web application; may be missing."""
+
+
+class TradingOperationsReportRequest(WhitebirdModel):
+    """Request body of `client.trading.reports.operations()`."""
+
+    start_time: int
+    """Epoch milliseconds."""
+
+    end_time: int
+    """Epoch milliseconds."""
+
+    format: TradingReportFormat | str | None = TradingReportFormat.PDF
+
+
+class TradingOrder(WhitebirdModel):
+    """Order in the Bybit-like shape shared by the REST lists and the `order` WebSocket topic."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    order_link_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    symbol: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    category: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    side: TradingOrderSide | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    type: TradingOrderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: TradingOrderStatus | str | None = None
+    """Closed-order history may report Bybit-style values (`Cancelled`, `Filled`, ...).
+
+    Inferred from the web application; may be missing.
+    """
+
+    price: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    qty: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    leaves_qty: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    leaves_value: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    cum_exec_qty: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    cum_exec_value: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    avg_price: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    total_fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    time_in_force: TradingTimeInForce | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    take_profit: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    stop_loss: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    tp_limit_price: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    sl_limit_price: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    tp_order_type: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    sl_order_type: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    stop_order_type: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    created_time: str | None = None
+    """Epoch milliseconds. Inferred from the web application; may be missing."""
+
+    updated_time: str | None = None
+    """Epoch milliseconds. Inferred from the web application; may be missing."""
+
+
+class TradingOrderAck(WhitebirdModel):
+    """Trading order ack.
+
+    Returned by `client.trading.orders.amend()`, `client.trading.orders.create()` and
+    `client.trading.orders.cancel()`.
+    """
+
+    order_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class TradingOrderAmendRequest(WhitebirdModel):
+    """Request body of `client.trading.orders.amend()`."""
+
+    id: str
+    """Order id."""
+
+    symbol: str
+    qty: str | None = None
+    price: str | None = None
+    take_profit: str | None = None
+    """New take-profit trigger price; `"0"` removes it."""
+
+    stop_loss: str | None = None
+    """New stop-loss trigger price; `"0"` removes it."""
+
+    tpsl_mode: str | None = None
+    tp_order_type: TradingOrderType | str | None = None
+    sl_order_type: TradingOrderType | str | None = None
+    tp_limit_price: str | None = None
+    sl_limit_price: str | None = None
+    category: TradingCategory | str | None = TradingCategory.SPOT
+
+
+class TradingOrderCreateRequest(WhitebirdModel):
+    """Request body of `client.trading.orders.create()`."""
+
+    symbol: str
+    """Symbol without separator, e.g. `BTCUSDT`."""
+
+    side: TradingOrderSide | str
+    type: TradingOrderType | str
+    qty: str
+    """Quantity in the base coin. For market buys it is the amount to spend in the quote coin."""
+
+    price: str | None = None
+    """Limit price; leave out for market orders."""
+
+    time_in_force: TradingTimeInForce | str | None = None
+    """The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders."""
+
+    order_link_id: str | None = None
+    """Client order id."""
+
+    take_profit: str | None = None
+    """Take-profit trigger price."""
+
+    stop_loss: str | None = None
+    """Stop-loss trigger price."""
+
+    tpsl_mode: str | None = None
+    tp_order_type: TradingOrderType | str | None = None
+    sl_order_type: TradingOrderType | str | None = None
+    tp_limit_price: str | None = None
+    """Limit price of the take-profit order when `tpOrderType` is `Limit`."""
+
+    sl_limit_price: str | None = None
+    """Limit price of the stop-loss order when `slOrderType` is `Limit`."""
+
+    category: TradingCategory | str | None = TradingCategory.SPOT
+
+
+class TradingOrderRecord(WhitebirdModel):
+    """Order as stored by the order management service (history page)."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    external_id: str | None = None
+    """Client order id. Inferred from the web application; may be missing."""
+
+    symbol: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    category: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    side: TradingOrderRecordSide | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    type: TradingOrderRecordType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: TradingOrderStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    time_in_force: TradingTimeInForce | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    price: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    avg_price: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    orig_qty: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    executed_qty: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    remaining_qty: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    cumulative_quote_qty: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    total_fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    take_profit: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    stop_loss: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    error_code: str | None = None
+    """Rejection reason. Inferred from the web application; may be missing."""
+
+    exchange_time: int | None = None
+    """Creation time Inferred from the web application; may be missing."""
+
+    exchange_update_time: int | None = None
+    """Last update time Inferred from the web application; may be missing."""
+
+
+class TradingPortfolioPoint(WhitebirdModel):
+    """Used in `TradingPortfolioStatistics.points`."""
+
+    timestamp: int | None = None
+    """Epoch milliseconds. Inferred from the web application; may be missing."""
+
+    value: Decimal | None = None
+    """Portfolio value. Inferred from the web application; may be missing."""
+
+
+class TradingPortfolioStatistics(WhitebirdModel):
+    """Returned by `client.trading.account.portfolio_statistics()`."""
+
+    points: list[TradingPortfolioPoint] | None = None
+    """Inferred from the web application; may be missing."""
 
 
 class UserCodeRequest(WhitebirdModel):
