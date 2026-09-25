@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: Current account
+  version: '1'
+  description: |
+    Bank-transfer (current account, provider type `CA`) payments: Whitebird bank details and the
+    invoices to pay. Reconstructed from the whitebird.io web app.
+x-wb-service: current_account
+servers:
+- url: https://current-account-service.whitebird.io
+paths:
+  /api/v1/currentAccount/system/general:
+    get:
+      operationId: currentAccountSystemAccountsList
+      x-wb-resource: current_account.system_accounts
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List Whitebird bank accounts to pay into
+      description: |
+        Whitebird's bank accounts for a currency. The chosen `id` is sent as `internalToken` of a
+        `CA` deposit (`balance.deposits.create_fiat`) or `systemToken` of a `CA` purchase
+        (`exchange.orders.create`).
+      parameters:
+      - name: currency
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: fiatOpType
+        in: query
+        schema:
+          $ref: '#/components/schemas/CurrentAccountFiatOpType'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CurrentAccountSystemAccount'
+  /api/v1/currentAccount/{accountId}:
+    delete:
+      operationId: currentAccountDelete
+      x-wb-resource: current_account
+      x-wb-name: delete
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Unlink a bank account
+      description: Removes one of the client's current accounts (`payments.methods.list` with `providers` `["CA"]`).
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v1/currentAccount/order/{invoiceId}/invoice:
+    post:
+      operationId: currentAccountInvoicesDownload
+      x-wb-resource: current_account.invoices
+      x-wb-name: download
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Download the invoice of an exchange order
+      description: |
+        PDF invoice for paying a current-account (`CA`) exchange order by bank transfer;
+        `invoiceId` is the order's `input.processorTransactionId`.
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrentAccountReportRequest'
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/currentAccount/order/{invoiceId}/email/invoice:
+    post:
+      operationId: currentAccountInvoicesEmail
+      x-wb-resource: current_account.invoices
+      x-wb-name: email
+      x-wb-response: empty
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Email the invoice of an exchange order
+      description: Variant of `download` used by the mobile app; the invoice is sent to the client's e-mail.
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrentAccountReportRequest'
+      responses:
+        '200':
+          description: OK
+  /api/v1/currentAccount/order/deposit/invoice/{invoiceId}:
+    post:
+      operationId: currentAccountInvoicesDownloadDeposit
+      x-wb-resource: current_account.invoices
+      x-wb-name: download_deposit
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Download the invoice of a wallet deposit
+      description: PDF invoice of a `CA` fiat deposit; `invoiceId` is the operation's `orderIdentity` from `balance.current`.
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrentAccountReportRequest'
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/currentAccount/order/deposit/email/invoice/{invoiceId}:
+    post:
+      operationId: currentAccountInvoicesEmailDeposit
+      x-wb-resource: current_account.invoices
+      x-wb-name: email_deposit
+      x-wb-response: empty
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Email the invoice of a wallet deposit
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrentAccountReportRequest'
+      responses:
+        '200':
+          description: OK
+  /api/v1/currentAccount/order/current/invoice/download:
+    get:
+      operationId: currentAccountInvoicesDownloadByToken
+      x-wb-resource: current_account.invoices
+      x-wb-name: download_by_token
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Download an invoice with a download token
+      description: |
+        The token comes from the brokerage service
+        (`POST /api/v1/brokerage/payment/invoice/{id}/download-token`).
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+components:
+  schemas:
+    CurrentAccountReportRequest:
+      type: object
+      description: |
+        Shared document-request body. The web app sends `{}` for invoices; the fields exist for
+        statements served by the same code path.
+      properties:
+        limit:
+          type: integer
+        completionDateFrame:
+          $ref: '#/components/schemas/CurrentAccountDateFrame'
+        type:
+          type: string
+        format:
+          type: string
+    CurrentAccountDateFrame:
+      type: object
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+    CurrentAccountFiatOpType:
+      type: string
+      description: '`BALANCE` for wallet deposits, `BROKER` for brokerage payments; omitted for exchange orders.'
+      enum: [BALANCE, BROKER]
+    CurrentAccountSystemAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        bankName:
+          type: string
+          x-wb-inferred: true
+        number:
+          type: string
+          description: Account number.
+          x-wb-inferred: true

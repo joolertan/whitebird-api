@@ -1,0 +1,1630 @@
+openapi: 3.1.0
+info:
+  title: Exchange API (gateway)
+  version: '1'
+  description: |
+    Client exchange (buy/sell/convert crypto), custodial balance (deposits, withdrawals,
+    operations history) and payment-method lookups served by the API gateway under
+    `/api/v2/exchange` and `/api/v3/exchange`. Reconstructed from the whitebird.io web app.
+
+    Errors are answered as `{"code": int, "status": "MACHINE_CODE", "message": str,
+    "fields": [{"fieldName": str, "fieldValue": str}]}`. Limit errors
+    (`INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`) carry the limit in the `limit` field and the asset
+    in the `asset` field.
+x-wb-service: api
+servers:
+- url: https://api.whitebird.io
+paths:
+  /api/v3/exchange/client/quote:
+    post:
+      operationId: exchangeQuotesCreate
+      x-wb-resource: exchange.quotes
+      x-wb-name: create
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Request an exchange quote
+      description: |
+        Prices a conversion between two legs. Each leg is an `INTERNAL_BALANCE` (Whitebird
+        electronic wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER`
+        (bank card / bank account of a payment provider). Set the amount on exactly one leg; the
+        other one is computed. The quote `id` is then passed to `exchange.orders.create`.
+        The web app re-requests the quote every 15 s while the form is open.
+
+        Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
+        `AMOUNT_TOO_SMALL`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeQuoteRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeQuote'
+  /api/v3/exchange/client/limit:
+    post:
+      operationId: exchangeLimitsGet
+      x-wb-resource: exchange.limits
+      x-wb-name: get
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get exchange limits for a direction
+      description: |
+        Returns the minimum and maximum amounts for both legs of a direction. The web app calls it
+        before quoting and before creating an internal conversion order. Answers
+        `INVALID_MAX_LIMIT` when the client has exhausted its limits.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeLimitsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeLimits'
+  /api/v3/exchange/client/order:
+    post:
+      operationId: exchangeOrdersCreate
+      x-wb-resource: exchange.orders
+      x-wb-name: create
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Create an order from a quote
+      description: |
+        Accepts a quote. For a `FIAT_PROVIDER` input the response carries the payment step:
+        `input.link` (card acquiring page to redirect to; for Alfa-Bank the link carries
+        `mdOrder` and 3-D Secure data is fetched from the Alfa service) or `postForm` (Assist:
+        an HTML form to POST). For a `CRYPTO_TRANSFER` input `input.toAddress` is the Whitebird
+        address to send the crypto to. Then poll `exchange.orders.get` until the status is
+        `COMPLETED`, `FAILED` or `EXPIRED`.
+
+        Errors: `QUOTE_NOT_FOUND` (quote expired, request a new one), `ACTIVE_ORDER_FOUND`,
+        `ORDER_ALREADY_EXISTS`, `MAX_FIAT_CRYPTO_ORDERS_EXCEEDED`,
+        `MAX_CRYPTO_FIAT_ORDERS_EXCEEDED`, `MAX_CA_FIAT_CRYPTO_ORDERS_EXCEEDED`,
+        `INVALID_MFA_STATUS` (two-factor authentication must be enabled),
+        `INVALID_INTERNAL_BALANCE`, `INVALID_FIAT_BALANCE`, `INVALID_CRYPTO_BALANCE`,
+        `INVALID_CORPORATE_CARD`, `SINGLE_OP_MAX_VOLUME_EXCEEDED`,
+        `OP_MAX_VOLUME_FOR_PERIOD_REACHED`, `OP_MAX_NUM_FOR_PERIOD_REACHED`,
+        `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON` (anti-fraud),
+        `EXCHANGE_UNAVAILABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeOrderRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeOrder'
+  /api/v3/exchange/client/order/{orderId}:
+    get:
+      operationId: exchangeOrdersGet
+      x-wb-resource: exchange.orders
+      x-wb-name: get
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get an order
+      parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeOrder'
+  /api/v3/exchange/client/order/{orderId}/reject:
+    post:
+      operationId: exchangeOrdersReject
+      x-wb-resource: exchange.orders
+      x-wb-name: reject
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Cancel an active order
+      parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeOrderRejectRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v3/exchange/client/order/current:
+    get:
+      operationId: exchangeOrdersCurrent
+      x-wb-resource: exchange.orders
+      x-wb-name: current
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the active order
+      description: Returns the client's unfinished order for a destination, or an empty body when there is none.
+      parameters:
+      - name: destination
+        in: query
+        schema:
+          $ref: '#/components/schemas/ExchangeDestination'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeOrder'
+  /api/v3/exchange/client/order/current/all:
+    get:
+      operationId: exchangeOrdersCurrentAll
+      x-wb-resource: exchange.orders
+      x-wb-name: current_all
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List all active orders
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExchangeOrder'
+  /api/v3/exchange/client/order/history:
+    post:
+      operationId: exchangeOrdersHistory
+      x-wb-resource: exchange.orders
+      x-wb-name: history
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List finished and active orders
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Size'
+      - $ref: '#/components/parameters/Sort'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeOrderHistoryFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeOrderPage'
+  /api/v2/exchange/client/assets:
+    post:
+      operationId: exchangeAssetsList
+      x-wb-resource: exchange.assets
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List assets available for a destination
+      description: |
+        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app falls
+        back to `11111111-1111-1111-1111-111111111111` when embedded without one.
+      parameters:
+      - name: destination
+        in: query
+        schema:
+          $ref: '#/components/schemas/ExchangeDestination'
+      - name: merchantId
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeAssets'
+  /api/v2/exchange/client/balance/current:
+    get:
+      operationId: balanceCurrent
+      x-wb-resource: balance
+      x-wb-name: current
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List active deposits and withdrawals
+      description: Unfinished balance operations, split into crypto and fiat ones.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceCurrentOperations'
+  /api/v2/exchange/client/balance/crypto/deposit:
+    post:
+      operationId: balanceDepositsCreateCrypto
+      x-wb-resource: balance.deposits
+      x-wb-name: create_crypto
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Start a crypto deposit
+      description: |
+        Returns the Whitebird address to send the crypto to (`depositCryptoAddress`). Errors:
+        `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already uses
+        the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceCryptoDepositRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceCryptoDeposit'
+  /api/v2/exchange/client/balance/fiat/deposit:
+    post:
+      operationId: balanceDepositsCreateFiat
+      x-wb-resource: balance.deposits
+      x-wb-name: create_fiat
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Start a fiat deposit
+      description: |
+        Returns the payment step: `fiatPaymentLink` / `paymentDetails.webPaymentLink` (card
+        acquiring page), `paymentDetails.paymentLink` (bank app deep link, e.g. T-Bank QR) or
+        `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice
+        (see `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
+        `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
+        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceFiatDepositRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceFiatDeposit'
+  /api/v2/exchange/client/balance/crypto/deposit/calculate:
+    post:
+      operationId: balanceDepositsCalculateCrypto
+      x-wb-resource: balance.deposits
+      x-wb-name: calculate_crypto
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Calculate commission of a crypto deposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceCryptoCalculationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceCalculation'
+  /api/v2/exchange/client/balance/fiat/deposit/calculate:
+    post:
+      operationId: balanceDepositsCalculateFiat
+      x-wb-resource: balance.deposits
+      x-wb-name: calculate_fiat
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Calculate commission of a fiat deposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceFiatCalculationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceCalculation'
+  /api/v2/exchange/client/balance/crypto/withdrawal:
+    post:
+      operationId: balanceWithdrawalsCreateCrypto
+      x-wb-resource: balance.withdrawals
+      x-wb-name: create_crypto
+      x-wb-auth: mfa
+      x-wb-mfa-operation: WITHDRAWAL
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Withdraw crypto to an external address
+      description: |
+        Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount
+        and network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without it
+        the service answers "Operation denied, requires mfa checking". Errors:
+        `INVALID_CALCULATION` (calculation expired, calculate again),
+        `ACTIVE_WITHDRAWAL_REQUEST_FOUND`, `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`,
+        `DESTINATION_ADDRESS_IS_INTERNAL`, `INVALID_AMOUNT` (commission exceeds the amount),
+        `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`, `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`,
+        `AML_FRAUD_VALIDATION_ERROR`, `BALANCE_OPERATION_PROCESSING_ERROR`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceCryptoWithdrawalRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v2/exchange/client/balance/fiat/withdrawal:
+    post:
+      operationId: balanceWithdrawalsCreateFiat
+      x-wb-resource: balance.withdrawals
+      x-wb-name: create_fiat
+      x-wb-auth: mfa
+      x-wb-mfa-operation: WITHDRAWAL
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Withdraw fiat to a card or bank account
+      description: |
+        Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card /
+        payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
+        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the
+        crypto withdrawal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceFiatWithdrawalRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v2/exchange/client/balance/crypto/withdrawal/calculate:
+    post:
+      operationId: balanceWithdrawalsCalculateCrypto
+      x-wb-resource: balance.withdrawals
+      x-wb-name: calculate_crypto
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Calculate a crypto withdrawal
+      description: Returns the commission, the received amount and a calculation `id` valid until `expirationDate`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceCryptoCalculationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceCalculation'
+  /api/v2/exchange/client/balance/fiat/withdrawal/calculate:
+    post:
+      operationId: balanceWithdrawalsCalculateFiat
+      x-wb-resource: balance.withdrawals
+      x-wb-name: calculate_fiat
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Calculate a fiat withdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceFiatCalculationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceCalculation'
+  /api/v2/exchange/client/balance/crypto/reject:
+    post:
+      operationId: balanceOperationsRejectCrypto
+      x-wb-resource: balance.operations
+      x-wb-name: reject_crypto
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Cancel an active crypto deposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceRejectRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v2/exchange/client/balance/fiat/reject:
+    post:
+      operationId: balanceOperationsRejectFiat
+      x-wb-resource: balance.operations
+      x-wb-name: reject_fiat
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Cancel an active fiat deposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceRejectRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v2/exchange/client/balance/operation:
+    post:
+      operationId: balanceOperationsList
+      x-wb-resource: balance.operations
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List deposits, withdrawals and referral rewards
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Size'
+      - $ref: '#/components/parameters/Sort'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceOperationFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceOperationPage'
+  /api/v2/exchange/referrer/reward/create:
+    post:
+      operationId: referralWithdraw
+      x-wb-resource: referral
+      x-wb-name: withdraw
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Withdraw the referral balance to the wallet
+      description: |
+        Moves the whole `REFERRER_BALANCE` to the Whitebird wallet. Sent without a body; the client
+        must be verified. Errors: `PHONE_NUMBER_REQUIRED`, `PHONE_CONFIRMATION_REQUIRED`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v3/exchange/merchant/report:
+    post:
+      operationId: merchantDownloadReport
+      x-wb-resource: merchant
+      x-wb-name: download_report
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Export the merchant's client orders
+      description: CSV (windows-1251) or PDF export of the orders made through the merchant widget.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantReportRequest'
+      responses:
+        '200':
+          description: CSV or PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v2/exchange/client/payment/method:
+    post:
+      operationId: paymentsMethodsList
+      x-wb-resource: payments.methods
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List the client's payment methods
+      description: |
+        Bound cards, bank accounts and card-less methods usable for a direction. The web app sends
+        either a direction (`fiatAsset` + `orderType` + `destination`, from the exchange and
+        deposit/withdrawal forms) or a group (`countryGroup` `["BELARUS"]`, `["RUSSIA"]`,
+        `["BELARUS","RUSSIA"]`, or `providers` `["CA"]` for current accounts) on the
+        payment-methods page. A method's `id` is the `paymentToken` / `token` of deposits,
+        withdrawals and quotes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentMethodsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentMethod'
+  /api/v2/exchange/client/payment/provider:
+    post:
+      operationId: paymentsProvidersList
+      x-wb-resource: payments.providers
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List payment providers available for a destination
+      description: Providers the client can pay with or add a method for; `destination` may be null (all).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentProvidersRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentProvider'
+  /api/v2/exchange/client/payment/card/limits:
+    get:
+      operationId: paymentsCardsLimits
+      x-wb-resource: payments.cards
+      x-wb-name: limits
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get card binding limits
+      description: How many cards are bound in total and today, against the limits; binding is refused once either is reached.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentCardLimits'
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Zero-based page index.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      description: Page size.
+      schema:
+        type: integer
+        minimum: 1
+        default: 20
+    Sort:
+      name: sort
+      in: query
+      description: Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
+      schema:
+        type: array
+        items:
+          type: string
+  schemas:
+    ExchangeDestination:
+      type: string
+      description: |
+        Product context of a request. `EXCHANGE`: buy/sell with external card or address;
+        `ACCOUNTING`: operations on the Whitebird wallet (internal conversion); `SDK_*`: the same
+        contexts inside the embeddable widget (`SDK_CROSS`: wallet deposit/withdrawal assets,
+        `SDK_SWAP`: swap assets).
+      enum: [EXCHANGE, ACCOUNTING, SDK_EXCHANGE, SDK_ACCOUNTING, SDK_CROSS, SDK_SWAP]
+    ExchangeLegType:
+      type: string
+      description: |
+        `INTERNAL_BALANCE`: Whitebird wallet; `CRYPTO_TRANSFER`: external crypto address;
+        `FIAT_PROVIDER`: card or bank account of a payment provider.
+      enum: [FIAT_PROVIDER, CRYPTO_TRANSFER, INTERNAL_BALANCE]
+    ExchangeOrderStatus:
+      type: string
+      enum: [NEW, PENDING, PROCESSING, COMPLETED, FAILED, EXPIRED, DECLINED]
+    ExchangeLegStatus:
+      type: string
+      enum: [NEW, PROCESSING, UPDATED, COMPLETED, FAILED, EXPIRED]
+    PaymentProviderType:
+      type: string
+      description: Payment provider / payment method family (same values as the brokerage `ProviderType`).
+      enum: [ALFA, ASSIST, AZERICARD, BELVEB, BEPAID, BEPAID_CUSTOM, BGP, BRAZINO, BRICS, BSB, CA,
+        CARUSELL, CORTI_MILLI, DSB, ERIP, INSNC, MAXLINE, MODULBANK, MTS, MTS_CASH, MTS_MULTITRANSFER,
+        MTS_QR, SBER, SBP, SGB, SGB_CARD, STATUSBANK, TBANK, TEST, VTB, VTB_SBP, WILDBERRIES, ZUBRPARI]
+    ExchangeQuoteLegRequest:
+      type: object
+      required: [asset, type]
+      properties:
+        asset:
+          type: string
+          description: Asset code; network-specific for crypto transfers (`USDT_TRC`, `USDC_SOL`, ...).
+        type:
+          $ref: '#/components/schemas/ExchangeLegType'
+        amount:
+          type: number
+          format: decimal
+          description: Set on the leg whose amount the client fixes (input or output, not both).
+        provider:
+          $ref: '#/components/schemas/PaymentProviderType'
+        token:
+          type: string
+          description: Payment method id (bound card) of a `FIAT_PROVIDER` leg; the card number for `CORTI_MILLI`.
+        toAddress:
+          type: string
+          description: External crypto address of a `CRYPTO_TRANSFER` output.
+        comment:
+          type: string
+          description: Memo / destination tag of a `CRYPTO_TRANSFER` output.
+    ExchangeQuoteRequest:
+      type: object
+      required: [input, output]
+      properties:
+        input:
+          $ref: '#/components/schemas/ExchangeQuoteLegRequest'
+        output:
+          $ref: '#/components/schemas/ExchangeQuoteLegRequest'
+        promoCode:
+          type: string
+        sessionId:
+          type: string
+          description: Widget session id (merchant SDK).
+        merchantId:
+          type: string
+          description: Merchant id when quoting inside a merchant widget.
+    ExchangeLeg:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/ExchangeLegType'
+          x-wb-inferred: true
+        asset:
+          type: string
+          x-wb-inferred: true
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        transactionAmount:
+          type: number
+          format: decimal
+          description: Amount actually received or sent; differs from `amount` after a recalculation.
+          x-wb-inferred: true
+        feeAmount:
+          type: number
+          format: decimal
+          description: Service commission on the fiat leg, network commission on the crypto leg.
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/ExchangeLegStatus'
+          x-wb-inferred: true
+        provider:
+          $ref: '#/components/schemas/PaymentProviderType'
+          x-wb-inferred: true
+        token:
+          type: string
+          x-wb-inferred: true
+        post:
+          type: string
+          description: Masked card / account number of a `FIAT_PROVIDER` leg.
+          x-wb-inferred: true
+        paymentSystem:
+          type: string
+          description: Card brand (VISA, MASTERCARD, MIR, BELCARD, ...).
+          x-wb-inferred: true
+        clientBank:
+          type: string
+          x-wb-inferred: true
+        toAddress:
+          type: string
+          description: Destination address. On a `CRYPTO_TRANSFER` input this is the Whitebird address to pay to.
+          x-wb-inferred: true
+        fromAddress:
+          type: string
+          x-wb-inferred: true
+        hash:
+          type: string
+          description: Blockchain transaction hash.
+          x-wb-inferred: true
+        comment:
+          type: string
+          x-wb-inferred: true
+        link:
+          type: string
+          description: Payment page to redirect the client to (`FIAT_PROVIDER` input).
+          x-wb-inferred: true
+        processorTransactionId:
+          type: string
+          description: |
+            Transaction id at the payment provider (e.g. the Status Bank order id); for current-account
+            (`CA`) purchases the invoice id of `current_account.invoices.download`.
+          x-wb-inferred: true
+        processorTransactionNumber:
+          description: Transaction number at the payment provider (type not visible in the web app).
+          x-wb-inferred: true
+        expirationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+        failureMessage:
+          type: string
+          x-wb-inferred: true
+    ExchangePromoCode:
+      type: object
+      properties:
+        code:
+          type: string
+          x-wb-inferred: true
+        applied:
+          type: boolean
+          x-wb-inferred: true
+        rejectionReason:
+          type: string
+          x-wb-inferred: true
+    ExchangeQuote:
+      type: object
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        input:
+          $ref: '#/components/schemas/ExchangeLeg'
+          x-wb-inferred: true
+        output:
+          $ref: '#/components/schemas/ExchangeLeg'
+          x-wb-inferred: true
+        exchangeRateValue:
+          type: number
+          format: decimal
+          description: Displayed rate.
+          x-wb-inferred: true
+        actualRateValue:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        promoCode:
+          $ref: '#/components/schemas/ExchangePromoCode'
+          x-wb-inferred: true
+        creationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+        expirationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+    ExchangeLimitsLeg:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/ExchangeLegType'
+        provider:
+          $ref: '#/components/schemas/PaymentProviderType'
+        token:
+          type: string
+        toAddress:
+          type: string
+    ExchangeLimitsRequest:
+      type: object
+      required: [fromAsset, fromPaymentDetails, toAsset, toPaymentDetails]
+      properties:
+        fromAsset:
+          type: string
+        fromPaymentDetails:
+          $ref: '#/components/schemas/ExchangeLimitsLeg'
+        toAsset:
+          type: string
+        toPaymentDetails:
+          $ref: '#/components/schemas/ExchangeLimitsLeg'
+        merchantId:
+          type: string
+    ExchangeLimits:
+      type: object
+      properties:
+        fromMinAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        fromMaxAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        toMinAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        toMaxAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+    ExchangeOrderRequest:
+      type: object
+      required: [quoteId, destination]
+      properties:
+        quoteId:
+          type: string
+        destination:
+          $ref: '#/components/schemas/ExchangeDestination'
+        returnUrl:
+          type: string
+          description: Where the payment page returns after success.
+        failUrl:
+          type: string
+          description: Where the payment page returns after a failure.
+        systemToken:
+          type: string
+          description: Whitebird bank account to pay to (current-account `CA` purchases), from `current_account.banking_details`.
+        bankIdentifier:
+          type: string
+          description: Recipient bank for SBP payouts (RUB crypto-to-fiat).
+        additionalTimeout:
+          type: boolean
+          description: Longer waiting time for a crypto transfer from a service with deferred payouts.
+        externalId:
+          type: string
+          description: Merchant-side order id (widget).
+    ExchangeOrderRejectRequest:
+      type: object
+      description: 'The web app sends `{"requestBody": {}}`.'
+      properties:
+        requestBody:
+          type: object
+    ExchangePostForm:
+      type: object
+      description: HTML form to submit with POST (Assist acquiring).
+      properties:
+        action:
+          type: string
+          x-wb-inferred: true
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+          x-wb-inferred: true
+    ExchangeOrderConditions:
+      type: object
+      properties:
+        fromAsset:
+          type: string
+          x-wb-inferred: true
+        fromGrossAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        fromFeeAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        toAsset:
+          type: string
+          x-wb-inferred: true
+        toNetAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        toFeeAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        rate:
+          type: string
+          description: Pair of the rate, e.g. `BTC/USDT`.
+          x-wb-inferred: true
+        actualRateValue:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        exchangeRateValue:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+    ExchangeOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        number:
+          type: integer
+          format: int64
+          description: Application number shown to the client.
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/ExchangeOrderStatus'
+          x-wb-inferred: true
+        input:
+          $ref: '#/components/schemas/ExchangeLeg'
+          x-wb-inferred: true
+        output:
+          $ref: '#/components/schemas/ExchangeLeg'
+          x-wb-inferred: true
+        conditions:
+          $ref: '#/components/schemas/ExchangeOrderConditions'
+          x-wb-inferred: true
+        exchangeRateValue:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        postForm:
+          $ref: '#/components/schemas/ExchangePostForm'
+          x-wb-inferred: true
+        recalculationReason:
+          type: string
+          description: Why the terms were recalculated, e.g. `WRONG_AMOUNT` (a different amount was received).
+          x-wb-inferred: true
+        creationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+        completionDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+    ExchangeDateFrame:
+      type: object
+      description: |
+        Time interval. The web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a
+        colon-less offset, e.g. `2026-11-07T00:00:00+0300`.
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+    ExchangeOrderHistoryFilter:
+      type: object
+      properties:
+        limit:
+          type: integer
+          default: 20
+        inputAssets:
+          type: array
+          items:
+            type: string
+        outputAssets:
+          type: array
+          items:
+            type: string
+        inputOperationTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeLegType'
+        outputOperationTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeLegType'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeOrderStatus'
+        creationDateFrame:
+          $ref: '#/components/schemas/ExchangeDateFrame'
+    ExchangeOrderPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeOrder'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    ExchangeAssetCategory:
+      type: string
+      enum: [CRYPTO, STABLECOIN, STOCK, FIAT]
+    ExchangeCryptoAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Network-specific id, e.g. `USDT_TRC`.
+          x-wb-inferred: true
+        code:
+          type: string
+          description: Asset code, e.g. `USDT`.
+          x-wb-inferred: true
+        category:
+          $ref: '#/components/schemas/ExchangeAssetCategory'
+          x-wb-inferred: true
+        network:
+          type: string
+          x-wb-inferred: true
+        protocol:
+          type: string
+          description: Token standard, e.g. `TRC-20`.
+          x-wb-inferred: true
+    ExchangeFiatAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        code:
+          type: string
+          x-wb-inferred: true
+        category:
+          $ref: '#/components/schemas/ExchangeAssetCategory'
+          x-wb-inferred: true
+    ExchangeAssets:
+      type: object
+      properties:
+        cryptoAssets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeCryptoAsset'
+          x-wb-inferred: true
+        fiatAssets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeFiatAsset'
+          x-wb-inferred: true
+    BalanceAccountType:
+      type: string
+      enum: [WALLET]
+    BalanceOperationType:
+      type: string
+      enum: [DEPOSIT, WITHDRAWAL, REFERRER_REWARD]
+    BalanceOperationStatus:
+      type: string
+      description: Status of a deposit / withdrawal transaction (crypto and fiat statuses share the enum).
+      enum: [NEW, PENDING, PROCESSING, SELECTED, SUBMITTING, SUBMITTED, SUBMIT_TIMEOUT, CONFIRMED,
+        COMPLETED, APPROVED, PROCESSED, REJECTED, DECLINED, ERROR, AML_ERROR, AML_BLOCKED, ARREST,
+        TIMEOUT, INVALID_AMOUNT, NOT_FOUND, PENDING_RESOLVE, PENDING_RESOLVED, PENDING_RENEWED,
+        PENDING_REVIEW]
+    BalanceCryptoAsset:
+      type: object
+      required: [code, amount]
+      properties:
+        code:
+          type: string
+        amount:
+          type: number
+          format: decimal
+        network:
+          type: string
+          description: Network of the asset, e.g. `Tron`, `Ethereum`, `BNB`, `SOLANA`, `Ton`, `Bitcoin`.
+    BalanceFiatAsset:
+      type: object
+      required: [code, amount]
+      properties:
+        code:
+          type: string
+        amount:
+          type: number
+          format: decimal
+    BalanceCryptoDepositRequest:
+      type: object
+      required: [accountType, asset]
+      properties:
+        accountType:
+          $ref: '#/components/schemas/BalanceAccountType'
+        asset:
+          $ref: '#/components/schemas/BalanceCryptoAsset'
+        additionalSubmitTimeout:
+          type: boolean
+          description: Wait longer for the transfer (deposits from services with deferred payouts).
+    BalanceCryptoDeposit:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          x-wb-inferred: true
+        depositCryptoAddress:
+          type: string
+          x-wb-inferred: true
+    BalanceFiatDepositRequest:
+      type: object
+      required: [accountType, asset, fiatProviderType]
+      properties:
+        accountType:
+          $ref: '#/components/schemas/BalanceAccountType'
+        asset:
+          $ref: '#/components/schemas/BalanceFiatAsset'
+        fiatProviderType:
+          $ref: '#/components/schemas/PaymentProviderType'
+        paymentToken:
+          type: string
+          description: Id of the payment method (bound card) to pay with.
+        internalToken:
+          type: string
+          description: Whitebird bank account to pay to (required for `CA` current-account deposits).
+        returnUrl:
+          type: string
+        failUrl:
+          type: string
+    BalancePaymentDetails:
+      type: object
+      properties:
+        paymentLink:
+          type: string
+          description: Deep link into the bank app (e.g. T-Bank).
+          x-wb-inferred: true
+        webPaymentLink:
+          type: string
+          x-wb-inferred: true
+        postForm:
+          $ref: '#/components/schemas/ExchangePostForm'
+          x-wb-inferred: true
+    BalanceFiatDeposit:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          x-wb-inferred: true
+        fiatPaymentLink:
+          type: string
+          x-wb-inferred: true
+        paymentDetails:
+          $ref: '#/components/schemas/BalancePaymentDetails'
+          x-wb-inferred: true
+    BalanceCryptoCalculationRequest:
+      type: object
+      required: [accountType, asset]
+      properties:
+        accountType:
+          $ref: '#/components/schemas/BalanceAccountType'
+        asset:
+          $ref: '#/components/schemas/BalanceCryptoAsset'
+        toAddress:
+          type: string
+          description: Destination address (withdrawals).
+    BalanceCommissionType:
+      type: string
+      description: How the commission is applied; the web app only sends `ADD` (MTS QR payments).
+      enum: [ADD]
+    BalanceFiatCalculationRequest:
+      type: object
+      required: [asset, fiatProviderType]
+      properties:
+        asset:
+          $ref: '#/components/schemas/BalanceFiatAsset'
+        fiatProviderType:
+          $ref: '#/components/schemas/PaymentProviderType'
+        paymentToken:
+          type: string
+        commissionType:
+          $ref: '#/components/schemas/BalanceCommissionType'
+    BalanceCalculation:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Calculation id, passed as `calculationId` to a crypto withdrawal.
+          x-wb-inferred: true
+        commissionAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        receivedAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        withdrawalAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        expirationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+    BalanceCryptoWithdrawalRequest:
+      type: object
+      required: [accountType, calculationId]
+      properties:
+        accountType:
+          $ref: '#/components/schemas/BalanceAccountType'
+        calculationId:
+          type: string
+        comment:
+          type: string
+          description: Memo / destination tag.
+    BalanceFiatWithdrawalRequest:
+      type: object
+      required: [accountType, asset, fiatProviderType]
+      properties:
+        accountType:
+          $ref: '#/components/schemas/BalanceAccountType'
+        asset:
+          $ref: '#/components/schemas/BalanceFiatAsset'
+        fiatProviderType:
+          $ref: '#/components/schemas/PaymentProviderType'
+        paymentToken:
+          type: string
+        commissionType:
+          $ref: '#/components/schemas/BalanceCommissionType'
+        bankIdentifier:
+          type: string
+    BalanceRejectRequest:
+      type: object
+      required: [transactionId]
+      properties:
+        transactionId:
+          type: string
+        operationType:
+          type: string
+          description: Same as the path segment (`crypto` or `fiat`).
+          enum: [crypto, fiat]
+    BalanceCurrentOperation:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          x-wb-inferred: true
+        number:
+          description: Application number shown to the client (integer or numeric string).
+          x-wb-inferred: true
+        operationType:
+          $ref: '#/components/schemas/BalanceOperationType'
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/BalanceOperationStatus'
+          x-wb-inferred: true
+        asset:
+          type: string
+          x-wb-inferred: true
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        serviceFee:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        networkFee:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        createdAt:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+        network:
+          type: string
+          description: Crypto operations only.
+          x-wb-inferred: true
+        depositCryptoAddress:
+          type: string
+          description: Crypto deposits only.
+          x-wb-inferred: true
+        externalCryptoAddress:
+          type: string
+          x-wb-inferred: true
+        txHash:
+          type: string
+          x-wb-inferred: true
+        fiatProvider:
+          $ref: '#/components/schemas/PaymentProviderType'
+          description: Fiat operations only.
+          x-wb-inferred: true
+        orderIdentity:
+          type: string
+          description: Provider order id; for `CA` deposits the invoice id (see `current_account.invoices`).
+          x-wb-inferred: true
+        cardMask:
+          type: string
+          x-wb-inferred: true
+        phoneNumber:
+          type: string
+          x-wb-inferred: true
+    BalanceCurrentOperations:
+      type: object
+      properties:
+        cryptoOperations:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceCurrentOperation'
+          x-wb-inferred: true
+        fiatOperations:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceCurrentOperation'
+          x-wb-inferred: true
+    BalanceOperationFilter:
+      type: object
+      properties:
+        limit:
+          type: integer
+          default: 20
+        transactionTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceOperationType'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceOperationStatus'
+        currencies:
+          type: array
+          items:
+            type: string
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        expandCurrencyNetworks:
+          type: boolean
+    BalanceOperation:
+      type: object
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        number:
+          description: Application number shown to the client (integer or numeric string).
+          x-wb-inferred: true
+        type:
+          $ref: '#/components/schemas/BalanceOperationType'
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/BalanceOperationStatus'
+          x-wb-inferred: true
+        txStatus:
+          $ref: '#/components/schemas/BalanceOperationStatus'
+          description: Status of the underlying transaction; takes precedence over `status` when present.
+          x-wb-inferred: true
+        asset:
+          type: string
+          x-wb-inferred: true
+        requestedAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        netAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        commission:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        providerType:
+          $ref: '#/components/schemas/PaymentProviderType'
+          x-wb-inferred: true
+        post:
+          type: string
+          description: Masked card / account number.
+          x-wb-inferred: true
+        paymentSystem:
+          type: string
+          x-wb-inferred: true
+        externalCryptoAddress:
+          type: string
+          x-wb-inferred: true
+        transactionHash:
+          type: string
+          x-wb-inferred: true
+        creationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+        completionDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+    BalanceOperationPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceOperation'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    MerchantReportFileType:
+      type: string
+      enum: [CSV, PDF]
+    MerchantReportRequest:
+      type: object
+      required: [fileType]
+      properties:
+        fileType:
+          $ref: '#/components/schemas/MerchantReportFileType'
+        creationDateFrame:
+          $ref: '#/components/schemas/ExchangeDateFrame'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeOrderStatus'
+        assets:
+          type: array
+          items:
+            type: string
+        clientId:
+          type: [string, 'null']
+    PaymentOrderType:
+      type: string
+      enum: [BUY, SELL]
+    PaymentCountryGroup:
+      type: string
+      enum: [BELARUS, RUSSIA]
+    PaymentMethodsRequest:
+      type: object
+      properties:
+        fiatAsset:
+          type: string
+          description: Fiat currency of the direction.
+        orderType:
+          $ref: '#/components/schemas/PaymentOrderType'
+        destination:
+          $ref: '#/components/schemas/ExchangeDestination'
+        countryGroup:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentCountryGroup'
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentProviderType'
+    PaymentMethodStatus:
+      type: string
+      enum: [ENABLED, CURRENCY_DISABLED, DIRECTION_DISABLED]
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          description: Method id (type not visible in the web app); empty for methods without a bound card.
+          x-wb-inferred: true
+        providerId:
+          $ref: '#/components/schemas/PaymentProviderType'
+          x-wb-inferred: true
+        providerType:
+          $ref: '#/components/schemas/PaymentProviderType'
+          x-wb-inferred: true
+        number:
+          type: string
+          description: Masked card or account number; empty for card-less methods.
+          x-wb-inferred: true
+        brand:
+          type: string
+          description: Card brand, e.g. `MASTERCARD`.
+          x-wb-inferred: true
+        name:
+          type: string
+          description: Name given by the client (`payments.cards.rename`).
+          x-wb-inferred: true
+        bankName:
+          type: string
+          x-wb-inferred: true
+        currency:
+          type: string
+          x-wb-inferred: true
+        supportedCurrencies:
+          type: array
+          items:
+            type: string
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/PaymentMethodStatus'
+          x-wb-inferred: true
+        isRestricted:
+          type: boolean
+          x-wb-inferred: true
+        isCrypto:
+          type: boolean
+          description: Crypto card (Alfa-Bank / Status Bank crypto cards).
+          x-wb-inferred: true
+    PaymentProvidersRequest:
+      type: object
+      properties:
+        destination:
+          anyOf:
+          - $ref: '#/components/schemas/ExchangeDestination'
+          - type: 'null'
+    PaymentProvider:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Provider code (`CARUSELL`, `SBP`, `VTB_SBP`, `VTB`, `MTS`, `MTS_QR`, `TBANK`, ...).
+          x-wb-inferred: true
+        name:
+          type: string
+          x-wb-inferred: true
+        addPaymentMethod:
+          type: boolean
+          description: Whether the client can add a method of this provider.
+          x-wb-inferred: true
+    PaymentCardLimit:
+      type: object
+      properties:
+        currentAmount:
+          type: integer
+          x-wb-inferred: true
+        limit:
+          type: integer
+          x-wb-inferred: true
+    PaymentCardLimits:
+      type: object
+      properties:
+        totalCards:
+          $ref: '#/components/schemas/PaymentCardLimit'
+          x-wb-inferred: true
+        recentCards:
+          $ref: '#/components/schemas/PaymentCardLimit'
+          description: Cards bound during the last day.
+          x-wb-inferred: true

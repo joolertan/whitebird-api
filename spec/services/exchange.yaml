@@ -1,0 +1,896 @@
+openapi: 3.1.0
+info:
+  title: Exchange core
+  version: '1'
+  description: |
+    Client profile and features, statements and certificates, payment commissions, exchange-rate
+    statistics, merchant settings (API keys, webhooks, client statistics) and the referral
+    programme, served by exchange-core. Reconstructed from the whitebird.io web app.
+x-wb-service: exchange
+servers:
+- url: https://exchange-core.whitebird.io
+paths:
+  /api/v1/client:
+    get:
+      operationId: clientGet
+      x-wb-resource: client
+      x-wb-name: get
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the client profile
+      description: Exchange-side profile of the logged-in user (verification status, type, limits, feature flags).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+  /api/v1/client/testing/complete:
+    post:
+      operationId: clientCompleteTesting
+      x-wb-resource: client
+      x-wb-name: complete_testing
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Mark the awareness test as passed
+      description: |
+        Last step of the crypto-awareness test required from Belarusian citizens
+        (`testingNeeded` and not `testingCompleted`): the questions come from the KYC service
+        (`GET /api/v1/verification-test`), the answers are posted to
+        `POST /api/v2/kyc/client/crypto-test`, then this call is made without a body.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v1/client/features:
+    get:
+      operationId: clientFeatures
+      x-wb-resource: client
+      x-wb-name: features
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List feature flags enabled for the client
+      description: |
+        The web app passes the default widget merchant `11111111-1111-1111-1111-111111111111`.
+        `WEB_CLIENT_ORDER_V1` switches the client back to the old calculator and disables the other
+        flags.
+      parameters:
+      - name: merchantId
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientFeature'
+  /api/v1/client/balance/report:
+    post:
+      operationId: reportsDownloadBalance
+      x-wb-resource: reports
+      x-wb-name: download_balance
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Download the deposits and withdrawals statement
+      description: PDF statement of wallet deposits, withdrawals and referral rewards matching the filter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportBalanceRequest'
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/client/balance/email/report:
+    post:
+      operationId: reportsEmailBalance
+      x-wb-resource: reports
+      x-wb-name: email_balance
+      x-wb-response: empty
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Email the deposits and withdrawals statement
+      description: Variant of `download_balance` used by the mobile app; the statement is sent to the client's e-mail.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportBalanceRequest'
+      responses:
+        '200':
+          description: OK
+  /api/v1/client/exchange/report:
+    post:
+      operationId: reportsDownloadExchange
+      x-wb-resource: reports
+      x-wb-name: download_exchange
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Download the exchange operations statement
+      description: |
+        PDF statement of exchange orders. The web app sends `limit` (20) and
+        `completionDateFrame` (the selected creation-date interval).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/client/exchange/email/report:
+    post:
+      operationId: reportsEmailExchange
+      x-wb-resource: reports
+      x-wb-name: email_exchange
+      x-wb-response: empty
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Email the exchange operations statement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '200':
+          description: OK
+  /api/v1/client/confirmation-certificate:
+    get:
+      operationId: reportsDownloadConfirmationCertificate
+      x-wb-resource: reports
+      x-wb-name: download_confirmation_certificate
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Download the client confirmation certificate
+      description: PDF certificate confirming the client relationship; offered to verified clients only.
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/client/email/confirmation-certificate:
+    get:
+      operationId: reportsEmailConfirmationCertificate
+      x-wb-resource: reports
+      x-wb-name: email_confirmation_certificate
+      x-wb-response: empty
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Email the client confirmation certificate
+      responses:
+        '200':
+          description: OK
+  /api/v1/client/payment/commissions:
+    post:
+      operationId: paymentsCommissionsList
+      x-wb-resource: payments.commissions
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List commissions per payment type
+      description: |
+        For `EXCHANGE`, `buyCommission` / `sellCommission` are the fees when the client buys /
+        sells crypto; for `ACCOUNTING` they are the deposit / withdrawal fees. Values are percents;
+        null means the direction is unavailable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommissionsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentCommission'
+  /api/v1/client/payment/commissions/directions-group:
+    post:
+      operationId: paymentsCommissionsByDirection
+      x-wb-resource: payments.commissions
+      x-wb-name: by_direction
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List exchange and wallet commissions per payment type
+      description: Sent without a body.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentDirectionCommission'
+  /api/v1/client/payment/{cardId}/provider/{providerType}:
+    put:
+      operationId: paymentsCardsRename
+      x-wb-resource: payments.cards
+      x-wb-name: rename
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Rename a bound card
+      description: An empty name removes the custom name.
+      parameters:
+      - name: cardId
+        in: path
+        required: true
+        description: '`id` of the payment method (`payments.methods.list`).'
+        schema:
+          type: string
+      - name: providerType
+        in: path
+        required: true
+        description: '`providerType` of the payment method.'
+        schema:
+          $ref: '#/components/schemas/PaymentProviderType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCardRenameRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentCard'
+  /api/v1/exchange/rate/stats:
+    post:
+      operationId: exchangeRatesStats
+      x-wb-resource: exchange.rates
+      x-wb-name: stats
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get current and 24-hour-ago exchange rates
+      description: Rates of the home-page ticker. The web app sends an empty filter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeRateStatsFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExchangeRateStat'
+  /api/v1/orders/current:
+    get:
+      operationId: exchangeLegacyOrdersCurrent
+      x-wb-resource: exchange.legacy_orders
+      x-wb-name: current
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the active order (exchange-core model)
+      description: Older order model kept by the web app for the order-details context; empty when there is no active order.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeLegacyOrder'
+  /api/v1/merchant/current:
+    get:
+      operationId: merchantGet
+      x-wb-resource: merchant
+      x-wb-name: get
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the merchant settings of the current client
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchant/current/blocker/currency:
+    get:
+      operationId: merchantPairs
+      x-wb-resource: merchant
+      x-wb-name: pairs
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List currency pairs and whether they are enabled for the merchant
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MerchantPair'
+  /api/v1/merchant/current/showName:
+    put:
+      operationId: merchantSetShowName
+      x-wb-resource: merchant
+      x-wb-name: set_show_name
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Set the name shown to the merchant's clients
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantShowNameRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchant/current/generate/apiKey:
+    post:
+      operationId: merchantApiKeysCreate
+      x-wb-resource: merchant.api_keys
+      x-wb-name: create
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Generate an API key
+      description: |
+        At most 3 keys. The plaintext key is returned once in `showApiKey` and belongs to the last
+        item of `apiKeys`; afterwards only `apiKeyHash` is available.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchant/current/remove/apiKey/{apiKeyId}:
+    post:
+      operationId: merchantApiKeysDelete
+      x-wb-resource: merchant.api_keys
+      x-wb-name: delete
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Delete an API key
+      parameters:
+      - name: apiKeyId
+        in: path
+        required: true
+        description: '`apiKeys[].id` from `merchant.get`.'
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchant/current/webhookURL:
+    put:
+      operationId: merchantWebhooksSetUrl
+      x-wb-resource: merchant.webhooks
+      x-wb-name: set_url
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Set the webhook URL
+      description: The web app only accepts `https://` URLs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantWebhookUrlRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchant/current/generate/webhookSigningHash:
+    post:
+      operationId: merchantWebhooksRotateSigningHash
+      x-wb-resource: merchant.webhooks
+      x-wb-name: rotate_signing_hash
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Generate a new webhook signing secret
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchant/current/clients/statistic/countByStatus:
+    post:
+      operationId: merchantStatisticsCountByStatus
+      x-wb-resource: merchant.statistics
+      x-wb-name: count_by_status
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Count the merchant's clients by verification status
+      description: Without dates the whole history is counted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantStatisticFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantClientCounts'
+  /api/v1/merchant/current/clients/statistic/csv:
+    post:
+      operationId: merchantStatisticsExportCsv
+      x-wb-resource: merchant.statistics
+      x-wb-name: export_csv
+      x-wb-response: binary
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Export the merchant's clients as CSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantStatisticFilter'
+      responses:
+        '200':
+          description: CSV document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/referrer/get:
+    get:
+      operationId: referralGet
+      x-wb-resource: referral
+      x-wb-name: get
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get the client's referral programme membership
+      description: |
+        Empty when the client has not joined the programme (see `referral.join`). The referral link
+        is `https://whitebird.io/signup?refid=<refId>`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Referral'
+  /api/v1/referrer/generate:
+    post:
+      operationId: referralJoin
+      x-wb-resource: referral
+      x-wb-name: join
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Join the referral programme
+      description: Accepts the partner offer and generates the client's referral id.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+  /api/v1/referrer/referral-count:
+    get:
+      operationId: referralCount
+      x-wb-resource: referral
+      x-wb-name: count
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Count the clients referred by the client
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+                format: int64
+components:
+  schemas:
+    ClientFeature:
+      type: string
+      enum: [MSI, MTS_BANK, VTB, CARUSELL, CARUSELL_V2, CORTI_MILLI, WEB_CLIENT_ORDER_V1,
+        WEB_CLIENT_ORDER_V2, SPOT_LIVE, AEDEX_TOKEN, RUBS_TOKEN, CUSTODIAL_WALLET,
+        HIDE_ALFA_CRYPTO_CARD_BLOCK, HIDE_STATUS_CRYPTO_CARD_BLOCK]
+    ReportRequest:
+      type: object
+      description: |
+        Filter of a statement. All fields are optional; the web app sends `limit` and
+        `completionDateFrame` for exchange statements and nothing for invoices.
+      properties:
+        limit:
+          type: integer
+          default: 20
+        completionDateFrame:
+          $ref: '#/components/schemas/ReportDateFrame'
+        type:
+          type: string
+          description: Document type (`PDF`, `XLSX`).
+        format:
+          type: string
+          description: Document format (`PDF`).
+    ReportDateFrame:
+      type: object
+      description: |
+        Time interval; the web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a colon-less
+        offset, e.g. `2026-11-07T00:00:00+0300`.
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+    ReportBalanceRequest:
+      description: Statement filter plus the operation filter of `balance.operations.list`.
+      allOf:
+      - $ref: '#/components/schemas/ReportRequest'
+      - type: object
+        properties:
+          transactionTypes:
+            type: array
+            items:
+              $ref: '#/components/schemas/ReportOperationType'
+          statuses:
+            type: array
+            items:
+              type: string
+          currencies:
+            type: array
+            items:
+              type: string
+          from:
+            type: string
+            format: date
+          to:
+            type: string
+            format: date
+    ReportOperationType:
+      type: string
+      enum: [DEPOSIT, WITHDRAWAL, REFERRER_REWARD]
+    MerchantApiKey:
+      type: object
+      properties:
+        id:
+          description: Key id, used by `merchant.api_keys.delete` (type not visible in the web app).
+          x-wb-inferred: true
+        apiKeyHash:
+          type: string
+          description: Masked key.
+          x-wb-inferred: true
+        creationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
+    Merchant:
+      type: object
+      properties:
+        apiKeys:
+          type: [array, 'null']
+          items:
+            $ref: '#/components/schemas/MerchantApiKey'
+          x-wb-inferred: true
+        showApiKey:
+          type: string
+          description: Plaintext of the key just generated (only in the `merchant.api_keys.create` response).
+          x-wb-inferred: true
+        webhookURL:
+          type: string
+          x-wb-inferred: true
+        webhookSigningHash:
+          type: string
+          description: Secret used to sign webhook calls.
+          x-wb-inferred: true
+        showName:
+          type: string
+          x-wb-inferred: true
+    MerchantCurrencyPair:
+      type: object
+      properties:
+        fromCurrency:
+          type: string
+          x-wb-inferred: true
+        toCurrency:
+          type: string
+          x-wb-inferred: true
+    MerchantPair:
+      type: object
+      properties:
+        currencyPair:
+          $ref: '#/components/schemas/MerchantCurrencyPair'
+          x-wb-inferred: true
+        enabled:
+          type: boolean
+          x-wb-inferred: true
+    MerchantShowNameRequest:
+      type: object
+      required: [showName]
+      properties:
+        showName:
+          type: string
+    MerchantWebhookUrlRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+    MerchantStatisticFilter:
+      type: object
+      properties:
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+    MerchantClientStatus:
+      type: string
+      enum: [NOT_VERIFIED, PENDING, VERIFIED, FROZEN, ARREST]
+    MerchantClientCounts:
+      type: object
+      description: Parallel arrays; `clientsCounts[i]` clients have status `statuses[i]`.
+      properties:
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantClientStatus'
+          x-wb-inferred: true
+        clientsCounts:
+          type: array
+          items:
+            type: integer
+            format: int64
+          x-wb-inferred: true
+    Referral:
+      type: object
+      properties:
+        refId:
+          type: string
+          x-wb-inferred: true
+        currency:
+          type: string
+          description: Currency of the referral balance.
+          x-wb-inferred: true
+    ClientStatus:
+      type: string
+      enum: [NEW, EMAIL_VERIFIED, NOT_VERIFIED, PENDING, VERIFIED, ACTUALIZATION_REQUIRED, FROZEN,
+        ARREST, BLOCKED, CLOSED]
+    ClientType:
+      type: string
+      enum: [INDIVIDUAL, INDIVIDUAL_ENTREPRENEUR, ORGANIZATION, BANK]
+    Client:
+      type: object
+      properties:
+        identity:
+          type: string
+          description: Client id (used as `clientId` in merchant reports).
+          x-wb-inferred: true
+        status:
+          $ref: '#/components/schemas/ClientStatus'
+          x-wb-inferred: true
+        clientType:
+          $ref: '#/components/schemas/ClientType'
+          x-wb-inferred: true
+        countryCode:
+          type: string
+          description: ISO 3166 numeric country code (`112` = Belarus).
+          x-wb-inferred: true
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientFeature'
+          x-wb-inferred: true
+        maxCaOrdersNumber:
+          type: integer
+          description: How many unfinished current-account purchase orders the client may have at once.
+          x-wb-inferred: true
+        testingNeeded:
+          type: boolean
+          description: The client must pass the crypto-awareness test.
+          x-wb-inferred: true
+        testingCompleted:
+          type: boolean
+          x-wb-inferred: true
+        phoneConfirmationRequired:
+          type: boolean
+          x-wb-inferred: true
+        internalBalanceEnabled:
+          type: boolean
+          description: The Whitebird wallet is available to the client.
+          x-wb-inferred: true
+    ExchangeDestination:
+      type: string
+      description: |
+        Product context of a request. `EXCHANGE`: buy/sell with external card or address;
+        `ACCOUNTING`: operations on the Whitebird wallet (internal conversion); `SDK_*`: the same
+        contexts inside the embeddable widget (`SDK_CROSS`: wallet deposit/withdrawal assets,
+        `SDK_SWAP`: swap assets).
+      enum: [EXCHANGE, ACCOUNTING, SDK_EXCHANGE, SDK_ACCOUNTING, SDK_CROSS, SDK_SWAP]
+    PaymentProviderType:
+      type: string
+      description: Payment provider / payment method family (same values as the brokerage `ProviderType`).
+      enum: [ALFA, ASSIST, AZERICARD, BELVEB, BEPAID, BEPAID_CUSTOM, BGP, BRAZINO, BRICS, BSB, CA,
+        CARUSELL, CORTI_MILLI, DSB, ERIP, INSNC, MAXLINE, MODULBANK, MTS, MTS_CASH, MTS_MULTITRANSFER,
+        MTS_QR, SBER, SBP, SGB, SGB_CARD, STATUSBANK, TBANK, TEST, VTB, VTB_SBP, WILDBERRIES, ZUBRPARI]
+    PaymentCommissionsRequest:
+      type: object
+      required: [destination]
+      properties:
+        destination:
+          $ref: '#/components/schemas/ExchangeDestination'
+    PaymentCommissionType:
+      type: string
+      description: Payment type of a commission (finer than the provider type).
+      enum: [ALFA, ALFA_CRYPTO_CARD, ASSIST_BELARUSBANK, ASSIST_OTHER, CA, CARUSELL, CORTI_MILLI,
+        FOREIGN_CARDS, MTS, MTS_CASH, MTS_MULTITRANSFER, MTS_QR, MTS_RF_CARDS, SBER, STATUSBANK, TBANK,
+        VTB]
+    PaymentCommission:
+      type: object
+      properties:
+        paymentType:
+          $ref: '#/components/schemas/PaymentCommissionType'
+          x-wb-inferred: true
+        buyCommission:
+          type: [string, number, 'null']
+          description: Percent (the web app expects decimal-comma strings such as `0,06`); null when unavailable.
+          x-wb-inferred: true
+        sellCommission:
+          type: [string, number, 'null']
+          description: Percent; null when unavailable.
+          x-wb-inferred: true
+    PaymentCommissionPair:
+      type: object
+      properties:
+        buy:
+          type: string
+          description: Percent, decimal comma.
+          x-wb-inferred: true
+        sell:
+          type: string
+          description: Percent, decimal comma.
+          x-wb-inferred: true
+    PaymentDirectionCommission:
+      type: object
+      properties:
+        paymentType:
+          $ref: '#/components/schemas/PaymentCommissionType'
+          x-wb-inferred: true
+        exchangeCommissions:
+          $ref: '#/components/schemas/PaymentCommissionPair'
+          description: Fees when buying (`buy`) and selling (`sell`) crypto.
+          x-wb-inferred: true
+        accountCommissions:
+          $ref: '#/components/schemas/PaymentCommissionPair'
+          description: Wallet deposit (`buy`) and withdrawal (`sell`) fees.
+          x-wb-inferred: true
+    PaymentCardRenameRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    PaymentCard:
+      type: object
+      properties:
+        id:
+          description: Card id (type not visible in the web app).
+          x-wb-inferred: true
+        number:
+          type: string
+          x-wb-inferred: true
+        brand:
+          type: string
+          x-wb-inferred: true
+        bank:
+          type: string
+          x-wb-inferred: true
+        providerType:
+          $ref: '#/components/schemas/PaymentProviderType'
+          x-wb-inferred: true
+        status:
+          type: string
+          x-wb-inferred: true
+        restricted:
+          type: boolean
+          x-wb-inferred: true
+        crypto:
+          type: boolean
+          x-wb-inferred: true
+        name:
+          type: string
+          x-wb-inferred: true
+    ExchangeRateStatsFilter:
+      type: object
+      description: Filter of the statistics; the web app always sends `{}`.
+      properties: {}
+    ExchangeRateStat:
+      type: object
+      properties:
+        base:
+          type: string
+          x-wb-inferred: true
+        quote:
+          type: string
+          x-wb-inferred: true
+        value:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        value24h:
+          type: number
+          format: decimal
+          description: Rate 24 hours ago.
+          x-wb-inferred: true
+    ExchangeLegacyCurrencyPair:
+      type: object
+      properties:
+        fromCurrency:
+          type: string
+          x-wb-inferred: true
+        toCurrency:
+          type: string
+          x-wb-inferred: true
+    ExchangeLegacyOperation:
+      type: object
+      properties:
+        currencyPair:
+          $ref: '#/components/schemas/ExchangeLegacyCurrencyPair'
+          x-wb-inferred: true
+    ExchangeLegacyOrder:
+      type: object
+      properties:
+        status:
+          type: string
+          description: E.g. `PROCESSING`, `CONFIRMED`.
+          x-wb-inferred: true
+        exchangeOperation:
+          $ref: '#/components/schemas/ExchangeLegacyOperation'
+          x-wb-inferred: true
+        promoCode:
+          description: Promo code applied to the order (shape not visible in the web app).
+          x-wb-inferred: true
