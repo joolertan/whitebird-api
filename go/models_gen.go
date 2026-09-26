@@ -2,6 +2,77 @@
 
 package whitebird
 
+// AccountingAccount is returned by [AccountingAccountsResource.Get].
+type AccountingAccount struct {
+	// Inferred from the web application; not yet observed in responses.
+	Balances []AccountingBalance `json:"balances,omitzero"`
+}
+
+// AccountingBalance is used in [AccountingAccount].
+type AccountingBalance struct {
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type AccountingAccountType `json:"type,omitzero"`
+	// Network of e-money assets. Inferred from the web application; not yet observed in responses.
+	Network string `json:"network,omitzero"`
+}
+
+// AccountingEnhancedAccount is returned by [AccountingAccountsResource.GetEnhanced].
+type AccountingEnhancedAccount struct {
+	// Inferred from the web application; not yet observed in responses.
+	Balances []AccountingEnhancedBalance `json:"balances,omitzero"`
+}
+
+// AccountingEnhancedBalance is used in [AccountingEnhancedAccount].
+type AccountingEnhancedBalance struct {
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Value in USD. Inferred from the web application; not yet observed in responses.
+	UsdAmount Decimal `json:"usdAmount,omitzero"`
+	// Price in USD. Inferred from the web application; not yet observed in responses.
+	UsdRate Decimal `json:"usdRate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Fiat bool `json:"fiat,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type AccountingAccountType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ReservedAmount Decimal `json:"reservedAmount,omitzero"`
+	// Older name of `reservedAmount`. Inferred from the web application; not yet observed in
+	// responses.
+	Reserved Decimal `json:"reserved,omitzero"`
+}
+
+// AccountingTransaction is returned by [AccountingTransactionsResource.List].
+type AccountingTransaction struct {
+	// Row id (type not visible in the web app). Inferred from the web application; not yet observed in
+	// responses.
+	ID any `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExternalTxID string `json:"externalTxId,omitzero"`
+	// Id of the referred user (referral accruals). Inferred from the web application; not yet observed
+	// in responses.
+	ReferralID string `json:"referralId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreatedTimestamp Time `json:"createdTimestamp,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Details *AccountingTransactionDetails `json:"details,omitzero"`
+}
+
+// AccountingTransactionDetails is used in [AccountingTransaction].
+type AccountingTransactionDetails struct {
+	// Inferred from the web application; not yet observed in responses.
+	RefereeEmail string `json:"refereeEmail,omitzero"`
+}
+
 // AlfaCardBindURL is returned by [ProvidersAlfaResource.CardBindURL].
 type AlfaCardBindURL struct {
 	// Alfa-Bank card binding page to open in a browser. Inferred from the web application; not yet
@@ -142,6 +213,144 @@ type AuthWebGlData struct {
 	Version                *string `json:"version,omitzero"`
 }
 
+// BalanceCalculation is returned by [BalanceDepositsResource.CalculateCrypto],
+// [BalanceDepositsResource.CalculateFiat], [BalanceWithdrawalsResource.CalculateCrypto] and
+// [BalanceWithdrawalsResource.CalculateFiat].
+type BalanceCalculation struct {
+	// Calculation id, passed as `calculationId` to a crypto withdrawal. Inferred from the web
+	// application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CommissionAmount Decimal `json:"commissionAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ReceivedAmount Decimal `json:"receivedAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	WithdrawalAmount Decimal `json:"withdrawalAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExpirationDate Time `json:"expirationDate,omitzero"`
+}
+
+// BalanceCryptoAsset is used in [BalanceDepositsCreateCryptoParams],
+// [BalanceDepositsCalculateCryptoParams] and [BalanceWithdrawalsCalculateCryptoParams].
+type BalanceCryptoAsset struct {
+	Code   string  `json:"code"`
+	Amount Decimal `json:"amount"`
+	// Network of the asset, e.g. `Tron`, `Ethereum`, `BNB`, `SOLANA`, `Ton`, `Bitcoin`.
+	Network *string `json:"network,omitzero"`
+}
+
+// BalanceCryptoDeposit is returned by [BalanceDepositsResource.CreateCrypto].
+type BalanceCryptoDeposit struct {
+	// Inferred from the web application; not yet observed in responses.
+	TransactionID string `json:"transactionId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	DepositCryptoAddress string `json:"depositCryptoAddress,omitzero"`
+}
+
+// BalanceCurrentOperation is used in [BalanceCurrentOperations].
+type BalanceCurrentOperation struct {
+	// Inferred from the web application; not yet observed in responses.
+	TransactionID string `json:"transactionId,omitzero"`
+	// Application number shown to the client (integer or numeric string). Inferred from the web
+	// application; not yet observed in responses.
+	Number any `json:"number,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	OperationType BalanceOperationType `json:"operationType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status BalanceOperationStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Asset string `json:"asset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ServiceFee Decimal `json:"serviceFee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	NetworkFee Decimal `json:"networkFee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreatedAt Time `json:"createdAt,omitzero"`
+	// Crypto operations only. Inferred from the web application; not yet observed in responses.
+	Network string `json:"network,omitzero"`
+	// Crypto deposits only. Inferred from the web application; not yet observed in responses.
+	DepositCryptoAddress string `json:"depositCryptoAddress,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExternalCryptoAddress string `json:"externalCryptoAddress,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TxHash string `json:"txHash,omitzero"`
+	// Fiat operations only. Inferred from the web application; not yet observed in responses.
+	FiatProvider PaymentProviderType `json:"fiatProvider,omitzero"`
+	// Provider order id; for `CA` deposits the invoice id (see `current_account.invoices`). Inferred
+	// from the web application; not yet observed in responses.
+	OrderIdentity string `json:"orderIdentity,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CardMask string `json:"cardMask,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PhoneNumber string `json:"phoneNumber,omitzero"`
+}
+
+// BalanceCurrentOperations is returned by [BalanceResource.Current].
+type BalanceCurrentOperations struct {
+	// Inferred from the web application; not yet observed in responses.
+	CryptoOperations []BalanceCurrentOperation `json:"cryptoOperations,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FiatOperations []BalanceCurrentOperation `json:"fiatOperations,omitzero"`
+}
+
+// BalanceFiatAsset is used in [BalanceDepositsCreateFiatParams],
+// [BalanceDepositsCalculateFiatParams], [BalanceWithdrawalsCreateFiatParams] and
+// [BalanceWithdrawalsCalculateFiatParams].
+type BalanceFiatAsset struct {
+	Code   string  `json:"code"`
+	Amount Decimal `json:"amount"`
+}
+
+// BalanceFiatDeposit is returned by [BalanceDepositsResource.CreateFiat].
+type BalanceFiatDeposit struct {
+	// Inferred from the web application; not yet observed in responses.
+	TransactionID string `json:"transactionId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FiatPaymentLink string `json:"fiatPaymentLink,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PaymentDetails *BalancePaymentDetails `json:"paymentDetails,omitzero"`
+}
+
+// BalanceOperation is returned by [BalanceOperationsResource.List].
+type BalanceOperation struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Application number shown to the client (integer or numeric string). Inferred from the web
+	// application; not yet observed in responses.
+	Number any `json:"number,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Type BalanceOperationType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status BalanceOperationStatus `json:"status,omitzero"`
+	// Status of the underlying transaction; takes precedence over `status` when present. Inferred from
+	// the web application; not yet observed in responses.
+	TxStatus BalanceOperationStatus `json:"txStatus,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Asset string `json:"asset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	RequestedAmount Decimal `json:"requestedAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	NetAmount Decimal `json:"netAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Commission Decimal `json:"commission,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ProviderType PaymentProviderType `json:"providerType,omitzero"`
+	// Masked card / account number. Inferred from the web application; not yet observed in responses.
+	Post string `json:"post,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PaymentSystem string `json:"paymentSystem,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExternalCryptoAddress string `json:"externalCryptoAddress,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TransactionHash string `json:"transactionHash,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CompletionDate Time `json:"completionDate,omitzero"`
+}
+
 // BalanceOrderResponse is returned by [BrokerageBalanceOrdersResource.CreateCryptoDeposit],
 // [BrokerageBalanceOrdersResource.CreateCryptoWithdrawal],
 // [BrokerageBalanceOrdersResource.ConfirmCryptoWithdrawal],
@@ -167,6 +376,17 @@ type BalanceOrderResponse struct {
 	PaymentLink                 string                        `json:"paymentLink,omitzero"`
 }
 
+// BalancePaymentDetails is used in [BalanceFiatDeposit].
+type BalancePaymentDetails struct {
+	// Deep link into the bank app (e.g. T-Bank). Inferred from the web application; not yet observed
+	// in responses.
+	PaymentLink string `json:"paymentLink,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	WebPaymentLink string `json:"webPaymentLink,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PostForm *ExchangePostForm `json:"postForm,omitzero"`
+}
+
 // CarusellBank is returned by [ProvidersCarusellResource.Banks].
 type CarusellBank struct {
 	// SBP member id of the bank, e.g. `100000000008`.
@@ -174,6 +394,35 @@ type CarusellBank struct {
 	// Bank name, mostly in Russian.
 	Description string `json:"description"`
 	Active      bool   `json:"active"`
+}
+
+// ExchangeClient is returned by [ClientResource.Get].
+type ExchangeClient struct {
+	// Client id (used as `clientId` in merchant reports). Inferred from the web application; not yet
+	// observed in responses.
+	Identity string `json:"identity,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status ClientStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ClientType ClientType `json:"clientType,omitzero"`
+	// ISO 3166 numeric country code (`112` = Belarus). Inferred from the web application; not yet
+	// observed in responses.
+	CountryCode string `json:"countryCode,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Features []ClientFeature `json:"features,omitzero"`
+	// How many unfinished current-account purchase orders the client may have at once. Inferred from
+	// the web application; not yet observed in responses.
+	MaxCaOrdersNumber int `json:"maxCaOrdersNumber,omitzero"`
+	// The client must pass the crypto-awareness test. Inferred from the web application; not yet
+	// observed in responses.
+	TestingNeeded bool `json:"testingNeeded,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TestingCompleted bool `json:"testingCompleted,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PhoneConfirmationRequired bool `json:"phoneConfirmationRequired,omitzero"`
+	// The Whitebird wallet is available to the client. Inferred from the web application; not yet
+	// observed in responses.
+	InternalBalanceEnabled bool `json:"internalBalanceEnabled,omitzero"`
 }
 
 // CryptoAddressResponse is returned by [BrokerageCryptoAddressesResource.List],
@@ -193,6 +442,24 @@ type CryptoWithdrawalCalculation struct {
 	ExpirationDate   Time    `json:"expirationDate,omitzero"`
 }
 
+// CurrentAccountDateFrame is used in [CurrentAccountInvoicesDownloadParams],
+// [CurrentAccountInvoicesEmailParams], [CurrentAccountInvoicesDownloadDepositParams] and
+// [CurrentAccountInvoicesEmailDepositParams].
+type CurrentAccountDateFrame struct {
+	Start *string `json:"start,omitzero"`
+	End   *string `json:"end,omitzero"`
+}
+
+// CurrentAccountSystemAccount is returned by [CurrentAccountSystemAccountsResource.List].
+type CurrentAccountSystemAccount struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	BankName string `json:"bankName,omitzero"`
+	// Account number. Inferred from the web application; not yet observed in responses.
+	Number string `json:"number,omitzero"`
+}
+
 // DateFrame is used in [BrokerageBalanceOrdersListParams], [BrokerageOrdersListParams],
 // [BrokerageOrdersDownloadReportParams] and [BrokerageOTCOrdersListParams].
 type DateFrame struct {
@@ -204,6 +471,272 @@ type DateFrame struct {
 type DownloadTokenResponse struct {
 	Token string `json:"token,omitzero"`
 }
+
+// ExchangeAssets is returned by [ExchangeAssetsResource.List].
+type ExchangeAssets struct {
+	// Inferred from the web application; not yet observed in responses.
+	CryptoAssets []ExchangeCryptoAsset `json:"cryptoAssets,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FiatAssets []ExchangeFiatAsset `json:"fiatAssets,omitzero"`
+}
+
+// ExchangeCryptoAsset is used in [ExchangeAssets].
+type ExchangeCryptoAsset struct {
+	// Network-specific id, e.g. `USDT_TRC`. Inferred from the web application; not yet observed in
+	// responses.
+	ID string `json:"id,omitzero"`
+	// Asset code, e.g. `USDT`. Inferred from the web application; not yet observed in responses.
+	Code string `json:"code,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Category ExchangeAssetCategory `json:"category,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Network string `json:"network,omitzero"`
+	// Token standard, e.g. `TRC-20`. Inferred from the web application; not yet observed in responses.
+	Protocol string `json:"protocol,omitzero"`
+}
+
+// ExchangeDateFrame is used in [ExchangeOrdersHistoryParams] and [MerchantDownloadReportParams].
+//
+// Time interval. The web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a colon-less
+// offset, e.g. `2026-11-07T00:00:00+0300`.
+type ExchangeDateFrame struct {
+	Start *string `json:"start,omitzero"`
+	End   *string `json:"end,omitzero"`
+}
+
+// ExchangeFiatAsset is used in [ExchangeAssets].
+type ExchangeFiatAsset struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Code string `json:"code,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Category ExchangeAssetCategory `json:"category,omitzero"`
+}
+
+// ExchangeLeg is used in [ExchangeOrder] and [ExchangeQuote].
+type ExchangeLeg struct {
+	// Inferred from the web application; not yet observed in responses.
+	Type ExchangeLegType `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Asset string `json:"asset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Amount actually received or sent; differs from `amount` after a recalculation. Inferred from the
+	// web application; not yet observed in responses.
+	TransactionAmount Decimal `json:"transactionAmount,omitzero"`
+	// Service commission on the fiat leg, network commission on the crypto leg. Inferred from the web
+	// application; not yet observed in responses.
+	FeeAmount Decimal `json:"feeAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status ExchangeLegStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Provider PaymentProviderType `json:"provider,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Token string `json:"token,omitzero"`
+	// Masked card / account number of a `FIAT_PROVIDER` leg. Inferred from the web application; not
+	// yet observed in responses.
+	Post string `json:"post,omitzero"`
+	// Card brand (VISA, MASTERCARD, MIR, BELCARD, ...). Inferred from the web application; not yet
+	// observed in responses.
+	PaymentSystem string `json:"paymentSystem,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ClientBank string `json:"clientBank,omitzero"`
+	// Destination address. On a `CRYPTO_TRANSFER` input this is the Whitebird address to pay to.
+	// Inferred from the web application; not yet observed in responses.
+	ToAddress string `json:"toAddress,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FromAddress string `json:"fromAddress,omitzero"`
+	// Blockchain transaction hash. Inferred from the web application; not yet observed in responses.
+	Hash string `json:"hash,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Comment string `json:"comment,omitzero"`
+	// Payment page to redirect the client to (`FIAT_PROVIDER` input). Inferred from the web
+	// application; not yet observed in responses.
+	Link string `json:"link,omitzero"`
+	// Transaction id at the payment provider (e.g. the Status Bank order id); for current-account
+	// (`CA`) purchases the invoice id of `current_account.invoices.download`. Inferred from the web
+	// application; not yet observed in responses.
+	ProcessorTransactionID string `json:"processorTransactionId,omitzero"`
+	// Transaction number at the payment provider (type not visible in the web app). Inferred from the
+	// web application; not yet observed in responses.
+	ProcessorTransactionNumber any `json:"processorTransactionNumber,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExpirationDate Time `json:"expirationDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FailureMessage string `json:"failureMessage,omitzero"`
+}
+
+// ExchangeLegacyCurrencyPair is used in [ExchangeLegacyOperation].
+type ExchangeLegacyCurrencyPair struct {
+	// Inferred from the web application; not yet observed in responses.
+	FromCurrency string `json:"fromCurrency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToCurrency string `json:"toCurrency,omitzero"`
+}
+
+// ExchangeLegacyOperation is used in [ExchangeLegacyOrder].
+type ExchangeLegacyOperation struct {
+	// Inferred from the web application; not yet observed in responses.
+	CurrencyPair *ExchangeLegacyCurrencyPair `json:"currencyPair,omitzero"`
+}
+
+// ExchangeLegacyOrder is returned by [ExchangeLegacyOrdersResource.Current].
+type ExchangeLegacyOrder struct {
+	// E.g. `PROCESSING`, `CONFIRMED`. Inferred from the web application; not yet observed in
+	// responses.
+	Status string `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExchangeOperation *ExchangeLegacyOperation `json:"exchangeOperation,omitzero"`
+	// Promo code applied to the order (shape not visible in the web app). Inferred from the web
+	// application; not yet observed in responses.
+	PromoCode any `json:"promoCode,omitzero"`
+}
+
+// ExchangeLimits is returned by [ExchangeLimitsResource.Get].
+type ExchangeLimits struct {
+	// Inferred from the web application; not yet observed in responses.
+	FromMinAmount Decimal `json:"fromMinAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FromMaxAmount Decimal `json:"fromMaxAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToMinAmount Decimal `json:"toMinAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToMaxAmount Decimal `json:"toMaxAmount,omitzero"`
+}
+
+// ExchangeLimitsLeg is used in [ExchangeLimitsGetParams].
+type ExchangeLimitsLeg struct {
+	Type      ExchangeLegType      `json:"type"`
+	Provider  *PaymentProviderType `json:"provider,omitzero"`
+	Token     *string              `json:"token,omitzero"`
+	ToAddress *string              `json:"toAddress,omitzero"`
+}
+
+// ExchangeOrder is returned by [ExchangeOrdersResource.Create], [ExchangeOrdersResource.Get],
+// [ExchangeOrdersResource.Current], [ExchangeOrdersResource.CurrentAll] and 1 other.
+type ExchangeOrder struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Application number shown to the client. Inferred from the web application; not yet observed in
+	// responses.
+	Number int64 `json:"number,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status ExchangeOrderStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Input *ExchangeLeg `json:"input,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Output *ExchangeLeg `json:"output,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Conditions *ExchangeOrderConditions `json:"conditions,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExchangeRateValue Decimal `json:"exchangeRateValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PostForm *ExchangePostForm `json:"postForm,omitzero"`
+	// Why the terms were recalculated, e.g. `WRONG_AMOUNT` (a different amount was received). Inferred
+	// from the web application; not yet observed in responses.
+	RecalculationReason string `json:"recalculationReason,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CompletionDate Time `json:"completionDate,omitzero"`
+}
+
+// ExchangeOrderConditions is used in [ExchangeOrder].
+type ExchangeOrderConditions struct {
+	// Inferred from the web application; not yet observed in responses.
+	FromAsset string `json:"fromAsset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FromGrossAmount Decimal `json:"fromGrossAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FromFeeAmount Decimal `json:"fromFeeAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToAsset string `json:"toAsset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToNetAmount Decimal `json:"toNetAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToFeeAmount Decimal `json:"toFeeAmount,omitzero"`
+	// Pair of the rate, e.g. `BTC/USDT`. Inferred from the web application; not yet observed in
+	// responses.
+	Rate string `json:"rate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ActualRateValue Decimal `json:"actualRateValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExchangeRateValue Decimal `json:"exchangeRateValue,omitzero"`
+}
+
+// ExchangePostForm is used in [BalancePaymentDetails] and [ExchangeOrder].
+//
+// HTML form to submit with POST (Assist acquiring).
+type ExchangePostForm struct {
+	// Inferred from the web application; not yet observed in responses.
+	Action string `json:"action,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Fields map[string]string `json:"fields,omitzero"`
+}
+
+// ExchangePromoCode is used in [ExchangeQuote].
+type ExchangePromoCode struct {
+	// Inferred from the web application; not yet observed in responses.
+	Code string `json:"code,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Applied bool `json:"applied,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	RejectionReason string `json:"rejectionReason,omitzero"`
+}
+
+// ExchangeQuote is returned by [ExchangeQuotesResource.Create].
+type ExchangeQuote struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Input *ExchangeLeg `json:"input,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Output *ExchangeLeg `json:"output,omitzero"`
+	// Displayed rate. Inferred from the web application; not yet observed in responses.
+	ExchangeRateValue Decimal `json:"exchangeRateValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ActualRateValue Decimal `json:"actualRateValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PromoCode *ExchangePromoCode `json:"promoCode,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExpirationDate Time `json:"expirationDate,omitzero"`
+}
+
+// ExchangeQuoteLegRequest is used in [ExchangeQuotesCreateParams].
+type ExchangeQuoteLegRequest struct {
+	// Asset code; network-specific for crypto transfers (`USDT_TRC`, `USDC_SOL`, ...).
+	Asset string          `json:"asset"`
+	Type  ExchangeLegType `json:"type"`
+	// Set on the leg whose amount the client fixes (input or output, not both).
+	Amount   Decimal              `json:"amount,omitzero"`
+	Provider *PaymentProviderType `json:"provider,omitzero"`
+	// Payment method id (bound card) of a `FIAT_PROVIDER` leg; the card number for `CORTI_MILLI`.
+	Token *string `json:"token,omitzero"`
+	// External crypto address of a `CRYPTO_TRANSFER` output.
+	ToAddress *string `json:"toAddress,omitzero"`
+	// Memo / destination tag of a `CRYPTO_TRANSFER` output.
+	Comment *string `json:"comment,omitzero"`
+}
+
+// ExchangeRateStat is returned by [ExchangeRatesResource.Stats].
+type ExchangeRateStat struct {
+	// Inferred from the web application; not yet observed in responses.
+	Base string `json:"base,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Quote string `json:"quote,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Value Decimal `json:"value,omitzero"`
+	// Rate 24 hours ago. Inferred from the web application; not yet observed in responses.
+	Value24H Decimal `json:"value24h,omitzero"`
+}
+
+// ExchangeRateStatsFilter is used in [ExchangeRatesStatsParams].
+//
+// Filter of the statistics; the web app always sends `{}`.
+type ExchangeRateStatsFilter map[string]any
 
 // KYCActualData is returned by [KYCActualizationResource.ActualData].
 type KYCActualData struct {
@@ -466,6 +999,60 @@ type MarketOrderbook struct {
 	ID string `json:"id"`
 }
 
+// Merchant is returned by [MerchantAPIKeysResource.Create], [MerchantAPIKeysResource.Delete],
+// [MerchantWebhooksResource.SetURL], [MerchantWebhooksResource.RotateSigningHash] and 2 others.
+type Merchant struct {
+	// Inferred from the web application; not yet observed in responses.
+	APIKeys []MerchantAPIKey `json:"apiKeys,omitzero"`
+	// Plaintext of the key just generated (only in the `merchant.api_keys.create` response). Inferred
+	// from the web application; not yet observed in responses.
+	ShowAPIKey string `json:"showApiKey,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	WebhookURL string `json:"webhookURL,omitzero"`
+	// Secret used to sign webhook calls. Inferred from the web application; not yet observed in
+	// responses.
+	WebhookSigningHash string `json:"webhookSigningHash,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ShowName string `json:"showName,omitzero"`
+}
+
+// MerchantAPIKey is used in [Merchant].
+type MerchantAPIKey struct {
+	// Key id, used by `merchant.api_keys.delete` (type not visible in the web app). Inferred from the
+	// web application; not yet observed in responses.
+	ID any `json:"id,omitzero"`
+	// Masked key. Inferred from the web application; not yet observed in responses.
+	APIKeyHash string `json:"apiKeyHash,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
+}
+
+// MerchantClientCounts is returned by [MerchantStatisticsResource.CountByStatus].
+//
+// Parallel arrays; `clientsCounts[i]` clients have status `statuses[i]`.
+type MerchantClientCounts struct {
+	// Inferred from the web application; not yet observed in responses.
+	Statuses []MerchantClientStatus `json:"statuses,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ClientsCounts []int64 `json:"clientsCounts,omitzero"`
+}
+
+// MerchantCurrencyPair is used in [MerchantPair].
+type MerchantCurrencyPair struct {
+	// Inferred from the web application; not yet observed in responses.
+	FromCurrency string `json:"fromCurrency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToCurrency string `json:"toCurrency,omitzero"`
+}
+
+// MerchantPair is returned by [MerchantResource.Pairs].
+type MerchantPair struct {
+	// Inferred from the web application; not yet observed in responses.
+	CurrencyPair *MerchantCurrencyPair `json:"currencyPair,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Enabled bool `json:"enabled,omitzero"`
+}
+
 // MtsQRAmount is used in [MtsQRPayment].
 type MtsQRAmount struct {
 	// Inferred from the web application; not yet observed in responses.
@@ -600,6 +1187,110 @@ type OTCOrderResponse struct {
 	CompletionDate     Time                 `json:"completionDate,omitzero"`
 }
 
+// PaymentCard is returned by [PaymentsCardsResource.Rename].
+type PaymentCard struct {
+	// Card id (type not visible in the web app). Inferred from the web application; not yet observed
+	// in responses.
+	ID any `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Number string `json:"number,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Brand string `json:"brand,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Bank string `json:"bank,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ProviderType PaymentProviderType `json:"providerType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status string `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Restricted bool `json:"restricted,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Crypto bool `json:"crypto,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+}
+
+// PaymentCardLimit is used in [PaymentCardLimits].
+type PaymentCardLimit struct {
+	// Inferred from the web application; not yet observed in responses.
+	CurrentAmount int `json:"currentAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Limit int `json:"limit,omitzero"`
+}
+
+// PaymentCardLimits is returned by [PaymentsCardsResource.Limits].
+type PaymentCardLimits struct {
+	// Inferred from the web application; not yet observed in responses.
+	TotalCards *PaymentCardLimit `json:"totalCards,omitzero"`
+	// Cards bound during the last day. Inferred from the web application; not yet observed in
+	// responses.
+	RecentCards *PaymentCardLimit `json:"recentCards,omitzero"`
+}
+
+// PaymentCommission is returned by [PaymentsCommissionsResource.List].
+type PaymentCommission struct {
+	// Inferred from the web application; not yet observed in responses.
+	PaymentType PaymentCommissionType `json:"paymentType,omitzero"`
+	// Percent (the web app expects decimal-comma strings such as `0,06`); null when unavailable.
+	// Inferred from the web application; not yet observed in responses.
+	BuyCommission any `json:"buyCommission,omitzero"`
+	// Percent; null when unavailable. Inferred from the web application; not yet observed in
+	// responses.
+	SellCommission any `json:"sellCommission,omitzero"`
+}
+
+// PaymentCommissionPair is used in [PaymentDirectionCommission].
+type PaymentCommissionPair struct {
+	// Percent, decimal comma. Inferred from the web application; not yet observed in responses.
+	Buy string `json:"buy,omitzero"`
+	// Percent, decimal comma. Inferred from the web application; not yet observed in responses.
+	Sell string `json:"sell,omitzero"`
+}
+
+// PaymentDirectionCommission is returned by [PaymentsCommissionsResource.ByDirection].
+type PaymentDirectionCommission struct {
+	// Inferred from the web application; not yet observed in responses.
+	PaymentType PaymentCommissionType `json:"paymentType,omitzero"`
+	// Fees when buying (`buy`) and selling (`sell`) crypto. Inferred from the web application; not yet
+	// observed in responses.
+	ExchangeCommissions *PaymentCommissionPair `json:"exchangeCommissions,omitzero"`
+	// Wallet deposit (`buy`) and withdrawal (`sell`) fees. Inferred from the web application; not yet
+	// observed in responses.
+	AccountCommissions *PaymentCommissionPair `json:"accountCommissions,omitzero"`
+}
+
+// PaymentMethod is returned by [PaymentsMethodsResource.List].
+type PaymentMethod struct {
+	// Method id (type not visible in the web app); empty for methods without a bound card. Inferred
+	// from the web application; not yet observed in responses.
+	ID any `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ProviderID PaymentProviderType `json:"providerId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ProviderType PaymentProviderType `json:"providerType,omitzero"`
+	// Masked card or account number; empty for card-less methods. Inferred from the web application;
+	// not yet observed in responses.
+	Number string `json:"number,omitzero"`
+	// Card brand, e.g. `MASTERCARD`. Inferred from the web application; not yet observed in responses.
+	Brand string `json:"brand,omitzero"`
+	// Name given by the client (`payments.cards.rename`). Inferred from the web application; not yet
+	// observed in responses.
+	Name string `json:"name,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	BankName string `json:"bankName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	SupportedCurrencies []string `json:"supportedCurrencies,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status PaymentMethodStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IsRestricted bool `json:"isRestricted,omitzero"`
+	// Crypto card (Alfa-Bank / Status Bank crypto cards). Inferred from the web application; not yet
+	// observed in responses.
+	IsCrypto bool `json:"isCrypto,omitzero"`
+}
+
 // PaymentMethodResponse is returned by [BrokeragePaymentsResource.Methods].
 type PaymentMethodResponse struct {
 	ID           string       `json:"id,omitzero"`
@@ -607,6 +1298,43 @@ type PaymentMethodResponse struct {
 	Bank         string       `json:"bank,omitzero"`
 	ProviderType ProviderType `json:"providerType,omitzero"`
 	Currency     string       `json:"currency,omitzero"`
+}
+
+// PaymentProvider is returned by [PaymentsProvidersResource.List].
+type PaymentProvider struct {
+	// Provider code (`CARUSELL`, `SBP`, `VTB_SBP`, `VTB`, `MTS`, `MTS_QR`, `TBANK`, ...). Inferred
+	// from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+	// Whether the client can add a method of this provider. Inferred from the web application; not yet
+	// observed in responses.
+	AddPaymentMethod bool `json:"addPaymentMethod,omitzero"`
+}
+
+// Referral is returned by [ReferralResource.Get].
+type Referral struct {
+	// Inferred from the web application; not yet observed in responses.
+	RefID string `json:"refId,omitzero"`
+	// Currency of the referral balance. Inferred from the web application; not yet observed in
+	// responses.
+	Currency string `json:"currency,omitzero"`
+}
+
+// ReferralTransaction is returned by [ReferralTransactionsResource.List].
+type ReferralTransaction struct {
+	// Row id (type not visible in the web app). Inferred from the web application; not yet observed in
+	// responses.
+	ID any `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExternalTxID string `json:"externalTxId,omitzero"`
+	// Negative for withdrawals from the referral balance. Inferred from the web application; not yet
+	// observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreatedTimestamp Time `json:"createdTimestamp,omitzero"`
 }
 
 // RegistrationSdkResult is returned by [RegistrationResource.CompleteSdk].
@@ -628,6 +1356,16 @@ type RegistrationState struct {
 	RegistrationID string `json:"registrationId,omitzero"`
 	// Inferred from the web application; not yet observed in responses.
 	Status RegistrationStatus `json:"status,omitzero"`
+}
+
+// ReportDateFrame is used in [ReportsDownloadBalanceParams], [ReportsEmailBalanceParams],
+// [ReportsDownloadExchangeParams] and [ReportsEmailExchangeParams].
+//
+// Time interval; the web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a colon-less
+// offset, e.g. `2026-11-07T00:00:00+0300`.
+type ReportDateFrame struct {
+	Start *string `json:"start,omitzero"`
+	End   *string `json:"end,omitzero"`
 }
 
 // StatusbankCardDetails is returned by [ProvidersStatusbankResource.CardDetails].

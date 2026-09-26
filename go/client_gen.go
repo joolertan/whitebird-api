@@ -5,22 +5,41 @@ package whitebird
 // Client is a client for the Whitebird API, created with [NewClient]. Its fields group the
 // operations by resource, following the layout of the API. A Client is safe for concurrent use.
 type Client struct {
-	Auth          *AuthResource
-	Brokerage     *BrokerageResource
-	KYC           *KYCResource
-	Market        *MarketResource
-	Notifications *NotificationsResource
-	Providers     *ProvidersResource
-	Registration  *RegistrationResource
-	Support       *SupportResource
-	Trading       *TradingResource
-	User          *UserResource
+	Accounting     *AccountingResource
+	Auth           *AuthResource
+	Balance        *BalanceResource
+	Brokerage      *BrokerageResource
+	Client         *ClientResource
+	CurrentAccount *CurrentAccountResource
+	Exchange       *ExchangeResource
+	KYC            *KYCResource
+	Market         *MarketResource
+	Merchant       *MerchantResource
+	Notifications  *NotificationsResource
+	Payments       *PaymentsResource
+	Providers      *ProvidersResource
+	Referral       *ReferralResource
+	Registration   *RegistrationResource
+	Reports        *ReportsResource
+	Support        *SupportResource
+	Trading        *TradingResource
+	User           *UserResource
 
 	core *core
 }
 
 func (c *Client) initResources() {
+	c.Accounting = &AccountingResource{
+		Accounts:     &AccountingAccountsResource{core: c.core},
+		Transactions: &AccountingTransactionsResource{core: c.core},
+	}
 	c.Auth = &AuthResource{core: c.core}
+	c.Balance = &BalanceResource{
+		Deposits:    &BalanceDepositsResource{core: c.core},
+		Operations:  &BalanceOperationsResource{core: c.core},
+		Withdrawals: &BalanceWithdrawalsResource{core: c.core},
+		core:        c.core,
+	}
 	c.Brokerage = &BrokerageResource{
 		BalanceOrders:   &BrokerageBalanceOrdersResource{core: c.core},
 		CryptoAddresses: &BrokerageCryptoAddressesResource{core: c.core},
@@ -29,6 +48,20 @@ func (c *Client) initResources() {
 		Payments:        &BrokeragePaymentsResource{core: c.core},
 		Subaccounts:     &BrokerageSubaccountsResource{core: c.core},
 		core:            c.core,
+	}
+	c.Client = &ClientResource{core: c.core}
+	c.CurrentAccount = &CurrentAccountResource{
+		Invoices:       &CurrentAccountInvoicesResource{core: c.core},
+		SystemAccounts: &CurrentAccountSystemAccountsResource{core: c.core},
+		core:           c.core,
+	}
+	c.Exchange = &ExchangeResource{
+		Assets:       &ExchangeAssetsResource{core: c.core},
+		LegacyOrders: &ExchangeLegacyOrdersResource{core: c.core},
+		Limits:       &ExchangeLimitsResource{core: c.core},
+		Orders:       &ExchangeOrdersResource{core: c.core},
+		Quotes:       &ExchangeQuotesResource{core: c.core},
+		Rates:        &ExchangeRatesResource{core: c.core},
 	}
 	c.KYC = &KYCResource{
 		Actualization:  &KYCActualizationResource{core: c.core},
@@ -43,7 +76,19 @@ func (c *Client) initResources() {
 		core:           c.core,
 	}
 	c.Market = &MarketResource{core: c.core}
+	c.Merchant = &MerchantResource{
+		APIKeys:    &MerchantAPIKeysResource{core: c.core},
+		Statistics: &MerchantStatisticsResource{core: c.core},
+		Webhooks:   &MerchantWebhooksResource{core: c.core},
+		core:       c.core,
+	}
 	c.Notifications = &NotificationsResource{core: c.core}
+	c.Payments = &PaymentsResource{
+		Cards:       &PaymentsCardsResource{core: c.core},
+		Commissions: &PaymentsCommissionsResource{core: c.core},
+		Methods:     &PaymentsMethodsResource{core: c.core},
+		Providers:   &PaymentsProvidersResource{core: c.core},
+	}
 	c.Providers = &ProvidersResource{
 		Alfa: &ProvidersAlfaResource{
 			CryptoCard: &ProvidersAlfaCryptoCardResource{core: c.core},
@@ -61,7 +106,12 @@ func (c *Client) initResources() {
 			CortiMilli: &ProvidersVtbCortiMilliResource{core: c.core},
 		},
 	}
+	c.Referral = &ReferralResource{
+		Transactions: &ReferralTransactionsResource{core: c.core},
+		core:         c.core,
+	}
 	c.Registration = &RegistrationResource{core: c.core}
+	c.Reports = &ReportsResource{core: c.core}
 	c.Support = &SupportResource{core: c.core}
 	c.Trading = &TradingResource{
 		Account:    &TradingAccountResource{core: c.core},

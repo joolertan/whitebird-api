@@ -11,6 +11,16 @@ from pydantic import Field
 from whitebird._models import Date, DateTime, StrEnum, WhitebirdModel
 
 __all__ = [
+    "AccountingAccount",
+    "AccountingAccountRequest",
+    "AccountingAccountType",
+    "AccountingBalance",
+    "AccountingEnhancedAccount",
+    "AccountingEnhancedBalance",
+    "AccountingTransaction",
+    "AccountingTransactionDetails",
+    "AccountingTransactionFilter",
+    "AccountingTransactionType",
     "AlfaCardBindUrl",
     "AlfaCardBindUrlRequest",
     "AlfaCryptoCardClientInfo",
@@ -33,13 +43,39 @@ __all__ = [
     "AuthMfaToken",
     "AuthMfaTokenRequest",
     "AuthWebGlData",
+    "BalanceAccountType",
+    "BalanceCalculation",
+    "BalanceCommissionType",
+    "BalanceCryptoAsset",
+    "BalanceCryptoCalculationRequest",
+    "BalanceCryptoDeposit",
+    "BalanceCryptoDepositRequest",
+    "BalanceCryptoWithdrawalRequest",
+    "BalanceCurrentOperation",
+    "BalanceCurrentOperations",
+    "BalanceFiatAsset",
+    "BalanceFiatCalculationRequest",
+    "BalanceFiatDeposit",
+    "BalanceFiatDepositRequest",
+    "BalanceFiatWithdrawalRequest",
+    "BalanceOperation",
+    "BalanceOperationFilter",
+    "BalanceOperationStatus",
+    "BalanceOperationType",
     "BalanceOrderFilterRequest",
     "BalanceOrderResponse",
     "BalanceOrderResponseAssetType",
     "BalanceOrderResponseDirection",
     "BalanceOrderStatus",
+    "BalancePaymentDetails",
+    "BalanceRejectRequest",
+    "BalanceRejectRequestOperationType",
     "CarusellBank",
+    "Client",
     "ClientCryptoWithdrawalTokenRequest",
+    "ClientFeature",
+    "ClientStatus",
+    "ClientType",
     "CryptoAddressRequest",
     "CryptoAddressResponse",
     "CryptoAddressResponseStatus",
@@ -47,8 +83,40 @@ __all__ = [
     "CryptoDepositRequest",
     "CryptoWithdrawalCalculation",
     "CryptoWithdrawalRequest",
+    "CurrentAccountDateFrame",
+    "CurrentAccountFiatOpType",
+    "CurrentAccountReportRequest",
+    "CurrentAccountSystemAccount",
     "DateFrame",
     "DownloadTokenResponse",
+    "ExchangeAssetCategory",
+    "ExchangeAssets",
+    "ExchangeCryptoAsset",
+    "ExchangeDateFrame",
+    "ExchangeDestination",
+    "ExchangeFiatAsset",
+    "ExchangeLeg",
+    "ExchangeLegStatus",
+    "ExchangeLegType",
+    "ExchangeLegacyCurrencyPair",
+    "ExchangeLegacyOperation",
+    "ExchangeLegacyOrder",
+    "ExchangeLimits",
+    "ExchangeLimitsLeg",
+    "ExchangeLimitsRequest",
+    "ExchangeOrder",
+    "ExchangeOrderConditions",
+    "ExchangeOrderHistoryFilter",
+    "ExchangeOrderRejectRequest",
+    "ExchangeOrderRequest",
+    "ExchangeOrderStatus",
+    "ExchangePostForm",
+    "ExchangePromoCode",
+    "ExchangeQuote",
+    "ExchangeQuoteLegRequest",
+    "ExchangeQuoteRequest",
+    "ExchangeRateStat",
+    "ExchangeRateStatsFilter",
     "FiatDepositRequest",
     "FiatWithdrawalRequest",
     "FileType",
@@ -78,6 +146,17 @@ __all__ = [
     "MarketKline",
     "MarketKlineInterval",
     "MarketOrderbook",
+    "Merchant",
+    "MerchantApiKey",
+    "MerchantClientCounts",
+    "MerchantClientStatus",
+    "MerchantCurrencyPair",
+    "MerchantPair",
+    "MerchantReportFileType",
+    "MerchantReportRequest",
+    "MerchantShowNameRequest",
+    "MerchantStatisticFilter",
+    "MerchantWebhookUrlRequest",
     "MtsCardBindRequest",
     "MtsCardCountry",
     "MtsQrAmount",
@@ -108,8 +187,28 @@ __all__ = [
     "OtcOrderResponse",
     "OtcOrderResponseSide",
     "OtcOrderStatus",
+    "PaymentCard",
+    "PaymentCardLimit",
+    "PaymentCardLimits",
+    "PaymentCardRenameRequest",
+    "PaymentCommission",
+    "PaymentCommissionPair",
+    "PaymentCommissionType",
+    "PaymentCommissionsRequest",
+    "PaymentCountryGroup",
+    "PaymentDirectionCommission",
+    "PaymentMethod",
     "PaymentMethodResponse",
+    "PaymentMethodStatus",
+    "PaymentMethodsRequest",
+    "PaymentOrderType",
+    "PaymentProvider",
+    "PaymentProviderType",
+    "PaymentProvidersRequest",
     "ProviderType",
+    "Referral",
+    "ReferralTransaction",
+    "ReferralTransactionsRequest",
     "RegistrationCodeRequest",
     "RegistrationIdRequest",
     "RegistrationInitiateRequest",
@@ -117,6 +216,10 @@ __all__ = [
     "RegistrationSdkResult",
     "RegistrationState",
     "RegistrationStatus",
+    "ReportBalanceRequest",
+    "ReportDateFrame",
+    "ReportOperationType",
+    "ReportRequest",
     "StatusbankCardDetails",
     "StatusbankCardSystem",
     "StatusbankCardSystems",
@@ -185,6 +288,29 @@ __all__ = [
 ]
 
 
+class AccountingAccountType(StrEnum):
+    """Accounting account type.
+
+    Values of `AccountingAccountRequest.type`, `AccountingBalance.type`,
+    `AccountingEnhancedBalance.type` and 1 more.
+    """
+
+    USER_BALANCE = "USER_BALANCE"
+    USER_PAYMENT = "USER_PAYMENT"
+    USER_EXCHANGE = "USER_EXCHANGE"
+    USER_FEES = "USER_FEES"
+    USER_PAYMENT_RESERVING = "USER_PAYMENT_RESERVING"
+    USER_SPOT_RESERVING = "USER_SPOT_RESERVING"
+    REFERRER_BALANCE = "REFERRER_BALANCE"
+    ICO_BALANCE = "ICO_BALANCE"
+
+
+class AccountingTransactionType(StrEnum):
+    """Only `REFERRER_FEE` is seen in the web app."""
+
+    REFERRER_FEE = "REFERRER_FEE"
+
+
 class AlfaCryptoCardStatus(StrEnum):
     """Issuance state of the Alfa crypto card.
 
@@ -220,6 +346,64 @@ class AuthMfaOperation(StrEnum):
     WITHDRAWAL = "WITHDRAWAL"
 
 
+class BalanceAccountType(StrEnum):
+    """Balance account type.
+
+    Values of `BalanceCryptoCalculationRequest.account_type`,
+    `BalanceCryptoDepositRequest.account_type`, `BalanceCryptoWithdrawalRequest.account_type` and 2
+    more.
+    """
+
+    WALLET = "WALLET"
+
+
+class BalanceCommissionType(StrEnum):
+    """How the commission is applied; the web app only sends `ADD` (MTS QR payments)."""
+
+    ADD = "ADD"
+
+
+class BalanceOperationStatus(StrEnum):
+    """Status of a deposit / withdrawal transaction (crypto and fiat statuses share the enum)."""
+
+    NEW = "NEW"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    SELECTED = "SELECTED"
+    SUBMITTING = "SUBMITTING"
+    SUBMITTED = "SUBMITTED"
+    SUBMIT_TIMEOUT = "SUBMIT_TIMEOUT"
+    CONFIRMED = "CONFIRMED"
+    COMPLETED = "COMPLETED"
+    APPROVED = "APPROVED"
+    PROCESSED = "PROCESSED"
+    REJECTED = "REJECTED"
+    DECLINED = "DECLINED"
+    ERROR = "ERROR"
+    AML_ERROR = "AML_ERROR"
+    AML_BLOCKED = "AML_BLOCKED"
+    ARREST = "ARREST"
+    TIMEOUT = "TIMEOUT"
+    INVALID_AMOUNT = "INVALID_AMOUNT"
+    NOT_FOUND = "NOT_FOUND"
+    PENDING_RESOLVE = "PENDING_RESOLVE"
+    PENDING_RESOLVED = "PENDING_RESOLVED"
+    PENDING_RENEWED = "PENDING_RENEWED"
+    PENDING_REVIEW = "PENDING_REVIEW"
+
+
+class BalanceOperationType(StrEnum):
+    """Balance operation type.
+
+    Values of `BalanceCurrentOperation.operation_type`, `BalanceOperation.type` and
+    `BalanceOperationFilter.transaction_types`.
+    """
+
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    REFERRER_REWARD = "REFERRER_REWARD"
+
+
 class BalanceOrderResponseAssetType(StrEnum):
     """Values of `BalanceOrderResponse.asset_type`."""
 
@@ -246,12 +430,136 @@ class BalanceOrderStatus(StrEnum):
     PENDING = "PENDING"
 
 
+class BalanceRejectRequestOperationType(StrEnum):
+    """Same as the path segment (`crypto` or `fiat`)."""
+
+    CRYPTO = "crypto"
+    FIAT = "fiat"
+
+
+class ClientFeature(StrEnum):
+    """Returned by `client.client.features()`. Values of `Client.features`."""
+
+    MSI = "MSI"
+    MTS_BANK = "MTS_BANK"
+    VTB = "VTB"
+    CARUSELL = "CARUSELL"
+    CARUSELL_V2 = "CARUSELL_V2"
+    CORTI_MILLI = "CORTI_MILLI"
+    WEB_CLIENT_ORDER_V1 = "WEB_CLIENT_ORDER_V1"
+    WEB_CLIENT_ORDER_V2 = "WEB_CLIENT_ORDER_V2"
+    SPOT_LIVE = "SPOT_LIVE"
+    AEDEX_TOKEN = "AEDEX_TOKEN"
+    RUBS_TOKEN = "RUBS_TOKEN"
+    CUSTODIAL_WALLET = "CUSTODIAL_WALLET"
+    HIDE_ALFA_CRYPTO_CARD_BLOCK = "HIDE_ALFA_CRYPTO_CARD_BLOCK"
+    HIDE_STATUS_CRYPTO_CARD_BLOCK = "HIDE_STATUS_CRYPTO_CARD_BLOCK"
+
+
+class ClientStatus(StrEnum):
+    """Values of `Client.status`."""
+
+    NEW = "NEW"
+    EMAIL_VERIFIED = "EMAIL_VERIFIED"
+    NOT_VERIFIED = "NOT_VERIFIED"
+    PENDING = "PENDING"
+    VERIFIED = "VERIFIED"
+    ACTUALIZATION_REQUIRED = "ACTUALIZATION_REQUIRED"
+    FROZEN = "FROZEN"
+    ARREST = "ARREST"
+    BLOCKED = "BLOCKED"
+    CLOSED = "CLOSED"
+
+
+class ClientType(StrEnum):
+    """Values of `Client.client_type`."""
+
+    INDIVIDUAL = "INDIVIDUAL"
+    INDIVIDUAL_ENTREPRENEUR = "INDIVIDUAL_ENTREPRENEUR"
+    ORGANIZATION = "ORGANIZATION"
+    BANK = "BANK"
+
+
 class CryptoAddressResponseStatus(StrEnum):
     """Values of `CryptoAddressResponse.status`."""
 
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
     BLOCKED = "BLOCKED"
+
+
+class CurrentAccountFiatOpType(StrEnum):
+    """Current account fiat op type.
+
+    `BALANCE` for wallet deposits, `BROKER` for brokerage payments; omitted for exchange orders.
+    """
+
+    BALANCE = "BALANCE"
+    BROKER = "BROKER"
+
+
+class ExchangeAssetCategory(StrEnum):
+    """Values of `ExchangeCryptoAsset.category` and `ExchangeFiatAsset.category`."""
+
+    CRYPTO = "CRYPTO"
+    STABLECOIN = "STABLECOIN"
+    STOCK = "STOCK"
+    FIAT = "FIAT"
+
+
+class ExchangeDestination(StrEnum):
+    """Product context of a request.
+
+    `EXCHANGE`: buy/sell with external card or address; `ACCOUNTING`: operations on the Whitebird
+    wallet (internal conversion); `SDK_*`: the same contexts inside the embeddable widget
+    (`SDK_CROSS`: wallet deposit/withdrawal assets, `SDK_SWAP`: swap assets).
+    """
+
+    EXCHANGE = "EXCHANGE"
+    ACCOUNTING = "ACCOUNTING"
+    SDK_EXCHANGE = "SDK_EXCHANGE"
+    SDK_ACCOUNTING = "SDK_ACCOUNTING"
+    SDK_CROSS = "SDK_CROSS"
+    SDK_SWAP = "SDK_SWAP"
+
+
+class ExchangeLegStatus(StrEnum):
+    """Values of `ExchangeLeg.status`."""
+
+    NEW = "NEW"
+    PROCESSING = "PROCESSING"
+    UPDATED = "UPDATED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    EXPIRED = "EXPIRED"
+
+
+class ExchangeLegType(StrEnum):
+    """Exchange leg type.
+
+    `INTERNAL_BALANCE`: Whitebird wallet; `CRYPTO_TRANSFER`: external crypto address;
+    `FIAT_PROVIDER`: card or bank account of a payment provider.
+    """
+
+    FIAT_PROVIDER = "FIAT_PROVIDER"
+    CRYPTO_TRANSFER = "CRYPTO_TRANSFER"
+    INTERNAL_BALANCE = "INTERNAL_BALANCE"
+
+
+class ExchangeOrderStatus(StrEnum):
+    """Exchange order status.
+
+    Values of `ExchangeOrder.status`, `ExchangeOrderHistoryFilter.statuses` and
+    `MerchantReportRequest.statuses`.
+    """
+
+    NEW = "NEW"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    EXPIRED = "EXPIRED"
+    DECLINED = "DECLINED"
 
 
 class FileType(StrEnum):
@@ -337,6 +645,23 @@ class MarketKlineInterval(StrEnum):
     VALUE_1_D = "1D"
     VALUE_1_W = "1W"
     VALUE_1_M = "1M"
+
+
+class MerchantClientStatus(StrEnum):
+    """Values of `MerchantClientCounts.statuses`."""
+
+    NOT_VERIFIED = "NOT_VERIFIED"
+    PENDING = "PENDING"
+    VERIFIED = "VERIFIED"
+    FROZEN = "FROZEN"
+    ARREST = "ARREST"
+
+
+class MerchantReportFileType(StrEnum):
+    """Values of `MerchantReportRequest.file_type`."""
+
+    CSV = "CSV"
+    PDF = "PDF"
 
 
 class MtsCardCountry(StrEnum):
@@ -464,6 +789,88 @@ class OtcOrderStatus(StrEnum):
     REJECTED = "REJECTED"
 
 
+class PaymentCommissionType(StrEnum):
+    """Payment type of a commission (finer than the provider type)."""
+
+    ALFA = "ALFA"
+    ALFA_CRYPTO_CARD = "ALFA_CRYPTO_CARD"
+    ASSIST_BELARUSBANK = "ASSIST_BELARUSBANK"
+    ASSIST_OTHER = "ASSIST_OTHER"
+    CA = "CA"
+    CARUSELL = "CARUSELL"
+    CORTI_MILLI = "CORTI_MILLI"
+    FOREIGN_CARDS = "FOREIGN_CARDS"
+    MTS = "MTS"
+    MTS_CASH = "MTS_CASH"
+    MTS_MULTITRANSFER = "MTS_MULTITRANSFER"
+    MTS_QR = "MTS_QR"
+    MTS_RF_CARDS = "MTS_RF_CARDS"
+    SBER = "SBER"
+    STATUSBANK = "STATUSBANK"
+    TBANK = "TBANK"
+    VTB = "VTB"
+
+
+class PaymentCountryGroup(StrEnum):
+    """Values of `PaymentMethodsRequest.country_group`."""
+
+    BELARUS = "BELARUS"
+    RUSSIA = "RUSSIA"
+
+
+class PaymentMethodStatus(StrEnum):
+    """Values of `PaymentMethod.status`."""
+
+    ENABLED = "ENABLED"
+    CURRENCY_DISABLED = "CURRENCY_DISABLED"
+    DIRECTION_DISABLED = "DIRECTION_DISABLED"
+
+
+class PaymentOrderType(StrEnum):
+    """Values of `PaymentMethodsRequest.order_type`."""
+
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class PaymentProviderType(StrEnum):
+    """Payment provider / payment method family (same values as the brokerage `ProviderType`)."""
+
+    ALFA = "ALFA"
+    ASSIST = "ASSIST"
+    AZERICARD = "AZERICARD"
+    BELVEB = "BELVEB"
+    BEPAID = "BEPAID"
+    BEPAID_CUSTOM = "BEPAID_CUSTOM"
+    BGP = "BGP"
+    BRAZINO = "BRAZINO"
+    BRICS = "BRICS"
+    BSB = "BSB"
+    CA = "CA"
+    CARUSELL = "CARUSELL"
+    CORTI_MILLI = "CORTI_MILLI"
+    DSB = "DSB"
+    ERIP = "ERIP"
+    INSNC = "INSNC"
+    MAXLINE = "MAXLINE"
+    MODULBANK = "MODULBANK"
+    MTS = "MTS"
+    MTS_CASH = "MTS_CASH"
+    MTS_MULTITRANSFER = "MTS_MULTITRANSFER"
+    MTS_QR = "MTS_QR"
+    SBER = "SBER"
+    SBP = "SBP"
+    SGB = "SGB"
+    SGB_CARD = "SGB_CARD"
+    STATUSBANK = "STATUSBANK"
+    TBANK = "TBANK"
+    TEST = "TEST"
+    VTB = "VTB"
+    VTB_SBP = "VTB_SBP"
+    WILDBERRIES = "WILDBERRIES"
+    ZUBRPARI = "ZUBRPARI"
+
+
 class ProviderType(StrEnum):
     """Provider type.
 
@@ -512,6 +919,14 @@ class RegistrationStatus(StrEnum):
     PENDING_EMAIL = "PENDING_EMAIL"
     PENDING_PHONE = "PENDING_PHONE"
     READY_TO_COMPLETE = "READY_TO_COMPLETE"
+
+
+class ReportOperationType(StrEnum):
+    """Values of `ReportBalanceRequest.transaction_types`."""
+
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    REFERRER_REWARD = "REFERRER_REWARD"
 
 
 class StatusbankPaymentSystem(StrEnum):
@@ -701,6 +1116,121 @@ class VtbCortiMilliServiceType(StrEnum):
     """Values of `VtbCortiMilliRateRequest.service_type`."""
 
     EXCHANGE = "EXCHANGE"
+
+
+class AccountingAccount(WhitebirdModel):
+    """Returned by `client.accounting.accounts.get()`."""
+
+    balances: list[AccountingBalance] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AccountingAccountRequest(WhitebirdModel):
+    """Accounting account request.
+
+    Request body of `client.accounting.accounts.get()` and
+    `client.accounting.accounts.get_enhanced()`.
+    """
+
+    type: AccountingAccountType | str
+    assets: list[str] | None = None
+    """Asset codes to include; all assets when null."""
+
+
+class AccountingBalance(WhitebirdModel):
+    """Used in `AccountingAccount.balances`."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    type: AccountingAccountType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    network: str | None = None
+    """Network of e-money assets. Inferred from the web application; may be missing."""
+
+
+class AccountingEnhancedAccount(WhitebirdModel):
+    """Returned by `client.accounting.accounts.get_enhanced()`."""
+
+    balances: list[AccountingEnhancedBalance] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AccountingEnhancedBalance(WhitebirdModel):
+    """Used in `AccountingEnhancedAccount.balances`."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    usd_amount: Decimal | None = None
+    """Value in USD. Inferred from the web application; may be missing."""
+
+    usd_rate: Decimal | None = None
+    """Price in USD. Inferred from the web application; may be missing."""
+
+    fiat: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    type: AccountingAccountType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    reserved_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    reserved: Decimal | None = None
+    """Older name of `reservedAmount`. Inferred from the web application; may be missing."""
+
+
+class AccountingTransaction(WhitebirdModel):
+    """Returned by `client.accounting.transactions.list()`."""
+
+    id: Any = None
+    """Row id (type not visible in the web app).
+
+    Inferred from the web application; may be missing.
+    """
+
+    external_tx_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    referral_id: str | None = None
+    """Id of the referred user (referral accruals).
+
+    Inferred from the web application; may be missing.
+    """
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    created_timestamp: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    details: AccountingTransactionDetails | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AccountingTransactionDetails(WhitebirdModel):
+    """Used in `AccountingTransaction.details`."""
+
+    referee_email: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class AccountingTransactionFilter(WhitebirdModel):
+    """Request body of `client.accounting.transactions.list()`."""
+
+    transaction_types: list[AccountingTransactionType | str] | None = None
+    account_type: AccountingAccountType | str | None = None
 
 
 class AlfaCardBindUrl(WhitebirdModel):
@@ -971,6 +1501,292 @@ class AuthWebGlData(WhitebirdModel):
     version: str | None = None
 
 
+class BalanceCalculation(WhitebirdModel):
+    """Balance calculation.
+
+    Returned by `client.balance.deposits.calculate_crypto()`,
+    `client.balance.deposits.calculate_fiat()`, `client.balance.withdrawals.calculate_crypto()` and
+    1 more.
+    """
+
+    id: str | None = None
+    """Calculation id, passed as `calculationId` to a crypto withdrawal.
+
+    Inferred from the web application; may be missing.
+    """
+
+    commission_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    received_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    withdrawal_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    expiration_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceCryptoAsset(WhitebirdModel):
+    """Used in `BalanceCryptoCalculationRequest.asset` and `BalanceCryptoDepositRequest.asset`."""
+
+    code: str
+    amount: Decimal
+    network: str | None = None
+    """Network of the asset, e.g. `Tron`, `Ethereum`, `BNB`, `SOLANA`, `Ton`, `Bitcoin`."""
+
+
+class BalanceCryptoCalculationRequest(WhitebirdModel):
+    """Balance crypto calculation request.
+
+    Request body of `client.balance.deposits.calculate_crypto()` and
+    `client.balance.withdrawals.calculate_crypto()`.
+    """
+
+    account_type: BalanceAccountType | str
+    asset: BalanceCryptoAsset
+    to_address: str | None = None
+    """Destination address (withdrawals)."""
+
+
+class BalanceCryptoDeposit(WhitebirdModel):
+    """Returned by `client.balance.deposits.create_crypto()`."""
+
+    transaction_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    deposit_crypto_address: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceCryptoDepositRequest(WhitebirdModel):
+    """Request body of `client.balance.deposits.create_crypto()`."""
+
+    account_type: BalanceAccountType | str
+    asset: BalanceCryptoAsset
+    additional_submit_timeout: bool | None = None
+    """Wait longer for the transfer (deposits from services with deferred payouts)."""
+
+
+class BalanceCryptoWithdrawalRequest(WhitebirdModel):
+    """Request body of `client.balance.withdrawals.create_crypto()`."""
+
+    account_type: BalanceAccountType | str
+    calculation_id: str
+    comment: str | None = None
+    """Memo / destination tag."""
+
+
+class BalanceCurrentOperation(WhitebirdModel):
+    """Balance current operation.
+
+    Used in `BalanceCurrentOperations.crypto_operations` and
+    `BalanceCurrentOperations.fiat_operations`.
+    """
+
+    transaction_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    number: Any = None
+    """Application number shown to the client (integer or numeric string).
+
+    Inferred from the web application; may be missing.
+    """
+
+    operation_type: BalanceOperationType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: BalanceOperationStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    service_fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    network_fee: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    created_at: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    network: str | None = None
+    """Crypto operations only. Inferred from the web application; may be missing."""
+
+    deposit_crypto_address: str | None = None
+    """Crypto deposits only. Inferred from the web application; may be missing."""
+
+    external_crypto_address: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    tx_hash: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    fiat_provider: PaymentProviderType | str | None = None
+    """Fiat operations only. Inferred from the web application; may be missing."""
+
+    order_identity: str | None = None
+    """Provider order id; for `CA` deposits the invoice id (see `current_account.invoices`).
+
+    Inferred from the web application; may be missing.
+    """
+
+    card_mask: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    phone_number: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceCurrentOperations(WhitebirdModel):
+    """Returned by `client.balance.current()`."""
+
+    crypto_operations: list[BalanceCurrentOperation] | None = None
+    """Inferred from the web application; may be missing."""
+
+    fiat_operations: list[BalanceCurrentOperation] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceFiatAsset(WhitebirdModel):
+    """Balance fiat asset.
+
+    Used in `BalanceFiatCalculationRequest.asset`, `BalanceFiatDepositRequest.asset` and
+    `BalanceFiatWithdrawalRequest.asset`.
+    """
+
+    code: str
+    amount: Decimal
+
+
+class BalanceFiatCalculationRequest(WhitebirdModel):
+    """Balance fiat calculation request.
+
+    Request body of `client.balance.deposits.calculate_fiat()` and
+    `client.balance.withdrawals.calculate_fiat()`.
+    """
+
+    asset: BalanceFiatAsset
+    fiat_provider_type: PaymentProviderType | str
+    payment_token: str | None = None
+    commission_type: BalanceCommissionType | str | None = None
+
+
+class BalanceFiatDeposit(WhitebirdModel):
+    """Returned by `client.balance.deposits.create_fiat()`."""
+
+    transaction_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    fiat_payment_link: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    payment_details: BalancePaymentDetails | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceFiatDepositRequest(WhitebirdModel):
+    """Request body of `client.balance.deposits.create_fiat()`."""
+
+    account_type: BalanceAccountType | str
+    asset: BalanceFiatAsset
+    fiat_provider_type: PaymentProviderType | str
+    payment_token: str | None = None
+    """Id of the payment method (bound card) to pay with."""
+
+    internal_token: str | None = None
+    """Whitebird bank account to pay to (required for `CA` current-account deposits)."""
+
+    return_url: str | None = None
+    fail_url: str | None = None
+
+
+class BalanceFiatWithdrawalRequest(WhitebirdModel):
+    """Request body of `client.balance.withdrawals.create_fiat()`."""
+
+    account_type: BalanceAccountType | str
+    asset: BalanceFiatAsset
+    fiat_provider_type: PaymentProviderType | str
+    payment_token: str | None = None
+    commission_type: BalanceCommissionType | str | None = None
+    bank_identifier: str | None = None
+
+
+class BalanceOperation(WhitebirdModel):
+    """Returned by `client.balance.operations.list()`."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    number: Any = None
+    """Application number shown to the client (integer or numeric string).
+
+    Inferred from the web application; may be missing.
+    """
+
+    type: BalanceOperationType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: BalanceOperationStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    tx_status: BalanceOperationStatus | str | None = None
+    """Status of the underlying transaction; takes precedence over `status` when present.
+
+    Inferred from the web application; may be missing.
+    """
+
+    asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    requested_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    net_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    commission: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    provider_type: PaymentProviderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    post: str | None = None
+    """Masked card / account number. Inferred from the web application; may be missing."""
+
+    payment_system: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    external_crypto_address: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    transaction_hash: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    creation_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    completion_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceOperationFilter(WhitebirdModel):
+    """Request body of `client.balance.operations.list()`."""
+
+    limit: int | None = 20
+    transaction_types: list[BalanceOperationType | str] | None = None
+    statuses: list[BalanceOperationStatus | str] | None = None
+    currencies: list[str] | None = None
+    from_: Date | None = None
+    to: Date | None = None
+    expand_currency_networks: bool | None = None
+
+
 class BalanceOrderFilterRequest(WhitebirdModel):
     """Request body of `client.brokerage.balance_orders.list()`."""
 
@@ -1018,6 +1834,34 @@ class BalanceOrderResponse(WhitebirdModel):
     payment_link: str | None = None
 
 
+class BalancePaymentDetails(WhitebirdModel):
+    """Used in `BalanceFiatDeposit.payment_details`."""
+
+    payment_link: str | None = None
+    """Deep link into the bank app (e.g.
+
+    T-Bank). Inferred from the web application; may be missing.
+    """
+
+    web_payment_link: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    post_form: ExchangePostForm | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class BalanceRejectRequest(WhitebirdModel):
+    """Balance reject request.
+
+    Request body of `client.balance.operations.reject_crypto()` and
+    `client.balance.operations.reject_fiat()`.
+    """
+
+    transaction_id: str
+    operation_type: BalanceRejectRequestOperationType | str | None = None
+    """Same as the path segment (`crypto` or `fiat`)."""
+
+
 class CarusellBank(WhitebirdModel):
     """Returned by `client.providers.carusell.banks()`."""
 
@@ -1028,6 +1872,55 @@ class CarusellBank(WhitebirdModel):
     """Bank name, mostly in Russian."""
 
     active: bool
+
+
+class Client(WhitebirdModel):
+    """Returned by `client.client.get()`."""
+
+    identity: str | None = None
+    """Client id (used as `clientId` in merchant reports).
+
+    Inferred from the web application; may be missing.
+    """
+
+    status: ClientStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    client_type: ClientType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    country_code: str | None = None
+    """ISO 3166 numeric country code (`112` = Belarus).
+
+    Inferred from the web application; may be missing.
+    """
+
+    features: list[ClientFeature | str] | None = None
+    """Inferred from the web application; may be missing."""
+
+    max_ca_orders_number: int | None = None
+    """How many unfinished current-account purchase orders the client may have at once.
+
+    Inferred from the web application; may be missing.
+    """
+
+    testing_needed: bool | None = None
+    """The client must pass the crypto-awareness test.
+
+    Inferred from the web application; may be missing.
+    """
+
+    testing_completed: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    phone_confirmation_required: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    internal_balance_enabled: bool | None = None
+    """The Whitebird wallet is available to the client.
+
+    Inferred from the web application; may be missing.
+    """
 
 
 class ClientCryptoWithdrawalTokenRequest(WhitebirdModel):
@@ -1091,6 +1984,39 @@ class CryptoWithdrawalRequest(WhitebirdModel):
     amount: Decimal
 
 
+class CurrentAccountDateFrame(WhitebirdModel):
+    """Used in `CurrentAccountReportRequest.completion_date_frame`."""
+
+    start: str | None = None
+    end: str | None = None
+
+
+class CurrentAccountReportRequest(WhitebirdModel):
+    """Shared document-request body.
+
+    The web app sends `{}` for invoices; the fields exist for statements served by the same code
+    path.
+    """
+
+    limit: int | None = None
+    completion_date_frame: CurrentAccountDateFrame | None = None
+    type: str | None = None
+    format: str | None = None
+
+
+class CurrentAccountSystemAccount(WhitebirdModel):
+    """Returned by `client.current_account.system_accounts.list()`."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    bank_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    number: str | None = None
+    """Account number. Inferred from the web application; may be missing."""
+
+
 class DateFrame(WhitebirdModel):
     """Date frame.
 
@@ -1107,6 +2033,449 @@ class DownloadTokenResponse(WhitebirdModel):
     """Returned by `client.brokerage.payments.invoice_download_token()`."""
 
     token: str | None = None
+
+
+class ExchangeAssets(WhitebirdModel):
+    """Returned by `client.exchange.assets.list()`."""
+
+    crypto_assets: list[ExchangeCryptoAsset] | None = None
+    """Inferred from the web application; may be missing."""
+
+    fiat_assets: list[ExchangeFiatAsset] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeCryptoAsset(WhitebirdModel):
+    """Used in `ExchangeAssets.crypto_assets`."""
+
+    id: str | None = None
+    """Network-specific id, e.g. `USDT_TRC`. Inferred from the web application; may be missing."""
+
+    code: str | None = None
+    """Asset code, e.g. `USDT`. Inferred from the web application; may be missing."""
+
+    category: ExchangeAssetCategory | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    network: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    protocol: str | None = None
+    """Token standard, e.g. `TRC-20`. Inferred from the web application; may be missing."""
+
+
+class ExchangeDateFrame(WhitebirdModel):
+    """Time interval.
+
+    The web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a colon-less offset, e.g.
+    `2026-11-07T00:00:00+0300`.
+    """
+
+    start: str | None = None
+    end: str | None = None
+
+
+class ExchangeFiatAsset(WhitebirdModel):
+    """Used in `ExchangeAssets.fiat_assets`."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    code: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    category: ExchangeAssetCategory | str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeLeg(WhitebirdModel):
+    """Used in `ExchangeOrder.input`, `ExchangeOrder.output`, `ExchangeQuote.input` and 1 more."""
+
+    type: ExchangeLegType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    transaction_amount: Decimal | None = None
+    """Amount actually received or sent; differs from `amount` after a recalculation.
+
+    Inferred from the web application; may be missing.
+    """
+
+    fee_amount: Decimal | None = None
+    """Service commission on the fiat leg, network commission on the crypto leg.
+
+    Inferred from the web application; may be missing.
+    """
+
+    status: ExchangeLegStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    provider: PaymentProviderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    token: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    post: str | None = None
+    """Masked card / account number of a `FIAT_PROVIDER` leg.
+
+    Inferred from the web application; may be missing.
+    """
+
+    payment_system: str | None = None
+    """Card brand (VISA, MASTERCARD, MIR, BELCARD, ...).
+
+    Inferred from the web application; may be missing.
+    """
+
+    client_bank: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_address: str | None = None
+    """Destination address.
+
+    On a `CRYPTO_TRANSFER` input this is the Whitebird address to pay to. Inferred from the web
+    application; may be missing.
+    """
+
+    from_address: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    hash: str | None = None
+    """Blockchain transaction hash. Inferred from the web application; may be missing."""
+
+    comment: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    link: str | None = None
+    """Payment page to redirect the client to (`FIAT_PROVIDER` input).
+
+    Inferred from the web application; may be missing.
+    """
+
+    processor_transaction_id: str | None = None
+    """Transaction id at the payment provider (e.g.
+
+    the Status Bank order id); for current-account (`CA`) purchases the invoice id of
+    `current_account.invoices.download`. Inferred from the web application; may be missing.
+    """
+
+    processor_transaction_number: Any = None
+    """Transaction number at the payment provider (type not visible in the web app).
+
+    Inferred from the web application; may be missing.
+    """
+
+    expiration_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    failure_message: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeLegacyCurrencyPair(WhitebirdModel):
+    """Used in `ExchangeLegacyOperation.currency_pair`."""
+
+    from_currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeLegacyOperation(WhitebirdModel):
+    """Used in `ExchangeLegacyOrder.exchange_operation`."""
+
+    currency_pair: ExchangeLegacyCurrencyPair | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeLegacyOrder(WhitebirdModel):
+    """Returned by `client.exchange.legacy_orders.current()`."""
+
+    status: str | None = None
+    """E.g. `PROCESSING`, `CONFIRMED`. Inferred from the web application; may be missing."""
+
+    exchange_operation: ExchangeLegacyOperation | None = None
+    """Inferred from the web application; may be missing."""
+
+    promo_code: Any = None
+    """Promo code applied to the order (shape not visible in the web app).
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class ExchangeLimits(WhitebirdModel):
+    """Returned by `client.exchange.limits.get()`."""
+
+    from_min_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    from_max_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_min_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_max_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeLimitsLeg(WhitebirdModel):
+    """Exchange limits leg.
+
+    Used in `ExchangeLimitsRequest.from_payment_details` and
+    `ExchangeLimitsRequest.to_payment_details`.
+    """
+
+    type: ExchangeLegType | str
+    provider: PaymentProviderType | str | None = None
+    token: str | None = None
+    to_address: str | None = None
+
+
+class ExchangeLimitsRequest(WhitebirdModel):
+    """Request body of `client.exchange.limits.get()`."""
+
+    from_asset: str
+    from_payment_details: ExchangeLimitsLeg
+    to_asset: str
+    to_payment_details: ExchangeLimitsLeg
+    merchant_id: str | None = None
+
+
+class ExchangeOrder(WhitebirdModel):
+    """Exchange order.
+
+    Returned by `client.exchange.orders.create()`, `client.exchange.orders.get()`,
+    `client.exchange.orders.current()` and 2 more.
+    """
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    number: int | None = None
+    """Application number shown to the client. Inferred from the web application; may be missing."""
+
+    status: ExchangeOrderStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    input: ExchangeLeg | None = None
+    """Inferred from the web application; may be missing."""
+
+    output: ExchangeLeg | None = None
+    """Inferred from the web application; may be missing."""
+
+    conditions: ExchangeOrderConditions | None = None
+    """Inferred from the web application; may be missing."""
+
+    exchange_rate_value: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    post_form: ExchangePostForm | None = None
+    """Inferred from the web application; may be missing."""
+
+    recalculation_reason: str | None = None
+    """Why the terms were recalculated, e.g.
+
+    `WRONG_AMOUNT` (a different amount was received). Inferred from the web application; may be
+    missing.
+    """
+
+    creation_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    completion_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeOrderConditions(WhitebirdModel):
+    """Used in `ExchangeOrder.conditions`."""
+
+    from_asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    from_gross_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    from_fee_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_net_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_fee_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    rate: str | None = None
+    """Pair of the rate, e.g. `BTC/USDT`. Inferred from the web application; may be missing."""
+
+    actual_rate_value: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    exchange_rate_value: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeOrderHistoryFilter(WhitebirdModel):
+    """Request body of `client.exchange.orders.history()`."""
+
+    limit: int | None = 20
+    input_assets: list[str] | None = None
+    output_assets: list[str] | None = None
+    input_operation_types: list[ExchangeLegType | str] | None = None
+    output_operation_types: list[ExchangeLegType | str] | None = None
+    statuses: list[ExchangeOrderStatus | str] | None = None
+    creation_date_frame: ExchangeDateFrame | None = None
+
+
+class ExchangeOrderRejectRequest(WhitebirdModel):
+    """The web app sends `{"requestBody": {}}`."""
+
+    request_body: Any = None
+
+
+class ExchangeOrderRequest(WhitebirdModel):
+    """Request body of `client.exchange.orders.create()`."""
+
+    quote_id: str
+    destination: ExchangeDestination | str
+    return_url: str | None = None
+    """Where the payment page returns after success."""
+
+    fail_url: str | None = None
+    """Where the payment page returns after a failure."""
+
+    system_token: str | None = None
+    """Whitebird bank account to pay to (current-account `CA` purchases), from
+    `current_account.banking_details`.
+    """
+
+    bank_identifier: str | None = None
+    """Recipient bank for SBP payouts (RUB crypto-to-fiat)."""
+
+    additional_timeout: bool | None = None
+    """Longer waiting time for a crypto transfer from a service with deferred payouts."""
+
+    external_id: str | None = None
+    """Merchant-side order id (widget)."""
+
+
+class ExchangePostForm(WhitebirdModel):
+    """HTML form to submit with POST (Assist acquiring)."""
+
+    action: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    fields: dict[str, str] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangePromoCode(WhitebirdModel):
+    """Used in `ExchangeQuote.promo_code`."""
+
+    code: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    applied: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    rejection_reason: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeQuote(WhitebirdModel):
+    """Returned by `client.exchange.quotes.create()`."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    input: ExchangeLeg | None = None
+    """Inferred from the web application; may be missing."""
+
+    output: ExchangeLeg | None = None
+    """Inferred from the web application; may be missing."""
+
+    exchange_rate_value: Decimal | None = None
+    """Displayed rate. Inferred from the web application; may be missing."""
+
+    actual_rate_value: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    promo_code: ExchangePromoCode | None = None
+    """Inferred from the web application; may be missing."""
+
+    creation_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    expiration_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ExchangeQuoteLegRequest(WhitebirdModel):
+    """Used in `ExchangeQuoteRequest.input` and `ExchangeQuoteRequest.output`."""
+
+    asset: str
+    """Asset code; network-specific for crypto transfers (`USDT_TRC`, `USDC_SOL`, ...)."""
+
+    type: ExchangeLegType | str
+    amount: Decimal | None = None
+    """Set on the leg whose amount the client fixes (input or output, not both)."""
+
+    provider: PaymentProviderType | str | None = None
+    token: str | None = None
+    """Payment method id (bound card) of a `FIAT_PROVIDER` leg; the card number for `CORTI_MILLI`.
+    """
+
+    to_address: str | None = None
+    """External crypto address of a `CRYPTO_TRANSFER` output."""
+
+    comment: str | None = None
+    """Memo / destination tag of a `CRYPTO_TRANSFER` output."""
+
+
+class ExchangeQuoteRequest(WhitebirdModel):
+    """Request body of `client.exchange.quotes.create()`."""
+
+    input: ExchangeQuoteLegRequest
+    output: ExchangeQuoteLegRequest
+    promo_code: str | None = None
+    session_id: str | None = None
+    """Widget session id (merchant SDK)."""
+
+    merchant_id: str | None = None
+    """Merchant id when quoting inside a merchant widget."""
+
+
+class ExchangeRateStat(WhitebirdModel):
+    """Returned by `client.exchange.rates.stats()`."""
+
+    base: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    quote: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    value: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    value24_h: Decimal | None = Field(
+        default=None, validation_alias="value24h", serialization_alias="value24h"
+    )
+    """Rate 24 hours ago. Inferred from the web application; may be missing."""
+
+
+class ExchangeRateStatsFilter(WhitebirdModel):
+    """Filter of the statistics; the web app always sends `{}`."""
 
 
 class FiatDepositRequest(WhitebirdModel):
@@ -1568,6 +2937,113 @@ class MarketOrderbook(WhitebirdModel):
     """Update id of the book; same sequence as `u` in WebSocket order book messages."""
 
 
+class Merchant(WhitebirdModel):
+    """Merchant.
+
+    Returned by `client.merchant.get()`, `client.merchant.set_show_name()`,
+    `client.merchant.api_keys.create()` and 3 more.
+    """
+
+    api_keys: list[MerchantApiKey] | None = None
+    """Inferred from the web application; may be missing."""
+
+    show_api_key: str | None = None
+    """Plaintext of the key just generated (only in the `merchant.api_keys.create` response).
+
+    Inferred from the web application; may be missing.
+    """
+
+    webhook_url: str | None = Field(
+        default=None, validation_alias="webhookURL", serialization_alias="webhookURL"
+    )
+    """Inferred from the web application; may be missing."""
+
+    webhook_signing_hash: str | None = None
+    """Secret used to sign webhook calls. Inferred from the web application; may be missing."""
+
+    show_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MerchantApiKey(WhitebirdModel):
+    """Used in `Merchant.api_keys`."""
+
+    id: Any = None
+    """Key id, used by `merchant.api_keys.delete` (type not visible in the web app).
+
+    Inferred from the web application; may be missing.
+    """
+
+    api_key_hash: str | None = None
+    """Masked key. Inferred from the web application; may be missing."""
+
+    creation_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MerchantClientCounts(WhitebirdModel):
+    """Parallel arrays; `clientsCounts[i]` clients have status `statuses[i]`."""
+
+    statuses: list[MerchantClientStatus | str] | None = None
+    """Inferred from the web application; may be missing."""
+
+    clients_counts: list[int] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MerchantCurrencyPair(WhitebirdModel):
+    """Used in `MerchantPair.currency_pair`."""
+
+    from_currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MerchantPair(WhitebirdModel):
+    """Returned by `client.merchant.pairs()`."""
+
+    currency_pair: MerchantCurrencyPair | None = None
+    """Inferred from the web application; may be missing."""
+
+    enabled: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class MerchantReportRequest(WhitebirdModel):
+    """Request body of `client.merchant.download_report()`."""
+
+    file_type: MerchantReportFileType | str
+    creation_date_frame: ExchangeDateFrame | None = None
+    statuses: list[ExchangeOrderStatus | str] | None = None
+    assets: list[str] | None = None
+    client_id: str | None = None
+
+
+class MerchantShowNameRequest(WhitebirdModel):
+    """Request body of `client.merchant.set_show_name()`."""
+
+    show_name: str
+
+
+class MerchantStatisticFilter(WhitebirdModel):
+    """Merchant statistic filter.
+
+    Request body of `client.merchant.statistics.count_by_status()` and
+    `client.merchant.statistics.export_csv()`.
+    """
+
+    from_date: Date | None = None
+    to_date: Date | None = None
+
+
+class MerchantWebhookUrlRequest(WhitebirdModel):
+    """Request body of `client.merchant.webhooks.set_url()`."""
+
+    url: str
+
+
 class MtsCardBindRequest(WhitebirdModel):
     """Request body of `client.providers.mts.bind_card()`."""
 
@@ -1854,6 +3330,173 @@ class OtcOrderResponse(WhitebirdModel):
     completion_date: DateTime | None = None
 
 
+class PaymentCard(WhitebirdModel):
+    """Returned by `client.payments.cards.rename()`."""
+
+    id: Any = None
+    """Card id (type not visible in the web app).
+
+    Inferred from the web application; may be missing.
+    """
+
+    number: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    brand: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    bank: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    provider_type: PaymentProviderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    restricted: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    crypto: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class PaymentCardLimit(WhitebirdModel):
+    """Used in `PaymentCardLimits.total_cards` and `PaymentCardLimits.recent_cards`."""
+
+    current_amount: int | None = None
+    """Inferred from the web application; may be missing."""
+
+    limit: int | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class PaymentCardLimits(WhitebirdModel):
+    """Returned by `client.payments.cards.limits()`."""
+
+    total_cards: PaymentCardLimit | None = None
+    """Inferred from the web application; may be missing."""
+
+    recent_cards: PaymentCardLimit | None = None
+    """Cards bound during the last day. Inferred from the web application; may be missing."""
+
+
+class PaymentCardRenameRequest(WhitebirdModel):
+    """Request body of `client.payments.cards.rename()`."""
+
+    name: str
+
+
+class PaymentCommission(WhitebirdModel):
+    """Returned by `client.payments.commissions.list()`."""
+
+    payment_type: PaymentCommissionType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    buy_commission: Any = None
+    """Percent (the web app expects decimal-comma strings such as `0,06`); null when unavailable.
+
+    Inferred from the web application; may be missing.
+    """
+
+    sell_commission: Any = None
+    """Percent; null when unavailable. Inferred from the web application; may be missing."""
+
+
+class PaymentCommissionPair(WhitebirdModel):
+    """Payment commission pair.
+
+    Used in `PaymentDirectionCommission.exchange_commissions` and
+    `PaymentDirectionCommission.account_commissions`.
+    """
+
+    buy: str | None = None
+    """Percent, decimal comma. Inferred from the web application; may be missing."""
+
+    sell: str | None = None
+    """Percent, decimal comma. Inferred from the web application; may be missing."""
+
+
+class PaymentCommissionsRequest(WhitebirdModel):
+    """Request body of `client.payments.commissions.list()`."""
+
+    destination: ExchangeDestination | str
+
+
+class PaymentDirectionCommission(WhitebirdModel):
+    """Returned by `client.payments.commissions.by_direction()`."""
+
+    payment_type: PaymentCommissionType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    exchange_commissions: PaymentCommissionPair | None = None
+    """Fees when buying (`buy`) and selling (`sell`) crypto.
+
+    Inferred from the web application; may be missing.
+    """
+
+    account_commissions: PaymentCommissionPair | None = None
+    """Wallet deposit (`buy`) and withdrawal (`sell`) fees.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class PaymentMethod(WhitebirdModel):
+    """Returned by `client.payments.methods.list()`."""
+
+    id: Any = None
+    """Method id (type not visible in the web app); empty for methods without a bound card.
+
+    Inferred from the web application; may be missing.
+    """
+
+    provider_id: PaymentProviderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    provider_type: PaymentProviderType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    number: str | None = None
+    """Masked card or account number; empty for card-less methods.
+
+    Inferred from the web application; may be missing.
+    """
+
+    brand: str | None = None
+    """Card brand, e.g. `MASTERCARD`. Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Name given by the client (`payments.cards.rename`).
+
+    Inferred from the web application; may be missing.
+    """
+
+    bank_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    supported_currencies: list[str] | None = None
+    """Inferred from the web application; may be missing."""
+
+    status: PaymentMethodStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    is_restricted: bool | None = None
+    """Inferred from the web application; may be missing."""
+
+    is_crypto: bool | None = None
+    """Crypto card (Alfa-Bank / Status Bank crypto cards).
+
+    Inferred from the web application; may be missing.
+    """
+
+
 class PaymentMethodResponse(WhitebirdModel):
     """Returned by `client.brokerage.payments.methods()`."""
 
@@ -1862,6 +3505,87 @@ class PaymentMethodResponse(WhitebirdModel):
     bank: str | None = None
     provider_type: ProviderType | str | None = None
     currency: str | None = None
+
+
+class PaymentMethodsRequest(WhitebirdModel):
+    """Request body of `client.payments.methods.list()`."""
+
+    fiat_asset: str | None = None
+    """Fiat currency of the direction."""
+
+    order_type: PaymentOrderType | str | None = None
+    destination: ExchangeDestination | str | None = None
+    country_group: list[PaymentCountryGroup | str] | None = None
+    providers: list[PaymentProviderType | str] | None = None
+
+
+class PaymentProvider(WhitebirdModel):
+    """Returned by `client.payments.providers.list()`."""
+
+    id: str | None = None
+    """Provider code (`CARUSELL`, `SBP`, `VTB_SBP`, `VTB`, `MTS`, `MTS_QR`, `TBANK`, ...).
+
+    Inferred from the web application; may be missing.
+    """
+
+    name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    add_payment_method: bool | None = None
+    """Whether the client can add a method of this provider.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class PaymentProvidersRequest(WhitebirdModel):
+    """Request body of `client.payments.providers.list()`."""
+
+    destination: ExchangeDestination | str | None = None
+
+
+class Referral(WhitebirdModel):
+    """Returned by `client.referral.get()`."""
+
+    ref_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Currency of the referral balance. Inferred from the web application; may be missing."""
+
+
+class ReferralTransaction(WhitebirdModel):
+    """Returned by `client.referral.transactions.list()`."""
+
+    id: Any = None
+    """Row id (type not visible in the web app).
+
+    Inferred from the web application; may be missing.
+    """
+
+    external_tx_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Negative for withdrawals from the referral balance.
+
+    Inferred from the web application; may be missing.
+    """
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    created_timestamp: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class ReferralTransactionsRequest(WhitebirdModel):
+    """Request body of `client.referral.transactions.list()`."""
+
+    page: int | None = 0
+    """Zero-based page index."""
+
+    size: int | None = 20
 
 
 class RegistrationCodeRequest(WhitebirdModel):
@@ -1944,6 +3668,51 @@ class RegistrationState(WhitebirdModel):
 
     status: RegistrationStatus | str | None = None
     """Inferred from the web application; may be missing."""
+
+
+class ReportBalanceRequest(WhitebirdModel):
+    """Statement filter plus the operation filter of `balance.operations.list`."""
+
+    limit: int | None = 20
+    completion_date_frame: ReportDateFrame | None = None
+    type: str | None = None
+    """Document type (`PDF`, `XLSX`)."""
+
+    format: str | None = None
+    """Document format (`PDF`)."""
+
+    transaction_types: list[ReportOperationType | str] | None = None
+    statuses: list[str] | None = None
+    currencies: list[str] | None = None
+    from_: Date | None = None
+    to: Date | None = None
+
+
+class ReportDateFrame(WhitebirdModel):
+    """Report date frame.
+
+    Time interval; the web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a colon-less
+    offset, e.g. `2026-11-07T00:00:00+0300`.
+    """
+
+    start: str | None = None
+    end: str | None = None
+
+
+class ReportRequest(WhitebirdModel):
+    """Filter of a statement.
+
+    All fields are optional; the web app sends `limit` and `completionDateFrame` for exchange
+    statements and nothing for invoices.
+    """
+
+    limit: int | None = 20
+    completion_date_frame: ReportDateFrame | None = None
+    type: str | None = None
+    """Document type (`PDF`, `XLSX`)."""
+
+    format: str | None = None
+    """Document format (`PDF`)."""
 
 
 class StatusbankCardDetails(WhitebirdModel):

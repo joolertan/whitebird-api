@@ -2,6 +2,33 @@
 
 package whitebird
 
+// AccountingAccountType is used in [AccountingAccountsGetParams],
+// [AccountingAccountsGetEnhancedParams], [AccountingTransactionsListParams], [AccountingBalance]
+// and 1 other.
+type AccountingAccountType string
+
+// Known values of [AccountingAccountType].
+const (
+	AccountingAccountTypeUserBalance          AccountingAccountType = "USER_BALANCE"
+	AccountingAccountTypeUserPayment          AccountingAccountType = "USER_PAYMENT"
+	AccountingAccountTypeUserExchange         AccountingAccountType = "USER_EXCHANGE"
+	AccountingAccountTypeUserFees             AccountingAccountType = "USER_FEES"
+	AccountingAccountTypeUserPaymentReserving AccountingAccountType = "USER_PAYMENT_RESERVING"
+	AccountingAccountTypeUserSpotReserving    AccountingAccountType = "USER_SPOT_RESERVING"
+	AccountingAccountTypeReferrerBalance      AccountingAccountType = "REFERRER_BALANCE"
+	AccountingAccountTypeIcoBalance           AccountingAccountType = "ICO_BALANCE"
+)
+
+// AccountingTransactionType is used in [AccountingTransactionsListParams].
+//
+// Only `REFERRER_FEE` is seen in the web app.
+type AccountingTransactionType string
+
+// Known values of [AccountingTransactionType].
+const (
+	AccountingTransactionTypeReferrerFee AccountingTransactionType = "REFERRER_FEE"
+)
+
 // AlfaCryptoCardStatus is used in [AlfaCryptoCardReleaseDetails].
 //
 // Issuance state of the Alfa crypto card. `CARD_RBS_BIND_ERROR` means the card was issued but
@@ -43,6 +70,72 @@ const (
 	AuthMFAOperationWithdrawal AuthMFAOperation = "WITHDRAWAL"
 )
 
+// BalanceAccountType is used in [BalanceDepositsCreateCryptoParams],
+// [BalanceDepositsCreateFiatParams], [BalanceDepositsCalculateCryptoParams],
+// [BalanceWithdrawalsCreateCryptoParams] and 2 others.
+type BalanceAccountType string
+
+// Known values of [BalanceAccountType].
+const (
+	BalanceAccountTypeWallet BalanceAccountType = "WALLET"
+)
+
+// BalanceCommissionType is used in [BalanceDepositsCalculateFiatParams],
+// [BalanceWithdrawalsCreateFiatParams] and [BalanceWithdrawalsCalculateFiatParams].
+//
+// How the commission is applied; the web app only sends `ADD` (MTS QR payments).
+type BalanceCommissionType string
+
+// Known values of [BalanceCommissionType].
+const (
+	BalanceCommissionTypeAdd BalanceCommissionType = "ADD"
+)
+
+// BalanceOperationStatus is used in [BalanceOperationsListParams], [BalanceCurrentOperation] and
+// [BalanceOperation].
+//
+// Status of a deposit / withdrawal transaction (crypto and fiat statuses share the enum).
+type BalanceOperationStatus string
+
+// Known values of [BalanceOperationStatus].
+const (
+	BalanceOperationStatusNew             BalanceOperationStatus = "NEW"
+	BalanceOperationStatusPending         BalanceOperationStatus = "PENDING"
+	BalanceOperationStatusProcessing      BalanceOperationStatus = "PROCESSING"
+	BalanceOperationStatusSelected        BalanceOperationStatus = "SELECTED"
+	BalanceOperationStatusSubmitting      BalanceOperationStatus = "SUBMITTING"
+	BalanceOperationStatusSubmitted       BalanceOperationStatus = "SUBMITTED"
+	BalanceOperationStatusSubmitTimeout   BalanceOperationStatus = "SUBMIT_TIMEOUT"
+	BalanceOperationStatusConfirmed       BalanceOperationStatus = "CONFIRMED"
+	BalanceOperationStatusCompleted       BalanceOperationStatus = "COMPLETED"
+	BalanceOperationStatusApproved        BalanceOperationStatus = "APPROVED"
+	BalanceOperationStatusProcessed       BalanceOperationStatus = "PROCESSED"
+	BalanceOperationStatusRejected        BalanceOperationStatus = "REJECTED"
+	BalanceOperationStatusDeclined        BalanceOperationStatus = "DECLINED"
+	BalanceOperationStatusError           BalanceOperationStatus = "ERROR"
+	BalanceOperationStatusAMLError        BalanceOperationStatus = "AML_ERROR"
+	BalanceOperationStatusAMLBlocked      BalanceOperationStatus = "AML_BLOCKED"
+	BalanceOperationStatusArrest          BalanceOperationStatus = "ARREST"
+	BalanceOperationStatusTimeout         BalanceOperationStatus = "TIMEOUT"
+	BalanceOperationStatusInvalidAmount   BalanceOperationStatus = "INVALID_AMOUNT"
+	BalanceOperationStatusNotFound        BalanceOperationStatus = "NOT_FOUND"
+	BalanceOperationStatusPendingResolve  BalanceOperationStatus = "PENDING_RESOLVE"
+	BalanceOperationStatusPendingResolved BalanceOperationStatus = "PENDING_RESOLVED"
+	BalanceOperationStatusPendingRenewed  BalanceOperationStatus = "PENDING_RENEWED"
+	BalanceOperationStatusPendingReview   BalanceOperationStatus = "PENDING_REVIEW"
+)
+
+// BalanceOperationType is used in [BalanceOperationsListParams], [BalanceCurrentOperation] and
+// [BalanceOperation].
+type BalanceOperationType string
+
+// Known values of [BalanceOperationType].
+const (
+	BalanceOperationTypeDeposit        BalanceOperationType = "DEPOSIT"
+	BalanceOperationTypeWithdrawal     BalanceOperationType = "WITHDRAWAL"
+	BalanceOperationTypeReferrerReward BalanceOperationType = "REFERRER_REWARD"
+)
+
 // BalanceOrderResponseAssetType is used in [BalanceOrderResponse].
 type BalanceOrderResponseAssetType string
 
@@ -75,6 +168,67 @@ const (
 	BalanceOrderStatusPending                    BalanceOrderStatus = "PENDING"
 )
 
+// BalanceRejectRequestOperationType is used in [BalanceOperationsRejectCryptoParams] and
+// [BalanceOperationsRejectFiatParams].
+//
+// Same as the path segment (`crypto` or `fiat`).
+type BalanceRejectRequestOperationType string
+
+// Known values of [BalanceRejectRequestOperationType].
+const (
+	BalanceRejectRequestOperationTypeCrypto BalanceRejectRequestOperationType = "crypto"
+	BalanceRejectRequestOperationTypeFiat   BalanceRejectRequestOperationType = "fiat"
+)
+
+// ClientFeature is returned by [ClientResource.Features].
+type ClientFeature string
+
+// Known values of [ClientFeature].
+const (
+	ClientFeatureMsi                       ClientFeature = "MSI"
+	ClientFeatureMtsBank                   ClientFeature = "MTS_BANK"
+	ClientFeatureVtb                       ClientFeature = "VTB"
+	ClientFeatureCarusell                  ClientFeature = "CARUSELL"
+	ClientFeatureCarusellV2                ClientFeature = "CARUSELL_V2"
+	ClientFeatureCortiMilli                ClientFeature = "CORTI_MILLI"
+	ClientFeatureWebClientOrderV1          ClientFeature = "WEB_CLIENT_ORDER_V1"
+	ClientFeatureWebClientOrderV2          ClientFeature = "WEB_CLIENT_ORDER_V2"
+	ClientFeatureSpotLive                  ClientFeature = "SPOT_LIVE"
+	ClientFeatureAedexToken                ClientFeature = "AEDEX_TOKEN"
+	ClientFeatureRubsToken                 ClientFeature = "RUBS_TOKEN"
+	ClientFeatureCustodialWallet           ClientFeature = "CUSTODIAL_WALLET"
+	ClientFeatureHideAlfaCryptoCardBlock   ClientFeature = "HIDE_ALFA_CRYPTO_CARD_BLOCK"
+	ClientFeatureHideStatusCryptoCardBlock ClientFeature = "HIDE_STATUS_CRYPTO_CARD_BLOCK"
+)
+
+// ClientStatus is used in [ExchangeClient].
+type ClientStatus string
+
+// Known values of [ClientStatus].
+const (
+	ClientStatusNew                   ClientStatus = "NEW"
+	ClientStatusEmailVerified         ClientStatus = "EMAIL_VERIFIED"
+	ClientStatusNotVerified           ClientStatus = "NOT_VERIFIED"
+	ClientStatusPending               ClientStatus = "PENDING"
+	ClientStatusVerified              ClientStatus = "VERIFIED"
+	ClientStatusActualizationRequired ClientStatus = "ACTUALIZATION_REQUIRED"
+	ClientStatusFrozen                ClientStatus = "FROZEN"
+	ClientStatusArrest                ClientStatus = "ARREST"
+	ClientStatusBlocked               ClientStatus = "BLOCKED"
+	ClientStatusClosed                ClientStatus = "CLOSED"
+)
+
+// ClientType is used in [ExchangeClient].
+type ClientType string
+
+// Known values of [ClientType].
+const (
+	ClientTypeIndividual             ClientType = "INDIVIDUAL"
+	ClientTypeIndividualEntrepreneur ClientType = "INDIVIDUAL_ENTREPRENEUR"
+	ClientTypeOrganization           ClientType = "ORGANIZATION"
+	ClientTypeBank                   ClientType = "BANK"
+)
+
 // CryptoAddressResponseStatus is used in [CryptoAddressResponse].
 type CryptoAddressResponseStatus string
 
@@ -83,6 +237,88 @@ const (
 	CryptoAddressResponseStatusPending CryptoAddressResponseStatus = "PENDING"
 	CryptoAddressResponseStatusActive  CryptoAddressResponseStatus = "ACTIVE"
 	CryptoAddressResponseStatusBlocked CryptoAddressResponseStatus = "BLOCKED"
+)
+
+// CurrentAccountFiatOpType is used in [CurrentAccountSystemAccountsListParams].
+//
+// `BALANCE` for wallet deposits, `BROKER` for brokerage payments; omitted for exchange orders.
+type CurrentAccountFiatOpType string
+
+// Known values of [CurrentAccountFiatOpType].
+const (
+	CurrentAccountFiatOpTypeBalance CurrentAccountFiatOpType = "BALANCE"
+	CurrentAccountFiatOpTypeBroker  CurrentAccountFiatOpType = "BROKER"
+)
+
+// ExchangeAssetCategory is used in [ExchangeCryptoAsset] and [ExchangeFiatAsset].
+type ExchangeAssetCategory string
+
+// Known values of [ExchangeAssetCategory].
+const (
+	ExchangeAssetCategoryCrypto     ExchangeAssetCategory = "CRYPTO"
+	ExchangeAssetCategoryStablecoin ExchangeAssetCategory = "STABLECOIN"
+	ExchangeAssetCategoryStock      ExchangeAssetCategory = "STOCK"
+	ExchangeAssetCategoryFiat       ExchangeAssetCategory = "FIAT"
+)
+
+// ExchangeDestination is used in [ExchangeAssetsListParams], [ExchangeOrdersCreateParams],
+// [ExchangeOrdersCurrentParams], [PaymentsCommissionsListParams] and 2 others.
+//
+// Product context of a request. `EXCHANGE`: buy/sell with external card or address; `ACCOUNTING`:
+// operations on the Whitebird wallet (internal conversion); `SDK_*`: the same contexts inside the
+// embeddable widget (`SDK_CROSS`: wallet deposit/withdrawal assets, `SDK_SWAP`: swap assets).
+type ExchangeDestination string
+
+// Known values of [ExchangeDestination].
+const (
+	ExchangeDestinationExchange      ExchangeDestination = "EXCHANGE"
+	ExchangeDestinationAccounting    ExchangeDestination = "ACCOUNTING"
+	ExchangeDestinationSdkExchange   ExchangeDestination = "SDK_EXCHANGE"
+	ExchangeDestinationSdkAccounting ExchangeDestination = "SDK_ACCOUNTING"
+	ExchangeDestinationSdkCross      ExchangeDestination = "SDK_CROSS"
+	ExchangeDestinationSdkSwap       ExchangeDestination = "SDK_SWAP"
+)
+
+// ExchangeLegStatus is used in [ExchangeLeg].
+type ExchangeLegStatus string
+
+// Known values of [ExchangeLegStatus].
+const (
+	ExchangeLegStatusNew        ExchangeLegStatus = "NEW"
+	ExchangeLegStatusProcessing ExchangeLegStatus = "PROCESSING"
+	ExchangeLegStatusUpdated    ExchangeLegStatus = "UPDATED"
+	ExchangeLegStatusCompleted  ExchangeLegStatus = "COMPLETED"
+	ExchangeLegStatusFailed     ExchangeLegStatus = "FAILED"
+	ExchangeLegStatusExpired    ExchangeLegStatus = "EXPIRED"
+)
+
+// ExchangeLegType is used in [ExchangeOrdersHistoryParams], [ExchangeLeg], [ExchangeLimitsLeg] and
+// [ExchangeQuoteLegRequest].
+//
+// `INTERNAL_BALANCE`: Whitebird wallet; `CRYPTO_TRANSFER`: external crypto address;
+// `FIAT_PROVIDER`: card or bank account of a payment provider.
+type ExchangeLegType string
+
+// Known values of [ExchangeLegType].
+const (
+	ExchangeLegTypeFiatProvider    ExchangeLegType = "FIAT_PROVIDER"
+	ExchangeLegTypeCryptoTransfer  ExchangeLegType = "CRYPTO_TRANSFER"
+	ExchangeLegTypeInternalBalance ExchangeLegType = "INTERNAL_BALANCE"
+)
+
+// ExchangeOrderStatus is used in [ExchangeOrdersHistoryParams], [MerchantDownloadReportParams] and
+// [ExchangeOrder].
+type ExchangeOrderStatus string
+
+// Known values of [ExchangeOrderStatus].
+const (
+	ExchangeOrderStatusNew        ExchangeOrderStatus = "NEW"
+	ExchangeOrderStatusPending    ExchangeOrderStatus = "PENDING"
+	ExchangeOrderStatusProcessing ExchangeOrderStatus = "PROCESSING"
+	ExchangeOrderStatusCompleted  ExchangeOrderStatus = "COMPLETED"
+	ExchangeOrderStatusFailed     ExchangeOrderStatus = "FAILED"
+	ExchangeOrderStatusExpired    ExchangeOrderStatus = "EXPIRED"
+	ExchangeOrderStatusDeclined   ExchangeOrderStatus = "DECLINED"
 )
 
 // FileType is used in [BrokerageOrdersDownloadReportParams].
@@ -185,6 +421,27 @@ const (
 	MarketKlineInterval1D      MarketKlineInterval = "1D"
 	MarketKlineInterval1W      MarketKlineInterval = "1W"
 	MarketKlineIntervalValue10 MarketKlineInterval = "1M"
+)
+
+// MerchantClientStatus is used in [MerchantClientCounts].
+type MerchantClientStatus string
+
+// Known values of [MerchantClientStatus].
+const (
+	MerchantClientStatusNotVerified MerchantClientStatus = "NOT_VERIFIED"
+	MerchantClientStatusPending     MerchantClientStatus = "PENDING"
+	MerchantClientStatusVerified    MerchantClientStatus = "VERIFIED"
+	MerchantClientStatusFrozen      MerchantClientStatus = "FROZEN"
+	MerchantClientStatusArrest      MerchantClientStatus = "ARREST"
+)
+
+// MerchantReportFileType is used in [MerchantDownloadReportParams].
+type MerchantReportFileType string
+
+// Known values of [MerchantReportFileType].
+const (
+	MerchantReportFileTypeCSV MerchantReportFileType = "CSV"
+	MerchantReportFileTypePDF MerchantReportFileType = "PDF"
 )
 
 // MtsCardCountry is returned by [ProvidersMtsResource.Countries].
@@ -329,6 +586,104 @@ const (
 	OTCOrderStatusRejected  OTCOrderStatus = "REJECTED"
 )
 
+// PaymentCommissionType is used in [PaymentCommission] and [PaymentDirectionCommission].
+//
+// Payment type of a commission (finer than the provider type).
+type PaymentCommissionType string
+
+// Known values of [PaymentCommissionType].
+const (
+	PaymentCommissionTypeAlfa              PaymentCommissionType = "ALFA"
+	PaymentCommissionTypeAlfaCryptoCard    PaymentCommissionType = "ALFA_CRYPTO_CARD"
+	PaymentCommissionTypeAssistBelarusbank PaymentCommissionType = "ASSIST_BELARUSBANK"
+	PaymentCommissionTypeAssistOther       PaymentCommissionType = "ASSIST_OTHER"
+	PaymentCommissionTypeCa                PaymentCommissionType = "CA"
+	PaymentCommissionTypeCarusell          PaymentCommissionType = "CARUSELL"
+	PaymentCommissionTypeCortiMilli        PaymentCommissionType = "CORTI_MILLI"
+	PaymentCommissionTypeForeignCards      PaymentCommissionType = "FOREIGN_CARDS"
+	PaymentCommissionTypeMts               PaymentCommissionType = "MTS"
+	PaymentCommissionTypeMtsCash           PaymentCommissionType = "MTS_CASH"
+	PaymentCommissionTypeMtsMultitransfer  PaymentCommissionType = "MTS_MULTITRANSFER"
+	PaymentCommissionTypeMtsQR             PaymentCommissionType = "MTS_QR"
+	PaymentCommissionTypeMtsRfCards        PaymentCommissionType = "MTS_RF_CARDS"
+	PaymentCommissionTypeSber              PaymentCommissionType = "SBER"
+	PaymentCommissionTypeStatusbank        PaymentCommissionType = "STATUSBANK"
+	PaymentCommissionTypeTbank             PaymentCommissionType = "TBANK"
+	PaymentCommissionTypeVtb               PaymentCommissionType = "VTB"
+)
+
+// PaymentCountryGroup is used in [PaymentsMethodsListParams].
+type PaymentCountryGroup string
+
+// Known values of [PaymentCountryGroup].
+const (
+	PaymentCountryGroupBelarus PaymentCountryGroup = "BELARUS"
+	PaymentCountryGroupRussia  PaymentCountryGroup = "RUSSIA"
+)
+
+// PaymentMethodStatus is used in [PaymentMethod].
+type PaymentMethodStatus string
+
+// Known values of [PaymentMethodStatus].
+const (
+	PaymentMethodStatusEnabled           PaymentMethodStatus = "ENABLED"
+	PaymentMethodStatusCurrencyDisabled  PaymentMethodStatus = "CURRENCY_DISABLED"
+	PaymentMethodStatusDirectionDisabled PaymentMethodStatus = "DIRECTION_DISABLED"
+)
+
+// PaymentOrderType is used in [PaymentsMethodsListParams].
+type PaymentOrderType string
+
+// Known values of [PaymentOrderType].
+const (
+	PaymentOrderTypeBuy  PaymentOrderType = "BUY"
+	PaymentOrderTypeSell PaymentOrderType = "SELL"
+)
+
+// PaymentProviderType is used in [BalanceDepositsCreateFiatParams],
+// [BalanceDepositsCalculateFiatParams], [BalanceWithdrawalsCreateFiatParams],
+// [BalanceWithdrawalsCalculateFiatParams] and 8 others.
+//
+// Payment provider / payment method family (same values as the brokerage `ProviderType`).
+type PaymentProviderType string
+
+// Known values of [PaymentProviderType].
+const (
+	PaymentProviderTypeAlfa             PaymentProviderType = "ALFA"
+	PaymentProviderTypeAssist           PaymentProviderType = "ASSIST"
+	PaymentProviderTypeAzericard        PaymentProviderType = "AZERICARD"
+	PaymentProviderTypeBelveb           PaymentProviderType = "BELVEB"
+	PaymentProviderTypeBepaid           PaymentProviderType = "BEPAID"
+	PaymentProviderTypeBepaidCustom     PaymentProviderType = "BEPAID_CUSTOM"
+	PaymentProviderTypeBgp              PaymentProviderType = "BGP"
+	PaymentProviderTypeBrazino          PaymentProviderType = "BRAZINO"
+	PaymentProviderTypeBrics            PaymentProviderType = "BRICS"
+	PaymentProviderTypeBsb              PaymentProviderType = "BSB"
+	PaymentProviderTypeCa               PaymentProviderType = "CA"
+	PaymentProviderTypeCarusell         PaymentProviderType = "CARUSELL"
+	PaymentProviderTypeCortiMilli       PaymentProviderType = "CORTI_MILLI"
+	PaymentProviderTypeDsb              PaymentProviderType = "DSB"
+	PaymentProviderTypeErip             PaymentProviderType = "ERIP"
+	PaymentProviderTypeInsnc            PaymentProviderType = "INSNC"
+	PaymentProviderTypeMaxline          PaymentProviderType = "MAXLINE"
+	PaymentProviderTypeModulbank        PaymentProviderType = "MODULBANK"
+	PaymentProviderTypeMts              PaymentProviderType = "MTS"
+	PaymentProviderTypeMtsCash          PaymentProviderType = "MTS_CASH"
+	PaymentProviderTypeMtsMultitransfer PaymentProviderType = "MTS_MULTITRANSFER"
+	PaymentProviderTypeMtsQR            PaymentProviderType = "MTS_QR"
+	PaymentProviderTypeSber             PaymentProviderType = "SBER"
+	PaymentProviderTypeSbp              PaymentProviderType = "SBP"
+	PaymentProviderTypeSgb              PaymentProviderType = "SGB"
+	PaymentProviderTypeSgbCard          PaymentProviderType = "SGB_CARD"
+	PaymentProviderTypeStatusbank       PaymentProviderType = "STATUSBANK"
+	PaymentProviderTypeTbank            PaymentProviderType = "TBANK"
+	PaymentProviderTypeTest             PaymentProviderType = "TEST"
+	PaymentProviderTypeVtb              PaymentProviderType = "VTB"
+	PaymentProviderTypeVtbSbp           PaymentProviderType = "VTB_SBP"
+	PaymentProviderTypeWildberries      PaymentProviderType = "WILDBERRIES"
+	PaymentProviderTypeZubrpari         PaymentProviderType = "ZUBRPARI"
+)
+
 // ProviderType is used in [BrokerageBalanceOrdersCreateFiatDepositParams],
 // [BrokerageBalanceOrdersCreateFiatWithdrawalParams], [BalanceOrderResponse] and
 // [PaymentMethodResponse].
@@ -379,6 +734,16 @@ const (
 	RegistrationStatusPendingEmail    RegistrationStatus = "PENDING_EMAIL"
 	RegistrationStatusPendingPhone    RegistrationStatus = "PENDING_PHONE"
 	RegistrationStatusReadyToComplete RegistrationStatus = "READY_TO_COMPLETE"
+)
+
+// ReportOperationType is used in [ReportsDownloadBalanceParams] and [ReportsEmailBalanceParams].
+type ReportOperationType string
+
+// Known values of [ReportOperationType].
+const (
+	ReportOperationTypeDeposit        ReportOperationType = "DEPOSIT"
+	ReportOperationTypeWithdrawal     ReportOperationType = "WITHDRAWAL"
+	ReportOperationTypeReferrerReward ReportOperationType = "REFERRER_REWARD"
 )
 
 // StatusbankPaymentSystem is used in [ProvidersStatusbankRegisterCardParams] and

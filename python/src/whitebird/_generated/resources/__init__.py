@@ -6,19 +6,31 @@ from __future__ import annotations
 from functools import cached_property
 
 from whitebird._engine import AsyncEngine, SyncEngine
+from whitebird._generated.resources.accounting import AccountingResource, AsyncAccountingResource
 from whitebird._generated.resources.auth import AsyncAuthResource, AuthResource
+from whitebird._generated.resources.balance import AsyncBalanceResource, BalanceResource
 from whitebird._generated.resources.brokerage import AsyncBrokerageResource, BrokerageResource
+from whitebird._generated.resources.client import AsyncClientResource, ClientResource
+from whitebird._generated.resources.current_account import (
+    AsyncCurrentAccountResource,
+    CurrentAccountResource,
+)
+from whitebird._generated.resources.exchange import AsyncExchangeResource, ExchangeResource
 from whitebird._generated.resources.kyc import AsyncKycResource, KycResource
 from whitebird._generated.resources.market import AsyncMarketResource, MarketResource
+from whitebird._generated.resources.merchant import AsyncMerchantResource, MerchantResource
 from whitebird._generated.resources.notifications import (
     AsyncNotificationsResource,
     NotificationsResource,
 )
+from whitebird._generated.resources.payments import AsyncPaymentsResource, PaymentsResource
 from whitebird._generated.resources.providers import AsyncProvidersResource, ProvidersResource
+from whitebird._generated.resources.referral import AsyncReferralResource, ReferralResource
 from whitebird._generated.resources.registration import (
     AsyncRegistrationResource,
     RegistrationResource,
 )
+from whitebird._generated.resources.reports import AsyncReportsResource, ReportsResource
 from whitebird._generated.resources.support import AsyncSupportResource, SupportResource
 from whitebird._generated.resources.trading import AsyncTradingResource, TradingResource
 from whitebird._generated.resources.user import AsyncUserResource, UserResource
@@ -30,14 +42,39 @@ class Resources:
     _engine: SyncEngine
 
     @cached_property
+    def accounting(self) -> AccountingResource:
+        """Operations of `client.accounting`."""
+        return AccountingResource(self._engine)
+
+    @cached_property
     def auth(self) -> AuthResource:
         """Operations of `client.auth`."""
         return AuthResource(self._engine)
 
     @cached_property
+    def balance(self) -> BalanceResource:
+        """Operations of `client.balance`."""
+        return BalanceResource(self._engine)
+
+    @cached_property
     def brokerage(self) -> BrokerageResource:
         """Operations of `client.brokerage`."""
         return BrokerageResource(self._engine)
+
+    @cached_property
+    def client(self) -> ClientResource:
+        """Operations of `client.client`."""
+        return ClientResource(self._engine)
+
+    @cached_property
+    def current_account(self) -> CurrentAccountResource:
+        """Operations of `client.current_account`."""
+        return CurrentAccountResource(self._engine)
+
+    @cached_property
+    def exchange(self) -> ExchangeResource:
+        """Operations of `client.exchange`."""
+        return ExchangeResource(self._engine)
 
     @cached_property
     def kyc(self) -> KycResource:
@@ -50,9 +87,19 @@ class Resources:
         return MarketResource(self._engine)
 
     @cached_property
+    def merchant(self) -> MerchantResource:
+        """Operations of `client.merchant`."""
+        return MerchantResource(self._engine)
+
+    @cached_property
     def notifications(self) -> NotificationsResource:
         """Operations of `client.notifications`."""
         return NotificationsResource(self._engine)
+
+    @cached_property
+    def payments(self) -> PaymentsResource:
+        """Operations of `client.payments`."""
+        return PaymentsResource(self._engine)
 
     @cached_property
     def providers(self) -> ProvidersResource:
@@ -60,9 +107,19 @@ class Resources:
         return ProvidersResource(self._engine)
 
     @cached_property
+    def referral(self) -> ReferralResource:
+        """Operations of `client.referral`."""
+        return ReferralResource(self._engine)
+
+    @cached_property
     def registration(self) -> RegistrationResource:
         """Operations of `client.registration`."""
         return RegistrationResource(self._engine)
+
+    @cached_property
+    def reports(self) -> ReportsResource:
+        """Operations of `client.reports`."""
+        return ReportsResource(self._engine)
 
     @cached_property
     def support(self) -> SupportResource:
@@ -86,14 +143,39 @@ class AsyncResources:
     _engine: AsyncEngine
 
     @cached_property
+    def accounting(self) -> AsyncAccountingResource:
+        """Operations of `client.accounting`."""
+        return AsyncAccountingResource(self._engine)
+
+    @cached_property
     def auth(self) -> AsyncAuthResource:
         """Operations of `client.auth`."""
         return AsyncAuthResource(self._engine)
 
     @cached_property
+    def balance(self) -> AsyncBalanceResource:
+        """Operations of `client.balance`."""
+        return AsyncBalanceResource(self._engine)
+
+    @cached_property
     def brokerage(self) -> AsyncBrokerageResource:
         """Operations of `client.brokerage`."""
         return AsyncBrokerageResource(self._engine)
+
+    @cached_property
+    def client(self) -> AsyncClientResource:
+        """Operations of `client.client`."""
+        return AsyncClientResource(self._engine)
+
+    @cached_property
+    def current_account(self) -> AsyncCurrentAccountResource:
+        """Operations of `client.current_account`."""
+        return AsyncCurrentAccountResource(self._engine)
+
+    @cached_property
+    def exchange(self) -> AsyncExchangeResource:
+        """Operations of `client.exchange`."""
+        return AsyncExchangeResource(self._engine)
 
     @cached_property
     def kyc(self) -> AsyncKycResource:
@@ -106,9 +188,19 @@ class AsyncResources:
         return AsyncMarketResource(self._engine)
 
     @cached_property
+    def merchant(self) -> AsyncMerchantResource:
+        """Operations of `client.merchant`."""
+        return AsyncMerchantResource(self._engine)
+
+    @cached_property
     def notifications(self) -> AsyncNotificationsResource:
         """Operations of `client.notifications`."""
         return AsyncNotificationsResource(self._engine)
+
+    @cached_property
+    def payments(self) -> AsyncPaymentsResource:
+        """Operations of `client.payments`."""
+        return AsyncPaymentsResource(self._engine)
 
     @cached_property
     def providers(self) -> AsyncProvidersResource:
@@ -116,9 +208,19 @@ class AsyncResources:
         return AsyncProvidersResource(self._engine)
 
     @cached_property
+    def referral(self) -> AsyncReferralResource:
+        """Operations of `client.referral`."""
+        return AsyncReferralResource(self._engine)
+
+    @cached_property
     def registration(self) -> AsyncRegistrationResource:
         """Operations of `client.registration`."""
         return AsyncRegistrationResource(self._engine)
+
+    @cached_property
+    def reports(self) -> AsyncReportsResource:
+        """Operations of `client.reports`."""
+        return AsyncReportsResource(self._engine)
 
     @cached_property
     def support(self) -> AsyncSupportResource:
