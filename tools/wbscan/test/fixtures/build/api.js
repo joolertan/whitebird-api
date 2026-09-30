@@ -12,11 +12,15 @@ var unbindTable;
 var unbind;
 var reports;
 var getReport;
+var exportPaths;
+var exportBody;
+var exportReport;
 var subscribe;
 var connect;
 var overrides;
 var tradingConfig;
 var sendTo;
+var sendPaths;
 var bindLink;
 var news;
 var logo;
@@ -85,6 +89,9 @@ function init() {
       let n = t.getUrl({ baseUrl: `https://exchange-core.whitebird.io/api/v1`, kind: e });
       return t.method === `get` ? http.get(n, { responseType: `blob` }) : http.post(n, { format: `pdf` }, { responseType: `blob` });
     };
+    exportPaths = { orders: `/orders/export`, trades: `/trades/export` };
+    exportBody = (e, t) => e === `orders` ? { ...t, format: `PDF` } : { ...t, limit: 100 };
+    exportReport = (e, t) => http.post(`https://exchange-core.whitebird.io/api/v1${exportPaths[e]}`, exportBody(e, t));
     subscribe = () => fetchEventSource(`https://notification-service.whitebird.io/api/v1/events/stream`, {
       headers: { Accept: `text/event-stream` },
       onmessage: e => e
@@ -110,6 +117,7 @@ function init() {
       }
     };
     sendTo = (e, t) => http.post(`${L(z.VITE_AUTH_URL)}${t}`, e);
+    sendPaths = { DEFAULT: `/registration/initiate`, SDK: "/registration/sdk/initiate", ICON: `/img/logo.svg` };
     bindLink = e => `https://mtsbank-service.whitebird.io/api/v1/card/bind?token=${e}`;
     news = () => http.get(`https://content.whitebird.io/api/news`);
     logo = { url: `https://whitebird.io/assets/logo.png` };

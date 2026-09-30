@@ -32,6 +32,7 @@ const inventory: Inventory = {
     notes: '',
   },
   services: {
+    'admin-service': { production: 'https://admin-service.whitebird.io', demo: null },
     'authorization-server': { production: 'https://authorization-server.whitebird.io', demo: null },
     'exchange-core': { production: 'https://exchange-core.whitebird.io', demo: null },
     'trading-service': { production: 'https://trading-service.whitebird.io', demo: 'https://trading-demo-service.whitebird.io' },
@@ -40,12 +41,15 @@ const inventory: Inventory = {
     endpoint('authorization-server', 'POST', '/oauth/token', {
       body: { kind: 'form-urlencoded', fields: ['grant_type', 'password', 'username'] },
     }),
+    endpoint('admin-service', 'POST', '/api/v1/audit/record'),
+    endpoint('exchange-core', 'POST', '/api/v1/admin/approve/{requestId}'),
     endpoint('exchange-core', 'GET', '/api/v1/orders', { query: ['page', 'size', 'status'] }),
     endpoint('exchange-core', 'POST', '/api/v1/quote', { body: { kind: 'json', fields: ['amount', 'currency'] } }),
     endpoint('exchange-core', 'POST', '/api/v1/subaccount/add/{id}'),
     endpoint('trading-service', 'POST', '/api/v1/orders'),
   ],
   unresolved: [],
+  paths: ['/registration/initiate'],
 };
 
 describe('diffInventory', async () => {
@@ -73,7 +77,7 @@ describe('diffInventory', async () => {
     ]);
   });
 
-  it('reports new endpoints; params match literal segments', () => {
+  it('reports new endpoints; params match literal segments; excluded.yaml is honoured', () => {
     assert.deepEqual(report.newEndpoints, [{ service: 'trading-service', method: 'POST', path: '/api/v1/orders' }]);
   });
 
@@ -84,10 +88,17 @@ describe('diffInventory', async () => {
     );
   });
 
-  it('reports changed request shapes', () => {
+  it('keeps operations whose path is in the code or that were verified live out of gone', () => {
+    assert.deepEqual(
+      report.unconfirmedEndpoints.map((e) => `${e.service} ${e.reason} ${e.path}`),
+      ['authorization-server mentioned /api/v1/registration/initiate', 'exchange-core live /api/v1/rates'],
+    );
+  });
+
+  it('reports request fields the spec lacks, not spec-only ones', () => {
     assert.deepEqual(report.changedEndpoints, [
-      { service: 'exchange-core', method: 'GET', path: '/api/v1/orders', query: { added: ['status'], removed: [] } },
-      { service: 'exchange-core', method: 'POST', path: '/api/v1/quote', body: { added: ['currency'], removed: ['asset'] } },
+      { service: 'exchange-core', method: 'GET', path: '/api/v1/orders', query: ['status'] },
+      { service: 'exchange-core', method: 'POST', path: '/api/v1/quote', body: ['currency'] },
     ]);
   });
 

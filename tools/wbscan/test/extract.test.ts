@@ -82,6 +82,11 @@ describe('extractInventory', () => {
     absent('exchange-core', 'GET', '/api/v1/client/statement/export');
   });
 
+  it('picks the conditional branch matching the chosen table entry', () => {
+    assert.deepEqual(find('exchange-core', 'POST', '/api/v1/orders/export').body.fields, ['format']);
+    assert.deepEqual(find('exchange-core', 'POST', '/api/v1/trades/export').body.fields, ['limit']);
+  });
+
   it('detects server-sent events', () => {
     assert.equal(find('notification-service', 'GET', '/api/v1/events/stream').responseType, 'event-stream');
     assert.equal(find('auth-server', 'GET', '/api/v1/sse/connect').responseType, 'event-stream');
@@ -116,6 +121,12 @@ describe('extractInventory', () => {
     const partials = inventory.unresolved.map((u) => u.partial);
     assert.ok(partials.includes('https://auth-server.whitebird.io/api/v1{?}'), partials.join('\n'));
     assert.ok(partials.includes('https://mtsbank-service.whitebird.io/api/v1/card/bind?token'), partials.join('\n'));
+  });
+
+  it('keeps static relative paths for URLs built indirectly', () => {
+    assert.ok(inventory.paths.includes('/registration/initiate'), inventory.paths.join('\n'));
+    assert.ok(inventory.paths.includes('/registration/sdk/initiate'));
+    assert.ok(!inventory.paths.includes('/img/logo.svg'));
   });
 
   it('is deterministic and sorted', () => {

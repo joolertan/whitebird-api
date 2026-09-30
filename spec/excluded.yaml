@@ -1,0 +1,7 @@
+# Calls the web app makes that the SDKs deliberately leave out. `wbscan diff` does not report
+# them as new. Each entry maps to the reason.
+hosts:
+  admin-service.whitebird.io: Back-office actions (transaction approval, audit records) for staff pages.
+  wb-exchange-proxy.onrender.com: Market info proxy of the trading terminal, hosted outside whitebird.io.
+endpoints:
+  POST https://api.whitebird.io/api/v3/exchange/merchant-admin/order/history: Merchant admin panel.

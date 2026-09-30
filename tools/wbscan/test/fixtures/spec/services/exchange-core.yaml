@@ -25,6 +25,9 @@ paths:
   /api/v1/admin/legacy:
     get:
       x-wb-source: openapi
+  /api/v1/rates:
+    get:
+      x-wb-source: live
 components:
   schemas:
     Quote:

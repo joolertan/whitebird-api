@@ -42,6 +42,8 @@ export interface Candidates {
   configs: NodePath<t.ObjectExpression>[];
   placeholders: NodePath<t.ObjectProperty>[];
   urlLiterals: NodePath<t.StringLiteral | t.TemplateLiteral>[];
+  /** Static relative paths such as `/registration/initiate`, whatever uses them. */
+  pathLiterals: Set<string>;
   envObjects: Map<string, string>[];
   grantTypes: Set<string>;
 }
@@ -52,6 +54,8 @@ const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', '
 const SSE_HANDLERS = new Set(['onmessage', 'onopen']);
 const PLACEHOLDER_KEY = /^(?!VITE_)[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ABSOLUTE_URL = /^https?:\/\/[\w.-]+(:\d+)?\/\S*$/i;
+const RELATIVE_PATH = /^\/[a-z][\w-]*(\/[\w.{}-]+)+$/i;
+const STATIC_FILE = /\.[a-z\d]{2,5}$/i;
 /** Object keys that describe a request rather than name it; skipped when picking a symbol. */
 const GENERIC_KEYS = new Set([
   'live', 'demo', 'spot', 'url', 'path', 'method', 'data', 'params', 'headers', 'body',
@@ -114,6 +118,7 @@ export function collect(chunk: Chunk): Candidates {
     configs: [],
     placeholders: [],
     urlLiterals: [],
+    pathLiterals: new Set(),
     envObjects: [],
     grantTypes: new Set(),
   };
@@ -143,6 +148,8 @@ export function collect(chunk: Chunk): Candidates {
     'StringLiteral|TemplateLiteral'(path) {
       const p = path as NodePath<t.StringLiteral | t.TemplateLiteral>;
       if (isUrlLiteral(p)) c.urlLiterals.push(p);
+      const text = staticString(p.node);
+      if (text && RELATIVE_PATH.test(text) && !STATIC_FILE.test(text)) c.pathLiterals.add(text);
     },
   });
   return c;

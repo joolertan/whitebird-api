@@ -148,8 +148,13 @@ export class Evaluator {
         return this.call(path as NodePath<t.CallExpression>, ctx);
       case 'NewExpression':
         return this.construct(path as NodePath<t.NewExpression>, ctx);
-      case 'ConditionalExpression':
-        return either(this.evaluate(path.get('consequent') as NodePath, ctx), this.evaluate(path.get('alternate') as NodePath, ctx));
+      case 'ConditionalExpression': {
+        const truth = this.truth(path.get('test') as NodePath, ctx);
+        const consequent = path.get('consequent') as NodePath;
+        const alternate = path.get('alternate') as NodePath;
+        if (truth !== undefined) return this.evaluate(truth ? consequent : alternate, ctx);
+        return either(this.evaluate(consequent, ctx), this.evaluate(alternate, ctx));
+      }
       case 'LogicalExpression':
         return this.logical(path as NodePath<t.LogicalExpression>, ctx);
       case 'ObjectExpression':

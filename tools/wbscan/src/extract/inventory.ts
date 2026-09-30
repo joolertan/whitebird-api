@@ -35,6 +35,8 @@ export interface Inventory {
   services: Record<string, ServiceHosts>;
   endpoints: Endpoint[];
   unresolved: Unresolved[];
+  /** Static relative paths found anywhere in the code, for calls whose URL is built indirectly. */
+  paths: string[];
 }
 
 const BODY_RANK: BodyKind[] = ['none', 'json', 'form-urlencoded', 'multipart'];

@@ -73,6 +73,8 @@ already have output. A daily run therefore only does real work when the site was
 - `unresolved`: request sites whose URL or method could not be resolved, and API URLs that occur
   in the code without a detected request (redirect targets, iframes, or missed clients), each with
   a best-effort `partial` URL.
+- `paths`: static relative paths found anywhere in the code (`/registration/initiate`), for calls
+  whose URL is assembled in a way the evaluator cannot follow.
 
 ### How URLs are resolved
 
@@ -101,7 +103,8 @@ assets.
 - `environments.yaml`: `services.<id>.{production, demo}` hosts and the public OAuth client
   (`oauth.basic`; token URL = `production` of `oauth.service` + `oauth.token_path`),
 - `services/*.yaml`: one OpenAPI 3.1 document per service. A file belongs to the inventory service
-  whose production or demo host is in its `servers`; `x-wb-service` is only its display name.
+  whose production or demo host is in its `servers`; `x-wb-service` is only its display name,
+- `excluded.yaml` (optional): hosts and `METHOD https://host/path` endpoints left out on purpose.
 
 Operations match inventory endpoints on (method, path with every parameter reduced to `{}`); a
 parameter segment on either side also matches a literal segment, so `/subaccount/add/{type}`
@@ -117,9 +120,20 @@ The report lists:
   (imported from a service's published spec) is not reported while that service's published
   `/v3/api-docs` still contains it, since the frontend need not call every documented operation.
   Run `openapi` before `diff` so the published specs are current,
-- changed request shapes: query parameter names, body kind and top-level body fields. Only compared
-  for operations not marked `x-wb-source: openapi`, and body fields only when the inventory knows
-  them.
+- changed request shapes: query parameters and top-level body fields the frontend sends but the
+  spec lacks, and a different body kind. Fields only the spec has are not reported, since the
+  static extractor cannot see every field (spread objects, values built elsewhere). Only compared
+  for operations not marked `x-wb-source: openapi`.
+
+Not drift, listed for information:
+
+- unconfirmed endpoints: spec operations without a resolved call whose path still appears in
+  `paths`, or that are marked `x-wb-source: live` (verified against the server; the frontend need
+  not call them).
+
+Entries of `excluded.yaml` (back-office pages, third-party proxies), each mapped to the reason,
+are never reported as new. The OAuth token
+endpoint is described by `environments.yaml` and is not reported either.
 
 ## CI
 

@@ -44,9 +44,17 @@ export interface Environments {
   oauth: OAuthClient | null;
 }
 
+/** `spec/excluded.yaml`: what the web app calls but the SDKs deliberately leave out. */
+export interface Excluded {
+  hosts: Set<string>;
+  /** `METHOD host/path/{}` keys. */
+  endpoints: Set<string>;
+}
+
 export interface Spec {
   services: SpecFile[];
   environments: Environments | null;
+  excluded: Excluded;
 }
 
 export interface EndpointRef {
@@ -55,14 +63,11 @@ export interface EndpointRef {
   path: string;
 }
 
-export interface SetChange {
-  added: string[];
-  removed: string[];
-}
-
 export interface ShapeChange extends EndpointRef {
-  query?: SetChange;
-  body?: SetChange;
+  /** Query parameters the frontend sends that the spec lacks. */
+  query?: string[];
+  /** Top-level body fields the frontend sends that the spec lacks. */
+  body?: string[];
   bodyKind?: { spec: string; inventory: string };
 }
 
@@ -75,6 +80,8 @@ export interface DiffReport {
   oauth: { field: string; spec: string | null; inventory: string | null }[];
   newEndpoints: EndpointRef[];
   goneEndpoints: (EndpointRef & { file: string })[];
+  /** Spec operations without a resolved call that are still accounted for; not drift. */
+  unconfirmedEndpoints: (EndpointRef & { file: string; reason: 'mentioned' | 'live' })[];
   changedEndpoints: ShapeChange[];
 }
 
@@ -173,11 +180,30 @@ async function specFiles(dir: string): Promise<SpecFile[]> {
 /** Reads `<dir>/environments.yaml` and `<dir>/services/*.yaml`, or spec files directly in `<dir>`. */
 export async function loadSpec(dir: string): Promise<Spec> {
   const envFile = join(dir, 'environments.yaml');
+  const excludedFile = join(dir, 'excluded.yaml');
   const servicesDir = existsSync(join(dir, 'services')) ? join(dir, 'services') : dir;
   return {
     services: await specFiles(servicesDir),
     environments: existsSync(envFile) ? parseEnvironments(await readFile(envFile, 'utf8')) : null,
+    excluded: existsSync(excludedFile) ? parseExcluded(await readFile(excludedFile, 'utf8')) : { hosts: new Set(), endpoints: new Set() },
   };
+}
+
+/** `hosts` and `endpoints` (`METHOD https://host/path`) are maps from the entry to the reason. */
+function parseExcluded(text: string): Excluded {
+  const doc: unknown = YAML.parse(text);
+  const keys = (v: unknown) => (isObject(v) ? Object.keys(v) : []);
+  const endpoints = keys(isObject(doc) ? doc.endpoints : undefined).map((entry) => {
+    const [method, url] = entry.split(/\s+/);
+    const parsed = url ? URL.parse(url) : null;
+    if (!method || !parsed) throw new Error(`excluded.yaml: expected "METHOD https://host/path", got "${entry}"`);
+    return endpointKey(method.toUpperCase(), parsed.host, decodeURI(parsed.pathname));
+  });
+  return { hosts: new Set(keys(isObject(doc) ? doc.hosts : undefined)), endpoints: new Set(endpoints) };
+}
+
+function endpointKey(method: string, host: string, path: string): string {
+  return `${method} ${host}${pathKey(path)}`;
 }
 
 /** Operation keys (`METHOD /path/{}`) of the specs services publish, by inventory service (`<service>.json`). */
@@ -196,25 +222,32 @@ function pathsMatch(a: string, b: string): boolean {
   return x.length === y.length && x.every((seg, i) => seg === y[i] || seg === '{}' || y[i] === '{}');
 }
 
-function setChange(spec: string[], inventory: string[]): SetChange | undefined {
-  const added = inventory.filter((k) => !spec.includes(k));
-  const removed = spec.filter((k) => !inventory.includes(k));
-  return added.length || removed.length ? { added, removed } : undefined;
+function missingFrom(spec: string[], inventory: string[]): string[] | undefined {
+  const missing = inventory.filter((k) => !spec.includes(k));
+  return missing.length ? missing : undefined;
 }
 
+// The extractor cannot see every field the app sends, so only inventory fields missing from the
+// spec count as drift; spec-only fields are expected blind spots.
 function shapeChange(op: SpecOperation, e: Endpoint): ShapeChange | undefined {
   const change: ShapeChange = { service: e.service, method: e.method, path: e.path };
-  const query = setChange(op.query, e.query);
+  const query = missingFrom(op.query, e.query);
   if (query) change.query = query;
   const specKind = op.body?.kind ?? 'none';
-  if (specKind !== e.body.kind) change.bodyKind = { spec: specKind, inventory: e.body.kind };
-  // An empty field list in the inventory means "not statically known", not "no fields".
-  const body = op.body && e.body.fields.length ? setChange(op.body.fields, e.body.fields) : undefined;
+  if (e.body.fields.length && specKind !== e.body.kind) {
+    change.bodyKind = { spec: specKind, inventory: e.body.kind };
+  }
+  const body = op.body ? missingFrom(op.body.fields, e.body.fields) : undefined;
   if (body) change.body = body;
   return change.query || change.body || change.bodyKind ? change : undefined;
 }
 
 const ref = (e: EndpointRef): EndpointRef => ({ service: e.service, method: e.method, path: e.path });
+
+function hostsOf(inventory: Inventory, service: string): string[] {
+  const urls = inventory.services[service];
+  return [urls?.production, urls?.demo].flatMap((url) => (url ? [hostOf(url)!] : []));
+}
 
 function serviceHosts(inventory: Inventory): Map<string, string> {
   const byHost = new Map<string, string>();
@@ -229,6 +262,9 @@ function serviceHosts(inventory: Inventory): Map<string, string> {
  * operations match on (method, path with parameters reduced to `{}`). A spec operation without a
  * match is "gone", except one marked `x-wb-source: openapi` that the service's published
  * api-docs still contain: the backend documents it even though the frontend does not call it.
+ * It is "unconfirmed" instead when its path still appears as a literal in the code (the URL is
+ * built in a way the extractor cannot follow) or when it is marked `x-wb-source: live`
+ * (verified against the server, not necessarily called by the frontend).
  * Request shapes are only compared for operations not imported from a published spec.
  */
 export function diffInventory(inventory: Inventory, spec: Spec, published = new Map<string, Set<string>>()): DiffReport {
@@ -238,6 +274,8 @@ export function diffInventory(inventory: Inventory, spec: Spec, published = new 
 
   const matched = new Set<Endpoint>();
   const goneEndpoints: DiffReport['goneEndpoints'] = [];
+  const unconfirmedEndpoints: DiffReport['unconfirmedEndpoints'] = [];
+  const literals = (inventory.paths ?? []).map(pathKey);
   const changedEndpoints: ShapeChange[] = [];
   for (const file of spec.services) {
     const service = file.hosts.map((h) => serviceByHost.get(h)).find((s) => s !== undefined);
@@ -247,8 +285,11 @@ export function diffInventory(inventory: Inventory, spec: Spec, published = new 
       const key = pathKey(op.path);
       const candidates = endpoints.filter((e) => e.method === op.method && pathsMatch(pathKey(e.path), key));
       if (!candidates.length) {
-        const documented = op.source === 'openapi' && docs?.has(`${op.method} ${key}`);
-        if (!documented) goneEndpoints.push({ service: service ?? file.service, method: op.method, path: op.path, file: file.file });
+        if (op.source === 'openapi' && docs?.has(`${op.method} ${key}`)) continue;
+        const ref = { service: service ?? file.service, method: op.method, path: op.path, file: file.file };
+        if (literals.some((l) => key.endsWith(l))) unconfirmedEndpoints.push({ ...ref, reason: 'mentioned' });
+        else if (op.source === 'live') unconfirmedEndpoints.push({ ...ref, reason: 'live' });
+        else goneEndpoints.push(ref);
         continue;
       }
       candidates.forEach((e) => matched.add(e));
@@ -258,9 +299,19 @@ export function diffInventory(inventory: Inventory, spec: Spec, published = new 
     }
   }
 
+  // Excluded endpoints and the OAuth token endpoint (described by environments.yaml) are not new.
+  const tokenUrl = spec.environments?.oauth?.tokenUrl;
+  const known = (e: Endpoint) =>
+    hostsOf(inventory, e.service).some(
+      (host) =>
+        spec.excluded.hosts.has(host) ||
+        spec.excluded.endpoints.has(endpointKey(e.method, host, e.path)) ||
+        (e.method === 'POST' && tokenUrl === `https://${host}${e.path}`),
+    );
+
   // Hosts the frontend calls vs. hosts the spec knows; a spec host only counts as removed when
   // the frontend no longer mentions it at all (env config included).
-  const calledHosts = [...serviceByHost.keys()];
+  const calledHosts = [...serviceByHost.keys()].filter((h) => !spec.excluded.hosts.has(h));
   const mentionedHosts = new Set([...calledHosts, ...Object.values(inventory.env).map((u) => hostOf(u)).filter((h) => !!h)]);
   const specHosts = new Set([...(spec.environments?.hosts ?? []), ...spec.services.flatMap((s) => s.hosts)]);
 
@@ -271,8 +322,9 @@ export function diffInventory(inventory: Inventory, spec: Spec, published = new 
     newHosts: calledHosts.filter((h) => !specHosts.has(h)).sort(),
     removedHosts: [...specHosts].filter((h) => !mentionedHosts.has(h)).sort(),
     oauth: oauthChanges(inventory, spec),
-    newEndpoints: inventory.endpoints.filter((e) => !matched.has(e)).map(ref),
+    newEndpoints: inventory.endpoints.filter((e) => !matched.has(e) && !known(e)).map(ref),
     goneEndpoints,
+    unconfirmedEndpoints,
     changedEndpoints,
   };
   report.drift = !!(
@@ -305,9 +357,13 @@ function groupByService<T extends EndpointRef>(items: T[]): Map<string, T[]> {
   return groups;
 }
 
-function describeSet(label: string, change: SetChange | undefined): string[] {
-  if (!change) return [];
-  return [...change.added.map((k) => `+${k}`), ...change.removed.map((k) => `-${k}`)].map((k) => `${label} ${k}`);
+const UNCONFIRMED = {
+  mentioned: 'path is in the code, the call was not resolved',
+  live: 'verified against the server, not called by the frontend',
+};
+
+function describeFields(label: string, names: string[] | undefined): string[] {
+  return (names ?? []).map((k) => `${label} +${k}`);
 }
 
 export function renderMarkdown(report: DiffReport): string {
@@ -337,11 +393,17 @@ export function renderMarkdown(report: DiffReport): string {
   section(`New endpoints (${report.newEndpoints.length})`, endpointList(report.newEndpoints));
   section(`Gone endpoints (${report.goneEndpoints.length})`, endpointList(report.goneEndpoints));
   section(
+    `Unconfirmed endpoints (${report.unconfirmedEndpoints.length}, not drift)`,
+    report.unconfirmedEndpoints.map(
+      (e) => `- \`${e.method} ${e.path}\` (${e.service}): ${UNCONFIRMED[e.reason]}`,
+    ),
+  );
+  section(
     `Changed request shapes (${report.changedEndpoints.length})`,
     report.changedEndpoints.map((c) => {
       const details = [
-        ...describeSet('query', c.query),
-        ...describeSet('body', c.body),
+        ...describeFields('query', c.query),
+        ...describeFields('body', c.body),
         ...(c.bodyKind ? [`body kind ${c.bodyKind.spec} -> ${c.bodyKind.inventory}`] : []),
       ];
       return `- \`${c.method} ${c.path}\` (${c.service}): ${details.join(', ')}`;

@@ -77,6 +77,7 @@ export function extractInventory(sources: ChunkSource[], build: BuildInfo): Inve
     services,
     endpoints: merged,
     unresolved: sortUnresolved(unresolved),
+    paths: [...new Set(candidates.flatMap((c) => [...c.pathLiterals]))].sort(),
   };
 }
 

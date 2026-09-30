@@ -1,0 +1,4 @@
+hosts:
+  admin-service.whitebird.io: Back-office pages.
+endpoints:
+  POST https://exchange-core.whitebird.io/api/v1/admin/approve/{id}: Admin panel.

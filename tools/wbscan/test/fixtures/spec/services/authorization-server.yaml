@@ -11,3 +11,5 @@ paths:
           application/x-www-form-urlencoded:
             schema:
               properties: { grant_type: {}, username: {}, password: {} }
+  /api/v1/registration/initiate:
+    post: {}
