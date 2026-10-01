@@ -1,0 +1,40 @@
+{% from "_macros.j2" import accessors, resource_struct, resource_impl %}
+{{ view.header }}
+
+{% if view.accessors %}
+//! Endpoints grouped by resource, reached from [`Client`] accessors such as
+//! `client.{{ view.accessors[0].name }}()`.
+{% else %}
+//! Endpoints grouped by resource.
+{% endif %}
+
+{% for line in view.resource_imports.lines() %}
+{{ line }}
+{% endfor %}
+
+impl Client {
+{{ accessors(view.accessors, "self") }}
+}
+{% for resource in view.resources %}
+
+{{ resource_struct(resource) }}
+
+{% call resource_impl(resource) %}
+{% for method in resource.methods %}
+
+{% for line in method.docs %}
+    {{ line }}
+{% endfor %}
+{% for attr in method.attrs %}
+    {{ attr }}
+{% endfor %}
+    pub {{ "async " if method.is_async }}fn {{ method.name }}(&self{{ method.args }}) -> {{ method.returns }} {
+        self.client
+            .request({{ method.request }})
+{% for call in method.chain + method.tail %}
+            {{ call }}
+{% endfor %}
+    }
+{% endfor %}
+{% endcall %}
+{% endfor %}

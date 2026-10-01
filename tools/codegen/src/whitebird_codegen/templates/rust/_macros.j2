@@ -1,0 +1,49 @@
+{% macro rust_struct(struct) %}
+{% for line in struct.docs %}
+{{ line }}
+{% endfor %}
+#[derive({{ struct.derives|join(", ") }})]
+{% for attr in struct.attrs %}
+{{ attr }}
+{% endfor %}
+pub struct {{ struct.name }} {
+{% for field in struct.fields %}
+{% for line in field.docs %}
+    {{ line }}
+{% endfor %}
+{% for attr in field.attrs %}
+    {{ attr }}
+{% endfor %}
+    pub {{ field.ident }}: {{ field.type }},
+{% endfor %}
+}
+{% endmacro %}
+
+{% macro accessors(items, client) %}
+{% for item in items %}
+
+{% for line in item.docs %}
+    {{ line }}
+{% endfor %}
+    pub fn {{ item.name }}(&self) -> {{ item.type }}<{{ "'_" if client == "self" else "'a" }}> {
+        {{ item.type }} { client: {{ client }} }
+    }
+{% endfor %}
+{% endmacro %}
+
+{% macro resource_struct(resource) %}
+{% for line in resource.docs %}
+{{ line }}
+{% endfor %}
+#[derive(Debug, Clone, Copy)]
+pub struct {{ resource.type }}<'a> {
+    client: &'a Client,
+}
+{% endmacro %}
+
+{% macro resource_impl(resource) %}
+impl{{ "<'a>" if resource.children }} {{ resource.type }}<{{ "'a" if resource.children else "'_" }}> {
+{{ accessors(resource.children, "self.client") }}
+{{ caller() }}
+}
+{% endmacro %}

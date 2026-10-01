@@ -1,0 +1,56 @@
+{{ view.header }}
+
+/// Deployment of the Whitebird services to talk to.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Environment {
+{% for env in view.environments %}
+{% for line in env.docs %}
+    {{ line }}
+{% endfor %}
+{% if env.default %}
+    #[default]
+{% endif %}
+    {{ env.variant }},
+{% endfor %}
+}
+
+/// Backend service hosting a group of endpoints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Service {
+{% for service in view.services %}
+{% for line in service.docs %}
+    {{ line }}
+{% endfor %}
+    {{ service.variant }},
+{% endfor %}
+}
+
+impl Service {
+    /// Key of the service in the API description, such as `brokerage`.
+    pub fn key(self) -> &'static str {
+        match self {
+{% for service in view.services %}
+            Self::{{ service.variant }} => {{ service.key }},
+{% endfor %}
+        }
+    }
+
+    /// Default base URL of the service in `environment`.
+    pub fn url(self, environment: Environment) -> &'static str {
+        match (self, environment) {
+{% for service in view.services %}
+{% for env, url in service.urls %}
+            (Self::{{ service.variant }}, Environment::{{ env }}) => {{ url }},
+{% endfor %}
+            (Self::{{ service.variant }}, _) => {{ service.default_url }},
+{% endfor %}
+        }
+    }
+}
+
+pub(crate) const OAUTH_SERVICE: Service = Service::{{ view.oauth_service }};
+pub(crate) const OAUTH_TOKEN_PATH: &str = {{ view.oauth_token_path }};
+/// Public OAuth client credentials of the web application.
+pub(crate) const OAUTH_BASIC: &str = {{ view.oauth_basic }};

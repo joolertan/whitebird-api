@@ -1,0 +1,30 @@
+{% from "_macros.j2" import rust_struct %}
+{{ view.header }}
+
+//! Models exchanged with the API.
+#![allow(missing_docs)]
+
+{% for line in view.model_imports.lines() %}
+{{ line }}
+{% endfor %}
+{% for struct in view.structs %}
+
+{{ rust_struct(struct) }}
+{% endfor %}
+{% for enum in view.enums %}
+
+{{ enum.macro }}! {
+{% for line in enum.docs %}
+    {{ line }}
+{% endfor %}
+    pub enum {{ enum.name }} {
+{% for variant in enum.variants %}
+{% for line in variant.docs %}
+        {{ line }}
+{% endfor %}
+        {{ variant.ident }} = {{ variant.literal }},
+{% endfor %}
+        _ => {{ enum.fallback }},
+    }
+}
+{% endfor %}

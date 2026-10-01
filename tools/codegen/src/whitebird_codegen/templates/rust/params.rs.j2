@@ -1,0 +1,13 @@
+{% from "_macros.j2" import rust_struct %}
+{{ view.header }}
+
+//! Parameters of the API methods: query, header and request body fields.
+#![allow(missing_docs)]
+
+{% for line in view.param_imports.lines() %}
+{{ line }}
+{% endfor %}
+{% for struct in view.params.values() %}
+
+{{ rust_struct(struct) }}
+{% endfor %}
