@@ -1,0 +1,63 @@
+[package]
+name = "whitebird-api"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Unofficial Whitebird API client"
+license = "MIT"
+repository = "https://github.com/joolertan/whitebird-api"
+homepage = "https://github.com/joolertan/whitebird-api"
+documentation = "https://docs.rs/whitebird-api"
+readme = "README.md"
+keywords = ["whitebird", "crypto", "exchange", "api", "client"]
+categories = ["api-bindings", "asynchronous", "cryptography::cryptocurrencies"]
+
+[lib]
+name = "whitebird"
+
+[features]
+default = ["rustls-tls"]
+# TLS through rustls.
+rustls-tls = ["reqwest/rustls"]
+# TLS through the platform library (OpenSSL, Secure Transport, SChannel).
+native-tls = ["reqwest/native-tls"]
+# TOTP codes computed from the base32 secret.
+otp = ["dep:hmac", "dep:sha1"]
+# Blocking client running on an internal current-thread runtime.
+blocking = ["tokio/rt"]
+
+[dependencies]
+base64 = "0.22"
+bon = "3"
+bytes = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
+fastrand = "2"
+form_urlencoded = "1"
+futures-core = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+hmac = { version = "0.13", optional = true }
+percent-encoding = "2"
+reqwest = { version = "0.13", default-features = false, features = ["http2", "multipart"] }
+rust_decimal = { version = "1", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+sha1 = { version = "0.11", optional = true }
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "time"] }
+
+[dev-dependencies]
+futures = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(docsrs)"] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
