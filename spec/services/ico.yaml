@@ -1,0 +1,2737 @@
+openapi: 3.1.0
+info:
+  title: Digital tokens (ICO)
+  version: '1'
+  description: Whitebird's ICO platform for digital tokens issued by Belarusian companies. An issuer (legal entity) publishes
+    emissions (token issues) with a nominal price, an annual interest rate and a buyback offer; investors buy tokens with
+    a card or an account balance and hold them as obligations, receive interest on per-currency ICO accounts, can apply to
+    sell tokens back during offer windows, and move money from ICO accounts to their e-accounts. Reconstructed from the whitebird.io
+    web app.
+x-wb-service: ico
+servers:
+- url: https://ico-service.whitebird.io
+paths:
+  /api/v1/ico/emission:
+    post:
+      operationId: icoEmissionsList
+      x-wb-resource: ico.emissions
+      x-wb-name: list
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List token emissions on sale
+      description: 'The public ICO showcase. The web app sends `withLogo: true, tokenType: ICO`, 12 items per page and sorts
+        by `creationDate,desc`; called logged out. When `page`/`size` are omitted the app sends `page=0&size=0`.'
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoEmissionFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoEmissionPage'
+  /api/v1/ico/emission/{emissionId}:
+    post:
+      operationId: icoEmissionsGet
+      x-wb-resource: ico.emissions
+      x-wb-name: get
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get an emission
+      description: Emission card / detail page. POST without a body; called logged out on the emission page.
+      parameters:
+      - name: emissionId
+        in: path
+        required: true
+        description: Emission ID (UUID).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoEmission'
+  /api/v1/ico/emission/{emissionId}/white-paper:
+    get:
+      operationId: icoEmissionsWhitePaper
+      x-wb-resource: ico.emissions
+      x-wb-name: white_paper
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-response: binary
+      x-wb-first-seen: '2026-11-07'
+      summary: Download the white paper of an emission
+      description: PDF white paper (saved by the web app as `WhitePaper-<emissionId>.pdf`).
+      parameters:
+      - name: emissionId
+        in: path
+        required: true
+        description: Emission ID (UUID).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/ico/emission/calculator:
+    post:
+      operationId: icoEmissionsCalculate
+      x-wb-resource: ico.emissions
+      x-wb-name: calculate
+      x-wb-auth: none
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the investment calculator range
+      description: 'Bounds of the income calculator shown on the ICO landing (by `currency`) and on an emission page (by `emissionId`).
+        The web app always sends `amount: 100`; the slider then lets the user pick an investment between `minAmount` and `maxAmount`
+        and shows `investment * rate` as the yearly income. Called logged out.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoCalculatorRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoCalculatorResult'
+  /api/v1/ico/emission/issue/request:
+    post:
+      operationId: icoEmissionsRequestIssue
+      x-wb-resource: ico.emissions
+      x-wb-name: request_issue
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Apply for a token issue
+      description: 'Application of a company that wants to issue tokens. The issuer cabinet sends the full form (`fullRequest:
+        true`); the issuers landing page sends only the contact fields. Success is HTTP 200.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoIssueRequest'
+      responses:
+        '200':
+          description: OK; the web app only checks that the body is not empty
+          content:
+            application/json:
+              schema: {}
+  /api/v1/ico/emission/my:
+    post:
+      operationId: icoEmissionsListMine
+      x-wb-resource: ico.emissions
+      x-wb-name: list_mine
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List the emissions of the current issuer
+      description: 'Issuer cabinet: the emissions issued by the authenticated client, with current debt figures.'
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          default: 10
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoMyEmissionFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoEmissionPage'
+  /api/v1/ico/emission/my/download:
+    post:
+      operationId: icoEmissionsDownloadMine
+      x-wb-resource: ico.emissions
+      x-wb-name: download_mine
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-response: binary
+      x-wb-first-seen: '2026-11-07'
+      summary: Download the issuer's emissions report
+      description: XLSX or PDF report of `list_mine` with the same filters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoMyEmissionReportRequest'
+      responses:
+        '200':
+          description: Report file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/ico/emission/my/analytics:
+    post:
+      operationId: icoEmissionsSalesAnalytics
+      x-wb-resource: ico.emissions
+      x-wb-name: sales_analytics
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List token sales of the current issuer
+      description: 'Issuer cabinet, sales analytics: sales of the issuer''s tokens, sorted by `sellDate,desc`.'
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          default: 10
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: sellDate,desc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoSalesAnalyticsFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoEmissionSalePage'
+  /api/v1/ico/emission/my/analytics/download:
+    post:
+      operationId: icoEmissionsDownloadSalesAnalytics
+      x-wb-resource: ico.emissions
+      x-wb-name: download_sales_analytics
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-response: binary
+      x-wb-first-seen: '2026-11-07'
+      summary: Download the sales analytics report
+      description: XLSX report of `sales_analytics` (`sales_analytics_report.xlsx`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoSalesAnalyticsFilter'
+      responses:
+        '200':
+          description: XLSX file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/ico/emission/investor:
+    post:
+      operationId: icoEmissionsListInvested
+      x-wb-resource: ico.emissions
+      x-wb-name: list_invested
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List emissions the investor holds
+      description: Emission names and IDs of the authenticated investor's holdings (filter options). POST without a body.
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoInvestorEmissionPage'
+  /api/v1/ico/emission/stable-coin/available:
+    get:
+      operationId: icoEmissionsStableCoinAvailability
+      x-wb-resource: ico.emissions
+      x-wb-name: stable_coin_availability
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Check availability of feature tokens
+      description: Whether feature tokens issued through the ICO service (for example `AEDEX`/`AED`, `STRUBS`/`RUBS`) are
+        available to the client. Answers a map from asset to availability.
+      parameters:
+      - name: assets
+        in: query
+        required: true
+        description: Assets to check.
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+  /api/v1/ico/investor/emission/{emissionId}/is-investor:
+    get:
+      operationId: icoEmissionsIsInvestor
+      x-wb-resource: ico.emissions
+      x-wb-name: is_investor
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Check whether the client invested in an emission
+      description: Used for emissions restricted to existing investors (`restrictToExistingInvestors`).
+      parameters:
+      - name: emissionId
+        in: path
+        required: true
+        description: Emission ID (UUID).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /api/v1/ico/issuer/get/{issuerId}:
+    get:
+      operationId: icoIssuersGet
+      x-wb-resource: ico.issuers
+      x-wb-name: get
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Get an issuer profile
+      description: 'Public issuer page: company details and logo/background document IDs. Unknown IDs answer 4xx.'
+      parameters:
+      - name: issuerId
+        in: path
+        required: true
+        description: Issuer client ID (UUID).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoIssuer'
+  /api/v1/ico/statistic/issuer/{issuerId}:
+    get:
+      operationId: icoIssuersStatistics
+      x-wb-resource: ico.issuers
+      x-wb-name: statistics
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Get issuer statistics
+      description: Totals shown on the public issuer page.
+      parameters:
+      - name: issuerId
+        in: path
+        required: true
+        description: Issuer client ID (UUID).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoIssuerStatistics'
+  /api/v1/ico/statistic/issuer/names:
+    post:
+      operationId: icoIssuersNames
+      x-wb-resource: ico.issuers
+      x-wb-name: names
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List issuer names
+      description: Issuers available as filter options in the operation history. The web app sends `{}`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: No filter fields are known; the web app sends `{}`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoIssuerNamePage'
+  /api/v1/ico/issuer/documents/get/{issuerId}/{type}:
+    get:
+      operationId: icoIssuersDocumentsList
+      x-wb-resource: ico.issuers.documents
+      x-wb-name: list
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: List issuer documents
+      description: Documents published on the issuer page, by category; the web app shows 6 per page.
+      parameters:
+      - name: issuerId
+        in: path
+        required: true
+        description: Issuer client ID (UUID).
+        schema:
+          type: string
+      - name: type
+        in: path
+        required: true
+        description: Document category.
+        schema:
+          $ref: '#/components/schemas/IcoIssuerDocumentType'
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoIssuerDocumentPage'
+  /api/v1/ico/issuer/document/download/{documentId}:
+    get:
+      operationId: icoIssuersDocumentsDownload
+      x-wb-resource: ico.issuers.documents
+      x-wb-name: download
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-response: binary
+      x-wb-first-seen: '2026-11-07'
+      summary: Download an issuer document
+      description: Raw file with its own content type (PDF reports, JPEG/PNG images). Also serves issuer logos and backgrounds
+        and emission logos (`files.issuerLogo`, `issuerLogoId`, ...).
+      parameters:
+      - name: documentId
+        in: path
+        required: true
+        description: Document ID (UUID).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Document file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/ico/obligation/investor:
+    post:
+      operationId: icoObligationsList
+      x-wb-resource: ico.obligations
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List the investor's token holdings
+      description: 'Portfolio of the authenticated investor: one obligation per emission held. The page is wrapped in `obligations`.'
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          default: 10
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoObligationFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoInvestorObligations'
+  /api/v1/ico/obligation/client/buy:
+    post:
+      operationId: icoObligationsBuyWithCard
+      x-wb-resource: ico.obligations
+      x-wb-name: buy_with_card
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Buy tokens with a bank card
+      description: 'Card purchase (`accountType: USER_PAYMENT`). Answers a `link` to the card payment page; for `ALFA` pass
+        `returnUrl`/`failUrl`. Limit violations answer 400 with status `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT` or `INVALID_TOTAL_TOKEN_LIMIT`
+        and the limit in `fields` (`limit`/`maxLimit`, `asset`).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoCardBuyRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoBuyResult'
+  /api/v1/ico/obligation/client/buy/calculation:
+    post:
+      operationId: icoObligationsCalculateCardBuy
+      x-wb-resource: ico.obligations
+      x-wb-name: calculate_card_buy
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Calculate a card purchase
+      description: Card commission and total to pay for `buy_with_card`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoCardBuyCalculationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoCardBuyCalculation'
+  /api/v1/ico/obligation/client/transfer:
+    post:
+      operationId: icoObligationsBuyWithBalance
+      x-wb-resource: ico.obligations
+      x-wb-name: buy_with_balance
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Buy tokens with an account balance
+      description: Pays for tokens from an e-account (`USER_BALANCE`) or an ICO account (`ICO_BALANCE`). Same limit errors
+        as `buy_with_card`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoBalanceBuyRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoBuyResult'
+  /api/v1/ico/obligation/client/rate:
+    post:
+      operationId: icoObligationsRate
+      x-wb-resource: ico.obligations
+      x-wb-name: rate
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the conversion rate for a token purchase
+      description: Rate used when the paying account currency differs from the emission currency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoRateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoRate'
+  /api/v1/ico/obligation/client/limit/residue:
+    get:
+      operationId: icoObligationsRemainingLimit
+      x-wb-resource: ico.obligations
+      x-wb-name: remaining_limit
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the remaining investment limit
+      description: Remaining yearly limit of a non-qualified investor, in `asset` (the web app asks for `BYN`).
+      parameters:
+      - name: asset
+        in: query
+        required: true
+        description: Currency of the limit.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: number
+                format: decimal
+  /api/v1/ico/investor/buyback:
+    post:
+      operationId: icoBuybacksList
+      x-wb-resource: ico.buybacks
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List the investor's buyback applications
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          default: 10
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoBuybackApplicationFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoBuybackApplicationPage'
+  /api/v1/ico/offer/buyback:
+    post:
+      operationId: icoBuybacksRequest
+      x-wb-resource: ico.buybacks
+      x-wb-name: request
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Apply for a buyback or change an application
+      description: Asks the issuer to buy back `value` tokens under the emission's offer; only possible during the request
+        window (`buybackRequestDateFrom`..`buybackRequestDateTo` of the obligation). Pass `buybackId` to change the amount
+        of an existing application. Not enough tokens answers `INSUFFICIENT_FUNDS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoBuybackRequest'
+      responses:
+        '200':
+          description: OK; the web app only checks that the body is not empty
+          content:
+            application/json:
+              schema: {}
+  /api/v1/ico/offer/buyback/{buybackId}:
+    delete:
+      operationId: icoBuybacksWithdraw
+      x-wb-resource: ico.buybacks
+      x-wb-name: withdraw
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Withdraw a buyback application
+      parameters:
+      - name: buybackId
+        in: path
+        required: true
+        description: Buyback application ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK; the web app only checks that the body is not empty
+          content:
+            application/json:
+              schema: {}
+  /api/v1/ico/issuer/emission/buyback:
+    post:
+      operationId: icoBuybacksListOffers
+      x-wb-resource: ico.buybacks
+      x-wb-name: list_offers
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List buyback offers on the issuer's emissions
+      description: 'Issuer cabinet: one row per offer window of each emission, with requested, approved and paid totals.'
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          default: 10
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoBuybackOfferFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoBuybackOfferPage'
+  /api/v1/ico/operation/all:
+    post:
+      operationId: icoOperationsList
+      x-wb-resource: ico.operations
+      x-wb-name: list
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List ICO account operations
+      description: History of ICO operations (purchases, income, buybacks, transfers, fees) of the client.
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index.
+        schema:
+          type: integer
+          default: 0
+      - name: size
+        in: query
+        description: Page size.
+        schema:
+          type: integer
+          default: 20
+      - name: sort
+        in: query
+        description: Spring Data sort expression, `property,asc|desc`.
+        schema:
+          type: string
+          default: creationDate,desc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoOperationFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoOperationPage'
+  /api/v1/ico/operation/statement:
+    post:
+      operationId: icoOperationsStatement
+      x-wb-resource: ico.operations
+      x-wb-name: statement
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-response: binary
+      x-wb-first-seen: '2026-11-07'
+      summary: Download an ICO operations statement
+      description: Statement of `list` with the same filters, as XLSX or PDF (`whitebird_ico_statement`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoStatementRequest'
+      responses:
+        '200':
+          description: Statement file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/ico/operation/transfer:
+    post:
+      operationId: icoOperationsTransfer
+      x-wb-resource: ico.operations
+      x-wb-name: transfer
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Transfer funds from an ICO account to an e-account
+      description: Moves money from an ICO account (`ICO_BALANCE`) to the e-account (`USER_BALANCE`) in the same currency.
+        Not enough money answers an error whose message contains `Insufficient funds`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoAccountTransferRequest'
+      responses:
+        '200':
+          description: OK; the web app only checks that the body is not empty
+          content:
+            application/json:
+              schema: {}
+  /api/v1/ico/operation/typeNames:
+    get:
+      operationId: icoOperationsTypeNames
+      x-wb-resource: ico.operations
+      x-wb-name: type_names
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: List operation type names
+      description: Values accepted by `nameTypes` of the operation filter (Russian labels, see `IcoOperation.type`).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  /api/v1/ico/statistic:
+    get:
+      operationId: icoStatisticsGet
+      x-wb-resource: ico.statistics
+      x-wb-name: get
+      x-wb-auth: none
+      x-wb-source: live
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the ICO showcase filters
+      description: Currencies and issuers that have emissions; filter options of the public showcase.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoStatistics'
+  /api/v1/ico/statistic/info:
+    post:
+      operationId: icoStatisticsClientInfo
+      x-wb-resource: ico.statistics
+      x-wb-name: client_info
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the client's ICO profile
+      description: Client type, status and residency used to decide whether the client is an issuer (legal entity) or an investor
+        and which emissions they may buy. POST without a body.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoClientInfo'
+  /api/v1/ico/investor/statistic/income:
+    post:
+      operationId: icoStatisticsInvestorYield
+      x-wb-resource: ico.statistics
+      x-wb-name: investor_yield
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the investor's average portfolio yield
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoYieldRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoYield'
+  /api/v1/ico/investor/statistic/debt/period:
+    post:
+      operationId: icoStatisticsInvestorRedemptions
+      x-wb-resource: ico.statistics
+      x-wb-name: investor_redemptions
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the investor's redemptions by year
+      description: Amounts the issuers owe the investor, grouped by year ("redemption by year" chart).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoDebtPeriodRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IcoYearAmount'
+  /api/v1/ico/obligation/invested/total:
+    post:
+      operationId: icoStatisticsInvestedTotal
+      x-wb-resource: ico.statistics
+      x-wb-name: invested_total
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the investor's portfolio by issuer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoInvestedTotalRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoInvestedTotal'
+  /api/v1/ico/obligation/invested/income:
+    post:
+      operationId: icoStatisticsInvestedIncome
+      x-wb-resource: ico.statistics
+      x-wb-name: invested_income
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the investor's income by issuer
+      description: Interest paid out and still to be paid, per issuer, for a period (`from`/`to` null for all time).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoInvestedIncomeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoInvestedIncome'
+  /api/v1/ico/issuer/statistic/debt:
+    get:
+      operationId: icoStatisticsIssuerDebt
+      x-wb-resource: ico.statistics
+      x-wb-name: issuer_debt
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the issuer's total debt
+      description: 'Issuer cabinet header: principal and accrued interest the issuer owes to investors.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoIssuerDebt'
+  /api/v1/ico/issuer/statistic/debt/period:
+    post:
+      operationId: icoStatisticsIssuerPaymentSchedule
+      x-wb-resource: ico.statistics
+      x-wb-name: issuer_payment_schedule
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-07'
+      summary: Get the payment schedule of an emission
+      description: 'Issuer cabinet: scheduled interest and offer payments of one emission (the app asks for the current year
+        + 3).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IcoPaymentScheduleRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IcoPaymentSchedule'
+components:
+  schemas:
+    IcoEmissionStatus:
+      type: string
+      description: 'Emission state: on sale, sold out, closed (redeemed), disabled.'
+      enum:
+      - OPENED
+      - SOLD
+      - CLOSED
+      - DISABLED
+    IcoBuybackOfferStatus:
+      type: string
+      description: 'Offer window state: upcoming, collecting applications, being paid, completed.'
+      enum:
+      - FUTURE
+      - REQUEST
+      - EXECUTE
+      - COMPLETED
+    IcoBuybackPaymentStatus:
+      type: string
+      description: Whether an emission still has open offer payments.
+      enum:
+      - OPENED
+      - CLOSED
+    IcoBuybackApplicationStatus:
+      type: string
+      description: Buyback application state; `DELETED` means withdrawn.
+      enum:
+      - REQUESTED
+      - IN_REVIEW
+      - APPROVED
+      - COMPLETED
+      - DELETED
+    IcoObligationStatus:
+      type: string
+      description: Holding state used by the portfolio filter.
+      enum:
+      - OPENED
+      - SOLD
+    IcoOperationStatus:
+      type: string
+      description: ICO operation state; `APPLIED` is success.
+      enum:
+      - REQUESTED
+      - APPROVED
+      - PARTIAL
+      - APPLIED
+      - ERROR
+    IcoAccountType:
+      type: string
+      description: Accounting account type. ICO flows use `USER_BALANCE` (e-account), `ICO_BALANCE` (ICO account) and `USER_PAYMENT`
+        (card payment).
+      enum:
+      - USER_BALANCE
+      - USER_PAYMENT
+      - USER_EXCHANGE
+      - USER_FEES
+      - USER_PAYMENT_RESERVING
+      - REFERRER_BALANCE
+      - ICO_BALANCE
+    IcoGuarantee:
+      type: string
+      description: Collateral of an emission.
+      enum:
+      - NONE
+      - SURETY
+      - BANK_GUARANTEE
+      - PLEDGE
+      - GUARANTEE_DEPOSIT
+      - OTHER
+    IcoBankruptcyRisk:
+      type: string
+      description: Bankruptcy risk level of the issuer.
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      - VERY_HIGH
+      - OTHER
+    IcoPaymentInterval:
+      type: string
+      description: Interest or offer period.
+      enum:
+      - MONTH
+      - QUARTER
+      - BIANNUAL
+      - ANNUAL
+    IcoReportFormat:
+      type: string
+      description: Report file format.
+      enum:
+      - XLSX
+      - PDF
+    IcoIssuerDocumentType:
+      type: string
+      description: 'Issuer document category: financial statements, constituent documents, other.'
+      enum:
+      - ACCOUNTING_REPORTS
+      - INCORPORATION_DOCUMENTS
+      - OTHER
+    IcoSolvency:
+      type: string
+      description: Issuer solvency.
+      enum:
+      - SOLVENT
+      - INSOLVENT
+      - PARTIALLY_SOLVENT
+      - SOLVENT_WITH_RESERVATION
+    IcoClientType:
+      type: string
+      description: Client type; legal entities act as issuers.
+      enum:
+      - INDIVIDUAL
+      - ORGANIZATION
+      - BANK
+      - INDIVIDUAL_ENTREPRENEUR
+    IcoClientStatus:
+      type: string
+      description: Client verification status.
+      enum:
+      - NEW
+      - EMAIL_VERIFIED
+      - PENDING
+      - NOT_VERIFIED
+      - VERIFIED
+      - FROZEN
+      - ARREST
+      - ACTUALIZATION_REQUIRED
+      - BLOCKED
+      - CLOSED
+    IcoYieldPeriod:
+      type: string
+      description: Period of the average yield.
+      enum:
+      - CURRENT_MONTH
+      - PREV_MONTH
+    IcoEmission:
+      type: object
+      description: 'An emission (token issue): a tranche of digital tokens a company sells to investors. Each token has a
+        nominal price `rate` in `currency`; holders earn interest at `feeRate` per year, paid every `feeInterval`, may sell
+        tokens back to the issuer under the offer (`buybackRate`, every `buybackInterval`) and are repaid when the emission
+        expires.'
+      properties:
+        emissionId:
+          type: string
+          format: uuid
+          x-wb-inferred: true
+        name:
+          type: string
+          x-wb-inferred: true
+          description: Emission number shown to users.
+        clientId:
+          type: string
+          format: uuid
+          x-wb-inferred: true
+          description: Issuer client ID.
+        issuerName:
+          type: string
+          x-wb-inferred: true
+        issuerLogoId:
+          type: string
+          x-wb-inferred: true
+          description: Document ID of the logo (see `ico.issuers.documents.download`).
+        issuerBackgroundId:
+          type: string
+          x-wb-inferred: true
+          description: Document ID of the page background.
+        issuerUrl:
+          type: string
+          x-wb-inferred: true
+        asset:
+          type: string
+          x-wb-inferred: true
+          description: Token asset code.
+        currency:
+          type: string
+          x-wb-inferred: true
+          description: Currency of the token nominal and payments.
+        rate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Nominal price of one token in `currency`.
+        value:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Number of tokens issued.
+        available:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens still on sale.
+        feeRate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Annual interest rate as a fraction (0.15 = 15 %).
+        feeInterval:
+          $ref: '#/components/schemas/IcoPaymentInterval'
+          x-wb-inferred: true
+        buybackRate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: 'Offer percentage as a fraction: share of tokens the issuer buys back per offer window.'
+        buybackInterval:
+          $ref: '#/components/schemas/IcoPaymentInterval'
+          x-wb-inferred: true
+        buybackEndDate:
+          type: string
+          x-wb-inferred: true
+          description: Repayment date (ISO-8601).
+        creationDate:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        primaryActivation:
+          type: string
+          x-wb-inferred: true
+          description: Start of the primary sale (ISO-8601).
+        primaryDeactivation:
+          type: string
+          x-wb-inferred: true
+          description: End of the primary sale (ISO-8601).
+        expirationDate:
+          type: string
+          x-wb-inferred: true
+          description: End of circulation (ISO-8601).
+        investors:
+          type: integer
+          x-wb-inferred: true
+          description: Number of investors.
+        guarantee:
+          $ref: '#/components/schemas/IcoGuarantee'
+          x-wb-inferred: true
+        bankruptcyRisk:
+          $ref: '#/components/schemas/IcoBankruptcyRisk'
+          x-wb-inferred: true
+        netAssets:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Net assets of the issuer, BYN.
+        riskCoefficient:
+          type:
+          - number
+          - 'null'
+          format: decimal
+          x-wb-inferred: true
+        residence:
+          type: boolean
+          x-wb-inferred: true
+          description: Residency flag; the web app blocks purchases when it is false.
+        restrictToExistingInvestors:
+          type: boolean
+          x-wb-inferred: true
+          description: Only clients who already invested in it may buy (see `is_investor`).
+        whitePaper:
+          x-wb-inferred: true
+          description: Present (truthy) when a white paper can be downloaded.
+        status:
+          $ref: '#/components/schemas/IcoEmissionStatus'
+          x-wb-inferred: true
+          description: Issuer cabinet only.
+        exchangeRate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Rate to the issuer's account currency. Issuer cabinet only.
+        buybackValue:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Offer payments. Issuer cabinet only.
+        feeCurrentAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Interest due in the current period. Issuer cabinet only.
+        buybackCurrentAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Offer payments due in the current period. Issuer cabinet only.
+    IcoEmissionPage:
+      type: object
+      description: Spring Data page of `IcoEmission`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoEmission'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoEmissionFilter:
+      type: object
+      properties:
+        withLogo:
+          type: boolean
+          description: The web app always sends true.
+        tokenType:
+          type: string
+          description: Token type; the web app sends `ICO`.
+        currencies:
+          type: array
+          items:
+            type: string
+        clientIds:
+          type: array
+          items:
+            type: string
+          description: Issuer client IDs.
+        feeRateFrom:
+          type: number
+          format: decimal
+          description: Minimum interest rate as a fraction.
+        feeRateTo:
+          type: number
+          format: decimal
+          description: Maximum interest rate as a fraction.
+        buybackRateFrom:
+          type: number
+          format: decimal
+          description: Minimum offer percentage as a fraction.
+        buybackRateTo:
+          type: number
+          format: decimal
+          description: Maximum offer percentage as a fraction.
+    IcoCalculatorRequest:
+      type: object
+      properties:
+        emissionId:
+          type: string
+          description: Emission to evaluate (emission page).
+        currency:
+          type: string
+          description: Currency to evaluate (landing page).
+        amount:
+          type: number
+          format: decimal
+          description: The web app sends 100.
+    IcoCalculatorResult:
+      type: object
+      properties:
+        minAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Minimum investment.
+        maxAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Maximum investment.
+        currency:
+          type: string
+          x-wb-inferred: true
+        rate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Annual interest rate as a fraction.
+    IcoIssueRequest:
+      type: object
+      description: Form values are sent as strings, as typed by the user.
+      properties:
+        currency:
+          type: string
+          description: Currency of the issue (`BYN`, `USD`, `EUR`, `RUB`).
+        amount:
+          type: string
+          description: Issue volume.
+        expirationDate:
+          type: string
+          description: 'Circulation period in months: `24`, `36`, `48`, `60` or a custom value.'
+        primaryDeactivation:
+          type: string
+          description: 'Sale period in months: `3`, `6` or `12`.'
+        feeInterval:
+          $ref: '#/components/schemas/IcoPaymentInterval'
+        feeRate:
+          type: string
+          description: Interest rate, percent.
+        feeDay:
+          type: string
+          description: 'Interest payment day of month: `5`, `10`, `15`, `20` or `25`.'
+        buybackInterval:
+          $ref: '#/components/schemas/IcoPaymentInterval'
+        buybackRate:
+          type: string
+          description: Offer percentage.
+        companyName:
+          type: string
+        clientName:
+          type: string
+          description: Contact person.
+        phoneNumber:
+          type: string
+        email:
+          type: string
+        companyUrl:
+          type: string
+        comment:
+          type: string
+        fullRequest:
+          type: boolean
+          description: True for the full issuer-cabinet form; absent for the contact-only landing form.
+    IcoMyEmissionFilter:
+      type: object
+      properties:
+        names:
+          type: array
+          items:
+            type: string
+          description: Emission names.
+        currencies:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoEmissionStatus'
+        buybackStatuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoBuybackPaymentStatus'
+        currentDebt:
+          type: boolean
+          description: Only emissions with (true) or without (false) current debt.
+    IcoMyEmissionReportRequest:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          $ref: '#/components/schemas/IcoReportFormat'
+        names:
+          type: array
+          items:
+            type: string
+          description: Emission names.
+        currencies:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoEmissionStatus'
+        buybackStatuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoBuybackPaymentStatus'
+        currentDebt:
+          type: boolean
+    IcoSalesAnalyticsFilter:
+      type: object
+      properties:
+        emissionNames:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoEmissionStatus'
+        dateFrom:
+          type: string
+          format: date-time
+          description: Sale date from.
+        dateTo:
+          type: string
+          format: date-time
+          description: Sale date to.
+    IcoEmissionSale:
+      type: object
+      description: One sale of the issuer's tokens.
+      properties:
+        name:
+          type: string
+          x-wb-inferred: true
+          description: Emission name.
+        sellDate:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        status:
+          $ref: '#/components/schemas/IcoEmissionStatus'
+          x-wb-inferred: true
+        soldValue:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens sold.
+        soldAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Proceeds in `currency`.
+        currency:
+          type: string
+          x-wb-inferred: true
+        soldAmountUsd:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Proceeds in the account currency.
+    IcoEmissionSalePage:
+      type: object
+      description: Spring Data page of `IcoEmissionSale`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoEmissionSale'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoInvestorEmission:
+      type: object
+      properties:
+        emissionId:
+          type: string
+          x-wb-inferred: true
+        name:
+          type: string
+          x-wb-inferred: true
+    IcoInvestorEmissionPage:
+      type: object
+      description: Spring Data page of `IcoInvestorEmission`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoInvestorEmission'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoIssuer:
+      type: object
+      description: 'An issuer: a company that issues tokens.'
+      required:
+      - clientId
+      - name
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          description: Profile type, e.g. `BASIC`.
+        details:
+          $ref: '#/components/schemas/IcoIssuerDetails'
+        files:
+          $ref: '#/components/schemas/IcoIssuerFiles'
+    IcoIssuerDetails:
+      type: object
+      properties:
+        description:
+          type: string
+        website:
+          type: string
+        unp:
+          type: integer
+          format: int64
+          description: Taxpayer number (UNP).
+        registrationDate:
+          type: string
+          description: As entered, e.g. `10.07.2003`.
+        registrationAuthority:
+          type: string
+        legalAddress:
+          type: string
+        activityType:
+          type: string
+        employeesCount:
+          type: integer
+        revenue:
+          type: number
+          format: decimal
+          description: Thousands of `currency`.
+        netProfit:
+          type: number
+          format: decimal
+          description: Thousands of `currency`.
+        currency:
+          type: string
+        revenueCurrency:
+          type: string
+        returnOnAssets:
+          type: string
+          description: Percent with a decimal comma, e.g. `0,10`.
+        liquidityK1:
+          type: number
+          format: decimal
+        solvency:
+          $ref: '#/components/schemas/IcoSolvency'
+    IcoIssuerFiles:
+      type: object
+      properties:
+        issuerLogo:
+          type: string
+          description: Document ID of the logo.
+        issuerBackground:
+          type: string
+          description: Document ID of the page background.
+    IcoIssuerStatistics:
+      type: object
+      properties:
+        currency:
+          type: string
+        emissionAmount:
+          type: number
+          format: decimal
+          description: Total issued, in `currency`.
+        feeAmount:
+          type: number
+          format: decimal
+          description: Total interest paid, in `currency`.
+        investors:
+          type: integer
+    IcoIssuerName:
+      type: object
+      properties:
+        clientId:
+          type: string
+          x-wb-inferred: true
+        name:
+          type: string
+          x-wb-inferred: true
+    IcoIssuerNamePage:
+      type: object
+      description: Spring Data page of `IcoIssuerName`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoIssuerName'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoIssuerDocument:
+      type: object
+      required:
+      - documentId
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/IcoIssuerDocumentType'
+        name:
+          type: string
+          description: File name.
+        size:
+          type: integer
+          format: int64
+          description: Bytes.
+    IcoIssuerDocumentPage:
+      type: object
+      description: Spring Data page of `IcoIssuerDocument`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoIssuerDocument'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoObligation:
+      type: object
+      description: 'An obligation: the investor''s holding of tokens of one emission, i.e. the issuer''s debt to the investor.'
+      properties:
+        uuid:
+          type: string
+          x-wb-inferred: true
+        emissionId:
+          type: string
+          x-wb-inferred: true
+        emissionName:
+          type: string
+          x-wb-inferred: true
+        issuerId:
+          type: string
+          x-wb-inferred: true
+        issuerName:
+          type: string
+          x-wb-inferred: true
+        issuerLogoId:
+          type: string
+          x-wb-inferred: true
+        value:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens held.
+        exchangeRate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Token price in `currency`.
+        currency:
+          type: string
+          x-wb-inferred: true
+        feeRate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Annual interest rate as a fraction.
+        remainFee:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Interest still to be received.
+        buybackRequestDateFrom:
+          type: string
+          x-wb-inferred: true
+          description: Start of the current offer request window (ISO-8601).
+        buybackRequestDateTo:
+          type: string
+          x-wb-inferred: true
+          description: End of the current offer request window (ISO-8601).
+        buybackDateFrom:
+          type: string
+          x-wb-inferred: true
+          description: Start of the offer payment window (ISO-8601).
+        buybackDateTo:
+          type: string
+          x-wb-inferred: true
+          description: End of the offer payment window (ISO-8601).
+    IcoObligationPage:
+      type: object
+      description: Spring Data page of `IcoObligation`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoObligation'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoInvestorObligations:
+      type: object
+      properties:
+        obligations:
+          $ref: '#/components/schemas/IcoObligationPage'
+    IcoObligationFilter:
+      type: object
+      properties:
+        currencies:
+          type: array
+          items:
+            type: string
+        issuerIds:
+          type: array
+          items:
+            type: string
+        emissionIds:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoObligationStatus'
+    IcoCardBuyRequest:
+      type: object
+      required:
+      - emissionId
+      - tokenAmount
+      properties:
+        emissionId:
+          type: string
+        toClientId:
+          type: string
+          description: Buyer client ID (from `ico.statistics.client_info`).
+        accountType:
+          $ref: '#/components/schemas/IcoAccountType'
+          description: The web app sends `USER_PAYMENT`.
+        asset:
+          type: string
+          description: Emission currency.
+        tokenAmount:
+          type: number
+          format: decimal
+          description: Number of tokens.
+        fiatProviderType:
+          type: string
+          description: Card provider type, e.g. `ALFA`.
+        paymentToken:
+          type: string
+          description: ID of the selected card provider / saved card.
+        totalAmount:
+          type: number
+          format: decimal
+          description: Total from `calculate_card_buy`.
+        returnUrl:
+          type: string
+          description: Return URL, sent for `ALFA`.
+        failUrl:
+          type: string
+          description: Failure URL, sent for `ALFA`.
+    IcoBuyResult:
+      type: object
+      properties:
+        link:
+          type: string
+          x-wb-inferred: true
+          description: Card payment page (card purchase).
+        txId:
+          type: string
+          x-wb-inferred: true
+          description: Transaction ID (balance purchase).
+    IcoCardBuyCalculationRequest:
+      type: object
+      required:
+      - emissionId
+      - tokenAmount
+      properties:
+        emissionId:
+          type: string
+        asset:
+          type: string
+          description: Emission currency.
+        tokenAmount:
+          type: number
+          format: decimal
+          description: Number of tokens.
+        fiatProviderType:
+          type: string
+        paymentToken:
+          type: string
+    IcoCardBuyCalculation:
+      type: object
+      properties:
+        commission:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        totalAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Amount charged to the card.
+    IcoBalanceBuyRequest:
+      type: object
+      required:
+      - emissionId
+      - accountType
+      - asset
+      - amount
+      properties:
+        emissionId:
+          type: string
+        accountType:
+          $ref: '#/components/schemas/IcoAccountType'
+          description: '`USER_BALANCE` or `ICO_BALANCE`.'
+        asset:
+          type: string
+          description: Currency of the paying account.
+        amount:
+          type: number
+          format: decimal
+          description: Number of tokens.
+    IcoRateRequest:
+      type: object
+      required:
+      - fromAsset
+      - toAsset
+      properties:
+        fromAsset:
+          type: string
+        toAsset:
+          type: string
+    IcoRate:
+      type: object
+      properties:
+        fromAsset:
+          type: string
+          x-wb-inferred: true
+        toAsset:
+          type: string
+          x-wb-inferred: true
+        rate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+    IcoBuybackApplication:
+      type: object
+      description: An investor's application to sell tokens back to the issuer under the emission's offer.
+      properties:
+        buybackId:
+          type: string
+          x-wb-inferred: true
+        emissionId:
+          type: string
+          x-wb-inferred: true
+        emissionName:
+          type: string
+          x-wb-inferred: true
+        issuerName:
+          type: string
+          x-wb-inferred: true
+        buybackDate:
+          type: string
+          x-wb-inferred: true
+          description: Application date (ISO-8601).
+        valueRequest:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens requested.
+        value:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens approved (meaningful once `APPROVED`/`COMPLETED`).
+        status:
+          $ref: '#/components/schemas/IcoBuybackApplicationStatus'
+          x-wb-inferred: true
+        buybackRequestDateFrom:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        buybackRequestDateTo:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        buybackDateFrom:
+          type: string
+          x-wb-inferred: true
+          description: Payment window start (ISO-8601).
+        buybackDateTo:
+          type: string
+          x-wb-inferred: true
+          description: Payment window end (ISO-8601).
+    IcoBuybackApplicationPage:
+      type: object
+      description: Spring Data page of `IcoBuybackApplication`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoBuybackApplication'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoBuybackApplicationFilter:
+      type: object
+      properties:
+        issuerIds:
+          type: array
+          items:
+            type: string
+        emissionIds:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoBuybackApplicationStatus'
+    IcoBuybackRequest:
+      type: object
+      required:
+      - emissionId
+      - value
+      properties:
+        emissionId:
+          type: string
+        value:
+          type: number
+          format: decimal
+          description: Tokens to sell back (at least 1).
+        buybackId:
+          type: string
+          description: Existing application to change.
+    IcoBuybackOffer:
+      type: object
+      description: One offer (buyback) window of an issuer's emission with its applications totals.
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        emissionName:
+          type: string
+          x-wb-inferred: true
+        currency:
+          type: string
+          x-wb-inferred: true
+        buybackRate:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Offer percentage as a fraction.
+        requestDateFrom:
+          type: string
+          x-wb-inferred: true
+          description: Request window start (ISO-8601).
+        requestDateTo:
+          type: string
+          x-wb-inferred: true
+          description: Request window end (ISO-8601).
+        status:
+          $ref: '#/components/schemas/IcoBuybackOfferStatus'
+          x-wb-inferred: true
+        count:
+          type: integer
+          x-wb-inferred: true
+          description: Number of applications.
+        value:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens requested.
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Amount requested.
+        valueApproved:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        amountApproved:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        calcDate:
+          type: string
+          x-wb-inferred: true
+          description: Settlement date (ISO-8601).
+        buybackDateFrom:
+          type: string
+          x-wb-inferred: true
+          description: Payment window start (ISO-8601).
+        buybackDateTo:
+          type: string
+          x-wb-inferred: true
+          description: Payment window end (ISO-8601).
+        payDate:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        amountPaid:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Credited to investors, account currency.
+    IcoBuybackOfferPage:
+      type: object
+      description: Spring Data page of `IcoBuybackOffer`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoBuybackOffer'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoBuybackOfferFilter:
+      type: object
+      properties:
+        emissionNames:
+          type: array
+          items:
+            type: string
+        currencies:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoBuybackOfferStatus'
+        buybackRateFrom:
+          type: number
+          format: decimal
+          description: Fraction.
+        buybackRateTo:
+          type: number
+          format: decimal
+          description: Fraction.
+        fromRequestDate:
+          type: string
+          format: date-time
+          description: Request window from.
+        toRequestDate:
+          type: string
+          format: date-time
+          description: Request window to.
+        fromDate:
+          type: string
+          format: date-time
+          description: Payment window from.
+        toDate:
+          type: string
+          format: date-time
+          description: Payment window to.
+    IcoOperation:
+      type: object
+      description: An operation on ICO or e-accounts caused by the token lifecycle.
+      properties:
+        id:
+          type: string
+          x-wb-inferred: true
+        date:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        type:
+          type: string
+          x-wb-inferred: true
+          description: Russian label, e.g. `Покупка токенов` (buy tokens), `Получение дохода` (income received), `Выплата
+            дохода` (income paid), `Выкуп токенов по оферте` (buyback by offer), `Возврат по оферте` (offer refund), `Продажа
+            токенов` (token sale), `Выпуск токенов` (issue), `Перевод средств` (transfer), `Погашение токенов` (redemption),
+            `Пополнение счета` (top-up), fee and tax labels; see `type_names`.
+        status:
+          $ref: '#/components/schemas/IcoOperationStatus'
+          x-wb-inferred: true
+        amountFrom:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        assetFrom:
+          type: string
+          x-wb-inferred: true
+        accountTypeFrom:
+          $ref: '#/components/schemas/IcoAccountType'
+          x-wb-inferred: true
+        amountTo:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Tokens for purchases.
+        assetTo:
+          type: string
+          x-wb-inferred: true
+        accountTypeTo:
+          $ref: '#/components/schemas/IcoAccountType'
+          x-wb-inferred: true
+        details:
+          $ref: '#/components/schemas/IcoOperationDetails'
+          x-wb-inferred: true
+    IcoOperationDetails:
+      type: object
+      properties:
+        issuerName:
+          type: string
+          x-wb-inferred: true
+        emissionName:
+          type: string
+          x-wb-inferred: true
+        signature:
+          type: string
+          x-wb-inferred: true
+          description: Transaction hash.
+    IcoOperationPage:
+      type: object
+      description: Spring Data page of `IcoOperation`.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoOperation'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+          description: Zero-based page index.
+        size:
+          type: integer
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    IcoOperationAccount:
+      type: object
+      required:
+      - asset
+      - type
+      properties:
+        asset:
+          type: string
+        type:
+          $ref: '#/components/schemas/IcoAccountType'
+          description: '`ICO_BALANCE` (ICO account) or `USER_BALANCE` (e-account).'
+    IcoOperationFilter:
+      type: object
+      properties:
+        dateFrom:
+          type: string
+          format: date
+        dateTo:
+          type: string
+          format: date
+        nameTypes:
+          type: array
+          items:
+            type: string
+          description: Operation type names from `type_names`.
+        issuerIds:
+          type: array
+          items:
+            type: string
+        emissionIds:
+          type: array
+          items:
+            type: string
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoOperationAccount'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoOperationStatus'
+    IcoStatementRequest:
+      type: object
+      properties:
+        dateFrom:
+          type: string
+          format: date
+        dateTo:
+          type: string
+          format: date
+        nameTypes:
+          type: array
+          items:
+            type: string
+          description: Operation type names from `type_names`.
+        issuerIds:
+          type: array
+          items:
+            type: string
+        emissionIds:
+          type: array
+          items:
+            type: string
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoOperationAccount'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoOperationStatus'
+        type:
+          $ref: '#/components/schemas/IcoReportFormat'
+    IcoAccountTransferRequest:
+      type: object
+      required:
+      - currencyFrom
+      - accountTypeFrom
+      - currencyTo
+      - accountTypeTo
+      - amount
+      properties:
+        clientId:
+          type: string
+          description: Client ID of the user.
+        currencyFrom:
+          type: string
+        accountTypeFrom:
+          $ref: '#/components/schemas/IcoAccountType'
+          description: '`ICO_BALANCE`.'
+        currencyTo:
+          type: string
+        accountTypeTo:
+          $ref: '#/components/schemas/IcoAccountType'
+          description: '`USER_BALANCE`.'
+        amount:
+          type: number
+          format: decimal
+    IcoStatistics:
+      type: object
+      properties:
+        currencies:
+          type: array
+          items:
+            type: string
+        issuers:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoStatisticsIssuer'
+    IcoStatisticsIssuer:
+      type: object
+      required:
+      - issuerId
+      - name
+      properties:
+        issuerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+    IcoClientInfo:
+      type: object
+      properties:
+        clientId:
+          type: string
+          x-wb-inferred: true
+        clientType:
+          $ref: '#/components/schemas/IcoClientType'
+          x-wb-inferred: true
+        clientStatus:
+          $ref: '#/components/schemas/IcoClientStatus'
+          x-wb-inferred: true
+        isBLR:
+          type: boolean
+          x-wb-inferred: true
+          description: Belarusian resident.
+    IcoYieldRequest:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          $ref: '#/components/schemas/IcoYieldPeriod'
+        currency:
+          type:
+          - string
+          - 'null'
+          description: '`USD`, `EUR`, `RUB`, `BYN` or null for all.'
+    IcoYield:
+      type: object
+      properties:
+        current:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Yield of the period as a fraction.
+        last:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Yield of the previous period as a fraction.
+    IcoDebtPeriodRequest:
+      type: object
+      properties:
+        currency:
+          type:
+          - string
+          - 'null'
+        asset:
+          type:
+          - string
+          - 'null'
+        name:
+          type:
+          - string
+          - 'null'
+          description: Emission name.
+        from:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        to:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    IcoYearAmount:
+      type: object
+      properties:
+        year:
+          type: integer
+          x-wb-inferred: true
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+    IcoInvestedTotalRequest:
+      type: object
+      properties:
+        currency:
+          type:
+          - string
+          - 'null'
+          description: Null for all currencies.
+    IcoInvestedTotal:
+      type: object
+      properties:
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoInvestedBalance'
+          x-wb-inferred: true
+    IcoInvestedBalance:
+      type: object
+      properties:
+        ownerId:
+          type: string
+          x-wb-inferred: true
+          description: Issuer ID.
+        ownerName:
+          type: string
+          x-wb-inferred: true
+          description: Issuer name.
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+    IcoInvestedIncomeRequest:
+      type: object
+      properties:
+        currency:
+          type:
+          - string
+          - 'null'
+        from:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        to:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    IcoInvestedIncome:
+      type: object
+      properties:
+        statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoInvestedIncomeItem'
+          x-wb-inferred: true
+    IcoInvestedIncomeItem:
+      type: object
+      properties:
+        ownerId:
+          type: string
+          x-wb-inferred: true
+          description: Issuer ID.
+        ownerName:
+          type: string
+          x-wb-inferred: true
+          description: Issuer name.
+        totalFee:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Interest paid out.
+        totalRemain:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Interest still to be paid.
+        totalAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        fromDate:
+          type: string
+          x-wb-inferred: true
+        toDate:
+          type: string
+          x-wb-inferred: true
+    IcoIssuerDebt:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Principal debt of the current period.
+        currentDebt:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+          description: Accrued interest of the current period.
+        currency:
+          type: string
+          x-wb-inferred: true
+    IcoPaymentScheduleRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: Emission name.
+        currency:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+    IcoPaymentSchedule:
+      type: object
+      properties:
+        emissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/IcoScheduledPayment'
+          x-wb-inferred: true
+    IcoScheduledPayment:
+      type: object
+      properties:
+        date:
+          type: string
+          x-wb-inferred: true
+          description: ISO-8601.
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        currency:
+          type: string
+          x-wb-inferred: true
+        unpaid:
+          type: boolean
+          x-wb-inferred: true
+          description: Overdue payment.
