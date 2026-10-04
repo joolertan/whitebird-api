@@ -25,3 +25,7 @@ htmlcov/
 .vscode/
 *.swp
 .DS_Store
+
+docs/reference/generated/
+scripts/docs/node_modules/
+site/

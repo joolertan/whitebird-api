@@ -1,0 +1,10 @@
+{
+  "name": "whitebird-api-docs",
+  "private": true,
+  "description": "Tools that render the Node.js API reference for the documentation site",
+  "devDependencies": {
+    "typedoc": "~0.28.20",
+    "typedoc-plugin-markdown": "~4.14.1",
+    "typescript": "~6.0.3"
+  }
+}
