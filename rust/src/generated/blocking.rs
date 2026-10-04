@@ -15,12 +15,17 @@ use crate::models::{
     BalanceFiatDeposit, BalanceOperation, BalanceOrderResponse, CarusellBank, ClientFeature,
     ClientModel, CryptoAddressResponse, CurrentAccountSystemAccount, DownloadTokenResponse,
     ExchangeAssets, ExchangeLegacyOrder, ExchangeLimits, ExchangeOrder, ExchangeQuote,
-    ExchangeRateStat, ExchangeRateStatsFilter, KycActualData, KycActualizationClientStatus,
-    KycCryptoTest, KycInvestorData, KycLivenessSession, KycLivenessStatus, KycMsiRedirect,
-    KycPersonalData, KycSumsubToken, KycVerification, MarketInstrument, MarketKline,
-    MarketOrderbook, Merchant, MerchantClientCounts, MerchantPair, MtsCardCountry, MtsQrCommission,
-    MtsQrInfo, NotificationEvent, NotificationStreamMessage, OrderUnifiedResponse,
-    OtcOrderCalculateResponse, OtcOrderResponse, PaymentCard, PaymentCardLimits, PaymentCommission,
+    ExchangeRateStat, ExchangeRateStatsFilter, IcoBuyResult, IcoBuybackApplication,
+    IcoBuybackOffer, IcoCalculatorResult, IcoCardBuyCalculation, IcoClientInfo, IcoEmission,
+    IcoEmissionSale, IcoInvestedIncome, IcoInvestedTotal, IcoInvestorEmission,
+    IcoInvestorObligations, IcoIssuer, IcoIssuerDebt, IcoIssuerDocument, IcoIssuerDocumentType,
+    IcoIssuerName, IcoIssuerStatistics, IcoOperation, IcoPaymentSchedule, IcoRate, IcoStatistics,
+    IcoYearAmount, IcoYield, KycActualData, KycActualizationClientStatus, KycCryptoTest,
+    KycInvestorData, KycLivenessSession, KycLivenessStatus, KycMsiRedirect, KycPersonalData,
+    KycSumsubToken, KycVerification, MarketInstrument, MarketKline, MarketOrderbook, Merchant,
+    MerchantClientCounts, MerchantPair, MtsCardCountry, MtsQrCommission, MtsQrInfo,
+    NotificationEvent, NotificationStreamMessage, OrderUnifiedResponse, OtcOrderCalculateResponse,
+    OtcOrderResponse, PaymentCard, PaymentCardLimits, PaymentCommission,
     PaymentDirectionCommission, PaymentMethod, PaymentMethodResponse, PaymentProvider,
     PaymentProviderType, Referral, ReferralTransaction, RegistrationSdkResult, RegistrationState,
     StatusbankCardDetails, StatusbankCardSystems, StatusbankOrderConfirmation,
@@ -56,8 +61,19 @@ use crate::params::{
     CurrentAccountInvoicesEmailParams, CurrentAccountSystemAccountsListParams,
     ExchangeAssetsListParams, ExchangeLimitsGetParams, ExchangeOrdersCreateParams,
     ExchangeOrdersCurrentParams, ExchangeOrdersHistoryParams, ExchangeOrdersRejectParams,
-    ExchangeQuotesCreateParams, KycAgreeOfferParams, KycCryptoTestSubmitParams, KycGetParams,
-    KycLivenessStartParams, KycMsiAuthenticateParams, KycProfileClosureConfirmParams,
+    ExchangeQuotesCreateParams, IcoBuybacksListOffersParams, IcoBuybacksListParams,
+    IcoBuybacksRequestParams, IcoEmissionsCalculateParams, IcoEmissionsDownloadMineParams,
+    IcoEmissionsDownloadSalesAnalyticsParams, IcoEmissionsListInvestedParams,
+    IcoEmissionsListMineParams, IcoEmissionsListParams, IcoEmissionsRequestIssueParams,
+    IcoEmissionsSalesAnalyticsParams, IcoEmissionsStableCoinAvailabilityParams,
+    IcoIssuersDocumentsListParams, IcoObligationsBuyWithBalanceParams,
+    IcoObligationsBuyWithCardParams, IcoObligationsCalculateCardBuyParams,
+    IcoObligationsListParams, IcoObligationsRateParams, IcoObligationsRemainingLimitParams,
+    IcoOperationsListParams, IcoOperationsStatementParams, IcoOperationsTransferParams,
+    IcoStatisticsInvestedIncomeParams, IcoStatisticsInvestedTotalParams,
+    IcoStatisticsInvestorRedemptionsParams, IcoStatisticsInvestorYieldParams,
+    IcoStatisticsIssuerPaymentScheduleParams, KycAgreeOfferParams, KycCryptoTestSubmitParams,
+    KycGetParams, KycLivenessStartParams, KycMsiAuthenticateParams, KycProfileClosureConfirmParams,
     KycQualificationSubmitParams, KycSdkLinkParams, KycSubmitParams, KycSumsubTokenParams,
     MarketInstrumentsParams, MarketKlinesParams, MarketOrderbookParams,
     MerchantDownloadReportParams, MerchantSetShowNameParams, MerchantStatisticsCountByStatusParams,
@@ -119,6 +135,11 @@ impl Client {
     /// Endpoints of `client.exchange()`.
     pub fn exchange(&self) -> Exchange<'_> {
         Exchange { client: self }
+    }
+
+    /// Endpoints of `client.ico()`.
+    pub fn ico(&self) -> Ico<'_> {
+        Ico { client: self }
     }
 
     /// Endpoints of `client.kyc()`.
@@ -1940,6 +1961,898 @@ impl ExchangeRates<'_> {
     pub fn stats(&self, body: ExchangeRateStatsFilter) -> Result<Vec<ExchangeRateStat>> {
         self.client
             .block_on(self.client.as_async().exchange().rates().stats(body))
+    }
+}
+
+/// Endpoints of `client.ico()`.
+#[derive(Debug, Clone, Copy)]
+pub struct Ico<'a> {
+    client: &'a Client,
+}
+
+impl<'a> Ico<'a> {
+    /// Endpoints of `client.ico().buybacks()`.
+    pub fn buybacks(&self) -> IcoBuybacks<'a> {
+        IcoBuybacks {
+            client: self.client,
+        }
+    }
+
+    /// Endpoints of `client.ico().emissions()`.
+    pub fn emissions(&self) -> IcoEmissions<'a> {
+        IcoEmissions {
+            client: self.client,
+        }
+    }
+
+    /// Endpoints of `client.ico().issuers()`.
+    pub fn issuers(&self) -> IcoIssuers<'a> {
+        IcoIssuers {
+            client: self.client,
+        }
+    }
+
+    /// Endpoints of `client.ico().obligations()`.
+    pub fn obligations(&self) -> IcoObligations<'a> {
+        IcoObligations {
+            client: self.client,
+        }
+    }
+
+    /// Endpoints of `client.ico().operations()`.
+    pub fn operations(&self) -> IcoOperations<'a> {
+        IcoOperations {
+            client: self.client,
+        }
+    }
+
+    /// Endpoints of `client.ico().statistics()`.
+    pub fn statistics(&self) -> IcoStatisticsResource<'a> {
+        IcoStatisticsResource {
+            client: self.client,
+        }
+    }
+}
+
+/// Endpoints of `client.ico().buybacks()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoBuybacks<'a> {
+    client: &'a Client,
+}
+
+impl IcoBuybacks<'_> {
+    /// List the investor's buyback applications
+    ///
+    /// `POST /api/v1/ico/investor/buyback`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list(&self, params: IcoBuybacksListParams) -> Paginator<IcoBuybackApplication> {
+        Paginator::new(
+            self.client,
+            self.client.as_async().ico().buybacks().list(params),
+        )
+    }
+
+    /// Apply for a buyback or change an application
+    ///
+    /// Asks the issuer to buy back `value` tokens under the emission's offer; only possible
+    /// during the request window (`buybackRequestDateFrom`..`buybackRequestDateTo` of the
+    /// obligation). Pass `buybackId` to change the amount of an existing application. Not
+    /// enough tokens answers `INSUFFICIENT_FUNDS`.
+    ///
+    /// `POST /api/v1/ico/offer/buyback`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn request(&self, params: IcoBuybacksRequestParams) -> Result<Value> {
+        self.client
+            .block_on(self.client.as_async().ico().buybacks().request(params))
+    }
+
+    /// Withdraw a buyback application
+    ///
+    /// `DELETE /api/v1/ico/offer/buyback/{buybackId}`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn withdraw(&self, buyback_id: &str) -> Result<Value> {
+        self.client
+            .block_on(self.client.as_async().ico().buybacks().withdraw(buyback_id))
+    }
+
+    /// List buyback offers on the issuer's emissions
+    ///
+    /// Issuer cabinet: one row per offer window of each emission, with requested, approved and
+    /// paid totals.
+    ///
+    /// `POST /api/v1/ico/issuer/emission/buyback`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list_offers(&self, params: IcoBuybacksListOffersParams) -> Paginator<IcoBuybackOffer> {
+        Paginator::new(
+            self.client,
+            self.client.as_async().ico().buybacks().list_offers(params),
+        )
+    }
+}
+
+/// Endpoints of `client.ico().emissions()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoEmissions<'a> {
+    client: &'a Client,
+}
+
+impl IcoEmissions<'_> {
+    /// List token emissions on sale
+    ///
+    /// The public ICO showcase. The web app sends `withLogo: true, tokenType: ICO`, 12 items
+    /// per page and sorts by `creationDate,desc`; called logged out. When `page`/`size` are
+    /// omitted the app sends `page=0&size=0`.
+    ///
+    /// `POST /api/v1/ico/emission`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    /// Public: works without signing in.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list(&self, params: IcoEmissionsListParams) -> Paginator<IcoEmission> {
+        Paginator::new(
+            self.client,
+            self.client.as_async().ico().emissions().list(params),
+        )
+    }
+
+    /// Get an emission
+    ///
+    /// Emission card / detail page. POST without a body; called logged out on the emission
+    /// page.
+    ///
+    /// `POST /api/v1/ico/emission/{emissionId}`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn get(&self, emission_id: &str) -> Result<IcoEmission> {
+        self.client
+            .block_on(self.client.as_async().ico().emissions().get(emission_id))
+    }
+
+    /// Download the white paper of an emission
+    ///
+    /// PDF white paper (saved by the web app as `WhitePaper-\<emissionId\>.pdf`).
+    ///
+    /// `GET /api/v1/ico/emission/{emissionId}/white-paper`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub fn white_paper(&self, emission_id: &str) -> Result<Bytes> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .white_paper(emission_id),
+        )
+    }
+
+    /// Get the investment calculator range
+    ///
+    /// Bounds of the income calculator shown on the ICO landing (by `currency`) and on an
+    /// emission page (by `emissionId`). The web app always sends `amount: 100`; the slider then
+    /// lets the user pick an investment between `minAmount` and `maxAmount` and shows
+    /// `investment * rate` as the yearly income. Called logged out.
+    ///
+    /// `POST /api/v1/ico/emission/calculator`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn calculate(&self, params: IcoEmissionsCalculateParams) -> Result<IcoCalculatorResult> {
+        self.client
+            .block_on(self.client.as_async().ico().emissions().calculate(params))
+    }
+
+    /// Apply for a token issue
+    ///
+    /// Application of a company that wants to issue tokens. The issuer cabinet sends the full
+    /// form (`fullRequest: true`); the issuers landing page sends only the contact fields.
+    /// Success is HTTP 200.
+    ///
+    /// `POST /api/v1/ico/emission/issue/request`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn request_issue(&self, params: IcoEmissionsRequestIssueParams) -> Result<Value> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .request_issue(params),
+        )
+    }
+
+    /// List the emissions of the current issuer
+    ///
+    /// Issuer cabinet: the emissions issued by the authenticated client, with current debt
+    /// figures.
+    ///
+    /// `POST /api/v1/ico/emission/my`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list_mine(&self, params: IcoEmissionsListMineParams) -> Paginator<IcoEmission> {
+        Paginator::new(
+            self.client,
+            self.client.as_async().ico().emissions().list_mine(params),
+        )
+    }
+
+    /// Download the issuer's emissions report
+    ///
+    /// XLSX or PDF report of `list_mine` with the same filters.
+    ///
+    /// `POST /api/v1/ico/emission/my/download`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub fn download_mine(&self, params: IcoEmissionsDownloadMineParams) -> Result<Bytes> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .download_mine(params),
+        )
+    }
+
+    /// List token sales of the current issuer
+    ///
+    /// Issuer cabinet, sales analytics: sales of the issuer's tokens, sorted by
+    /// `sellDate,desc`.
+    ///
+    /// `POST /api/v1/ico/emission/my/analytics`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn sales_analytics(
+        &self,
+        params: IcoEmissionsSalesAnalyticsParams,
+    ) -> Paginator<IcoEmissionSale> {
+        Paginator::new(
+            self.client,
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .sales_analytics(params),
+        )
+    }
+
+    /// Download the sales analytics report
+    ///
+    /// XLSX report of `sales_analytics` (`sales_analytics_report.xlsx`).
+    ///
+    /// `POST /api/v1/ico/emission/my/analytics/download`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub fn download_sales_analytics(
+        &self,
+        params: IcoEmissionsDownloadSalesAnalyticsParams,
+    ) -> Result<Bytes> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .download_sales_analytics(params),
+        )
+    }
+
+    /// List emissions the investor holds
+    ///
+    /// Emission names and IDs of the authenticated investor's holdings (filter options). POST
+    /// without a body.
+    ///
+    /// `POST /api/v1/ico/emission/investor`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list_invested(
+        &self,
+        params: IcoEmissionsListInvestedParams,
+    ) -> Paginator<IcoInvestorEmission> {
+        Paginator::new(
+            self.client,
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .list_invested(params),
+        )
+    }
+
+    /// Check availability of feature tokens
+    ///
+    /// Whether feature tokens issued through the ICO service (for example `AEDEX`/`AED`,
+    /// `STRUBS`/`RUBS`) are available to the client. Answers a map from asset to availability.
+    ///
+    /// `GET /api/v1/ico/emission/stable-coin/available`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn stable_coin_availability(
+        &self,
+        params: IcoEmissionsStableCoinAvailabilityParams,
+    ) -> Result<HashMap<String, bool>> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .stable_coin_availability(params),
+        )
+    }
+
+    /// Check whether the client invested in an emission
+    ///
+    /// Used for emissions restricted to existing investors (`restrictToExistingInvestors`).
+    ///
+    /// `GET /api/v1/ico/investor/emission/{emissionId}/is-investor`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn is_investor(&self, emission_id: &str) -> Result<bool> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .emissions()
+                .is_investor(emission_id),
+        )
+    }
+}
+
+/// Endpoints of `client.ico().issuers()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoIssuers<'a> {
+    client: &'a Client,
+}
+
+impl<'a> IcoIssuers<'a> {
+    /// Endpoints of `client.ico().issuers().documents()`.
+    pub fn documents(&self) -> IcoIssuersDocuments<'a> {
+        IcoIssuersDocuments {
+            client: self.client,
+        }
+    }
+
+    /// Get an issuer profile
+    ///
+    /// Public issuer page: company details and logo/background document IDs. Unknown IDs answer
+    /// 4xx.
+    ///
+    /// `GET /api/v1/ico/issuer/get/{issuerId}`
+    ///
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn get(&self, issuer_id: &str) -> Result<IcoIssuer> {
+        self.client
+            .block_on(self.client.as_async().ico().issuers().get(issuer_id))
+    }
+
+    /// Get issuer statistics
+    ///
+    /// Totals shown on the public issuer page.
+    ///
+    /// `GET /api/v1/ico/statistic/issuer/{issuerId}`
+    ///
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn statistics(&self, issuer_id: &str) -> Result<IcoIssuerStatistics> {
+        self.client
+            .block_on(self.client.as_async().ico().issuers().statistics(issuer_id))
+    }
+
+    /// List issuer names
+    ///
+    /// Issuers available as filter options in the operation history. The web app sends `{}`.
+    ///
+    /// `POST /api/v1/ico/statistic/issuer/names`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn names(&self, body: Value) -> Paginator<IcoIssuerName> {
+        Paginator::new(
+            self.client,
+            self.client.as_async().ico().issuers().names(body),
+        )
+    }
+}
+
+/// Endpoints of `client.ico().issuers().documents()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoIssuersDocuments<'a> {
+    client: &'a Client,
+}
+
+impl IcoIssuersDocuments<'_> {
+    /// List issuer documents
+    ///
+    /// Documents published on the issuer page, by category; the web app shows 6 per page.
+    ///
+    /// `GET /api/v1/ico/issuer/documents/get/{issuerId}/{type}`
+    ///
+    /// Public: works without signing in.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list(
+        &self,
+        issuer_id: &str,
+        r#type: IcoIssuerDocumentType,
+        params: IcoIssuersDocumentsListParams,
+    ) -> Paginator<IcoIssuerDocument> {
+        Paginator::new(
+            self.client,
+            self.client
+                .as_async()
+                .ico()
+                .issuers()
+                .documents()
+                .list(issuer_id, r#type, params),
+        )
+    }
+
+    /// Download an issuer document
+    ///
+    /// Raw file with its own content type (PDF reports, JPEG/PNG images). Also serves issuer
+    /// logos and backgrounds and emission logos (`files.issuerLogo`, `issuerLogoId`, ...).
+    ///
+    /// `GET /api/v1/ico/issuer/document/download/{documentId}`
+    ///
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub fn download(&self, document_id: &str) -> Result<Bytes> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .issuers()
+                .documents()
+                .download(document_id),
+        )
+    }
+}
+
+/// Endpoints of `client.ico().obligations()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoObligations<'a> {
+    client: &'a Client,
+}
+
+impl IcoObligations<'_> {
+    /// List the investor's token holdings
+    ///
+    /// Portfolio of the authenticated investor: one obligation per emission held. The page is
+    /// wrapped in `obligations`.
+    ///
+    /// `POST /api/v1/ico/obligation/investor`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn list(&self, params: IcoObligationsListParams) -> Result<IcoInvestorObligations> {
+        self.client
+            .block_on(self.client.as_async().ico().obligations().list(params))
+    }
+
+    /// Buy tokens with a bank card
+    ///
+    /// Card purchase (`accountType: USER_PAYMENT`). Answers a `link` to the card payment page;
+    /// for `ALFA` pass `returnUrl`/`failUrl`. Limit violations answer 400 with status
+    /// `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT` or `INVALID_TOTAL_TOKEN_LIMIT` and the limit in
+    /// `fields` (`limit`/`maxLimit`, `asset`).
+    ///
+    /// `POST /api/v1/ico/obligation/client/buy`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn buy_with_card(&self, params: IcoObligationsBuyWithCardParams) -> Result<IcoBuyResult> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .obligations()
+                .buy_with_card(params),
+        )
+    }
+
+    /// Calculate a card purchase
+    ///
+    /// Card commission and total to pay for `buy_with_card`.
+    ///
+    /// `POST /api/v1/ico/obligation/client/buy/calculation`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn calculate_card_buy(
+        &self,
+        params: IcoObligationsCalculateCardBuyParams,
+    ) -> Result<IcoCardBuyCalculation> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .obligations()
+                .calculate_card_buy(params),
+        )
+    }
+
+    /// Buy tokens with an account balance
+    ///
+    /// Pays for tokens from an e-account (`USER_BALANCE`) or an ICO account (`ICO_BALANCE`).
+    /// Same limit errors as `buy_with_card`.
+    ///
+    /// `POST /api/v1/ico/obligation/client/transfer`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn buy_with_balance(
+        &self,
+        params: IcoObligationsBuyWithBalanceParams,
+    ) -> Result<IcoBuyResult> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .obligations()
+                .buy_with_balance(params),
+        )
+    }
+
+    /// Get the conversion rate for a token purchase
+    ///
+    /// Rate used when the paying account currency differs from the emission currency.
+    ///
+    /// `POST /api/v1/ico/obligation/client/rate`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn rate(&self, params: IcoObligationsRateParams) -> Result<IcoRate> {
+        self.client
+            .block_on(self.client.as_async().ico().obligations().rate(params))
+    }
+
+    /// Get the remaining investment limit
+    ///
+    /// Remaining yearly limit of a non-qualified investor, in `asset` (the web app asks for
+    /// `BYN`).
+    ///
+    /// `GET /api/v1/ico/obligation/client/limit/residue`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn remaining_limit(&self, params: IcoObligationsRemainingLimitParams) -> Result<Decimal> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .obligations()
+                .remaining_limit(params),
+        )
+    }
+}
+
+/// Endpoints of `client.ico().operations()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoOperations<'a> {
+    client: &'a Client,
+}
+
+impl IcoOperations<'_> {
+    /// List ICO account operations
+    ///
+    /// History of ICO operations (purchases, income, buybacks, transfers, fees) of the client.
+    ///
+    /// `POST /api/v1/ico/operation/all`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy iterator over the items of every page; it yields errors as items.
+    pub fn list(&self, params: IcoOperationsListParams) -> Paginator<IcoOperation> {
+        Paginator::new(
+            self.client,
+            self.client.as_async().ico().operations().list(params),
+        )
+    }
+
+    /// Download an ICO operations statement
+    ///
+    /// Statement of `list` with the same filters, as XLSX or PDF (`whitebird_ico_statement`).
+    ///
+    /// `POST /api/v1/ico/operation/statement`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub fn statement(&self, params: IcoOperationsStatementParams) -> Result<Bytes> {
+        self.client
+            .block_on(self.client.as_async().ico().operations().statement(params))
+    }
+
+    /// Transfer funds from an ICO account to an e-account
+    ///
+    /// Moves money from an ICO account (`ICO_BALANCE`) to the e-account (`USER_BALANCE`) in the
+    /// same currency. Not enough money answers an error whose message contains `Insufficient
+    /// funds`.
+    ///
+    /// `POST /api/v1/ico/operation/transfer`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn transfer(&self, params: IcoOperationsTransferParams) -> Result<Value> {
+        self.client
+            .block_on(self.client.as_async().ico().operations().transfer(params))
+    }
+
+    /// List operation type names
+    ///
+    /// Values accepted by `nameTypes` of the operation filter (Russian labels, see
+    /// `IcoOperation.type`).
+    ///
+    /// `GET /api/v1/ico/operation/typeNames`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn type_names(&self) -> Result<Vec<String>> {
+        self.client
+            .block_on(self.client.as_async().ico().operations().type_names())
+    }
+}
+
+/// Endpoints of `client.ico().statistics()`.
+#[derive(Debug, Clone, Copy)]
+pub struct IcoStatisticsResource<'a> {
+    client: &'a Client,
+}
+
+impl IcoStatisticsResource<'_> {
+    /// Get the ICO showcase filters
+    ///
+    /// Currencies and issuers that have emissions; filter options of the public showcase.
+    ///
+    /// `GET /api/v1/ico/statistic`
+    ///
+    /// Public: works without signing in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn get(&self) -> Result<IcoStatistics> {
+        self.client
+            .block_on(self.client.as_async().ico().statistics().get())
+    }
+
+    /// Get the client's ICO profile
+    ///
+    /// Client type, status and residency used to decide whether the client is an issuer (legal
+    /// entity) or an investor and which emissions they may buy. POST without a body.
+    ///
+    /// `POST /api/v1/ico/statistic/info`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn client_info(&self) -> Result<IcoClientInfo> {
+        self.client
+            .block_on(self.client.as_async().ico().statistics().client_info())
+    }
+
+    /// Get the investor's average portfolio yield
+    ///
+    /// `POST /api/v1/ico/investor/statistic/income`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn investor_yield(&self, params: IcoStatisticsInvestorYieldParams) -> Result<IcoYield> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .statistics()
+                .investor_yield(params),
+        )
+    }
+
+    /// Get the investor's redemptions by year
+    ///
+    /// Amounts the issuers owe the investor, grouped by year ("redemption by year" chart).
+    ///
+    /// `POST /api/v1/ico/investor/statistic/debt/period`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn investor_redemptions(
+        &self,
+        params: IcoStatisticsInvestorRedemptionsParams,
+    ) -> Result<Vec<IcoYearAmount>> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .statistics()
+                .investor_redemptions(params),
+        )
+    }
+
+    /// Get the investor's portfolio by issuer
+    ///
+    /// `POST /api/v1/ico/obligation/invested/total`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn invested_total(
+        &self,
+        params: IcoStatisticsInvestedTotalParams,
+    ) -> Result<IcoInvestedTotal> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .statistics()
+                .invested_total(params),
+        )
+    }
+
+    /// Get the investor's income by issuer
+    ///
+    /// Interest paid out and still to be paid, per issuer, for a period (`from`/`to` null for
+    /// all time).
+    ///
+    /// `POST /api/v1/ico/obligation/invested/income`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn invested_income(
+        &self,
+        params: IcoStatisticsInvestedIncomeParams,
+    ) -> Result<IcoInvestedIncome> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .statistics()
+                .invested_income(params),
+        )
+    }
+
+    /// Get the issuer's total debt
+    ///
+    /// Issuer cabinet header: principal and accrued interest the issuer owes to investors.
+    ///
+    /// `GET /api/v1/ico/issuer/statistic/debt`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn issuer_debt(&self) -> Result<IcoIssuerDebt> {
+        self.client
+            .block_on(self.client.as_async().ico().statistics().issuer_debt())
+    }
+
+    /// Get the payment schedule of an emission
+    ///
+    /// Issuer cabinet: scheduled interest and offer payments of one emission (the app asks for
+    /// the current year + 3).
+    ///
+    /// `POST /api/v1/ico/issuer/statistic/debt/period`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub fn issuer_payment_schedule(
+        &self,
+        params: IcoStatisticsIssuerPaymentScheduleParams,
+    ) -> Result<IcoPaymentSchedule> {
+        self.client.block_on(
+            self.client
+                .as_async()
+                .ico()
+                .statistics()
+                .issuer_payment_schedule(params),
+        )
     }
 }
 

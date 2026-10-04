@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import Field
 
 from whitebird._models import Date, DateTime, StrEnum, WhitebirdModel
+from whitebird.pagination import Page
 
 __all__ = [
     "AccountingAccount",
@@ -120,6 +121,76 @@ __all__ = [
     "FiatDepositRequest",
     "FiatWithdrawalRequest",
     "FileType",
+    "IcoAccountTransferRequest",
+    "IcoAccountType",
+    "IcoBalanceBuyRequest",
+    "IcoBankruptcyRisk",
+    "IcoBuyResult",
+    "IcoBuybackApplication",
+    "IcoBuybackApplicationFilter",
+    "IcoBuybackApplicationStatus",
+    "IcoBuybackOffer",
+    "IcoBuybackOfferFilter",
+    "IcoBuybackOfferStatus",
+    "IcoBuybackPaymentStatus",
+    "IcoBuybackRequest",
+    "IcoCalculatorRequest",
+    "IcoCalculatorResult",
+    "IcoCardBuyCalculation",
+    "IcoCardBuyCalculationRequest",
+    "IcoCardBuyRequest",
+    "IcoClientInfo",
+    "IcoClientStatus",
+    "IcoClientType",
+    "IcoDebtPeriodRequest",
+    "IcoEmission",
+    "IcoEmissionFilter",
+    "IcoEmissionSale",
+    "IcoEmissionStatus",
+    "IcoGuarantee",
+    "IcoInvestedBalance",
+    "IcoInvestedIncome",
+    "IcoInvestedIncomeItem",
+    "IcoInvestedIncomeRequest",
+    "IcoInvestedTotal",
+    "IcoInvestedTotalRequest",
+    "IcoInvestorEmission",
+    "IcoInvestorObligations",
+    "IcoIssueRequest",
+    "IcoIssuer",
+    "IcoIssuerDebt",
+    "IcoIssuerDetails",
+    "IcoIssuerDocument",
+    "IcoIssuerDocumentType",
+    "IcoIssuerFiles",
+    "IcoIssuerName",
+    "IcoIssuerStatistics",
+    "IcoMyEmissionFilter",
+    "IcoMyEmissionReportRequest",
+    "IcoObligation",
+    "IcoObligationFilter",
+    "IcoObligationStatus",
+    "IcoOperation",
+    "IcoOperationAccount",
+    "IcoOperationDetails",
+    "IcoOperationFilter",
+    "IcoOperationStatus",
+    "IcoPaymentInterval",
+    "IcoPaymentSchedule",
+    "IcoPaymentScheduleRequest",
+    "IcoRate",
+    "IcoRateRequest",
+    "IcoReportFormat",
+    "IcoSalesAnalyticsFilter",
+    "IcoScheduledPayment",
+    "IcoSolvency",
+    "IcoStatementRequest",
+    "IcoStatistics",
+    "IcoStatisticsIssuer",
+    "IcoYearAmount",
+    "IcoYield",
+    "IcoYieldPeriod",
+    "IcoYieldRequest",
     "KycActualData",
     "KycActualizationClientStatus",
     "KycCryptoTest",
@@ -568,6 +639,159 @@ class FileType(StrEnum):
     CSV = "CSV"
     PDF = "PDF"
     XLSX = "XLSX"
+
+
+class IcoAccountType(StrEnum):
+    """Accounting account type.
+
+    ICO flows use `USER_BALANCE` (e-account), `ICO_BALANCE` (ICO account) and `USER_PAYMENT` (card
+    payment).
+    """
+
+    USER_BALANCE = "USER_BALANCE"
+    USER_PAYMENT = "USER_PAYMENT"
+    USER_EXCHANGE = "USER_EXCHANGE"
+    USER_FEES = "USER_FEES"
+    USER_PAYMENT_RESERVING = "USER_PAYMENT_RESERVING"
+    REFERRER_BALANCE = "REFERRER_BALANCE"
+    ICO_BALANCE = "ICO_BALANCE"
+
+
+class IcoBankruptcyRisk(StrEnum):
+    """Bankruptcy risk level of the issuer."""
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
+    OTHER = "OTHER"
+
+
+class IcoBuybackApplicationStatus(StrEnum):
+    """Buyback application state; `DELETED` means withdrawn."""
+
+    REQUESTED = "REQUESTED"
+    IN_REVIEW = "IN_REVIEW"
+    APPROVED = "APPROVED"
+    COMPLETED = "COMPLETED"
+    DELETED = "DELETED"
+
+
+class IcoBuybackOfferStatus(StrEnum):
+    """Offer window state: upcoming, collecting applications, being paid, completed."""
+
+    FUTURE = "FUTURE"
+    REQUEST = "REQUEST"
+    EXECUTE = "EXECUTE"
+    COMPLETED = "COMPLETED"
+
+
+class IcoBuybackPaymentStatus(StrEnum):
+    """Whether an emission still has open offer payments."""
+
+    OPENED = "OPENED"
+    CLOSED = "CLOSED"
+
+
+class IcoClientStatus(StrEnum):
+    """Client verification status."""
+
+    NEW = "NEW"
+    EMAIL_VERIFIED = "EMAIL_VERIFIED"
+    PENDING = "PENDING"
+    NOT_VERIFIED = "NOT_VERIFIED"
+    VERIFIED = "VERIFIED"
+    FROZEN = "FROZEN"
+    ARREST = "ARREST"
+    ACTUALIZATION_REQUIRED = "ACTUALIZATION_REQUIRED"
+    BLOCKED = "BLOCKED"
+    CLOSED = "CLOSED"
+
+
+class IcoClientType(StrEnum):
+    """Client type; legal entities act as issuers."""
+
+    INDIVIDUAL = "INDIVIDUAL"
+    ORGANIZATION = "ORGANIZATION"
+    BANK = "BANK"
+    INDIVIDUAL_ENTREPRENEUR = "INDIVIDUAL_ENTREPRENEUR"
+
+
+class IcoEmissionStatus(StrEnum):
+    """Emission state: on sale, sold out, closed (redeemed), disabled."""
+
+    OPENED = "OPENED"
+    SOLD = "SOLD"
+    CLOSED = "CLOSED"
+    DISABLED = "DISABLED"
+
+
+class IcoGuarantee(StrEnum):
+    """Collateral of an emission."""
+
+    NONE = "NONE"
+    SURETY = "SURETY"
+    BANK_GUARANTEE = "BANK_GUARANTEE"
+    PLEDGE = "PLEDGE"
+    GUARANTEE_DEPOSIT = "GUARANTEE_DEPOSIT"
+    OTHER = "OTHER"
+
+
+class IcoIssuerDocumentType(StrEnum):
+    """Issuer document category: financial statements, constituent documents, other."""
+
+    ACCOUNTING_REPORTS = "ACCOUNTING_REPORTS"
+    INCORPORATION_DOCUMENTS = "INCORPORATION_DOCUMENTS"
+    OTHER = "OTHER"
+
+
+class IcoObligationStatus(StrEnum):
+    """Holding state used by the portfolio filter."""
+
+    OPENED = "OPENED"
+    SOLD = "SOLD"
+
+
+class IcoOperationStatus(StrEnum):
+    """ICO operation state; `APPLIED` is success."""
+
+    REQUESTED = "REQUESTED"
+    APPROVED = "APPROVED"
+    PARTIAL = "PARTIAL"
+    APPLIED = "APPLIED"
+    ERROR = "ERROR"
+
+
+class IcoPaymentInterval(StrEnum):
+    """Interest or offer period."""
+
+    MONTH = "MONTH"
+    QUARTER = "QUARTER"
+    BIANNUAL = "BIANNUAL"
+    ANNUAL = "ANNUAL"
+
+
+class IcoReportFormat(StrEnum):
+    """Report file format."""
+
+    XLSX = "XLSX"
+    PDF = "PDF"
+
+
+class IcoSolvency(StrEnum):
+    """Issuer solvency."""
+
+    SOLVENT = "SOLVENT"
+    INSOLVENT = "INSOLVENT"
+    PARTIALLY_SOLVENT = "PARTIALLY_SOLVENT"
+    SOLVENT_WITH_RESERVATION = "SOLVENT_WITH_RESERVATION"
+
+
+class IcoYieldPeriod(StrEnum):
+    """Period of the average yield."""
+
+    CURRENT_MONTH = "CURRENT_MONTH"
+    PREV_MONTH = "PREV_MONTH"
 
 
 class KycActualizationClientStatus(StrEnum):
@@ -2496,6 +2720,1033 @@ class FiatWithdrawalRequest(WhitebirdModel):
     payment_token: str | None = None
     asset_code: str | None = None
     amount: Decimal
+
+
+class IcoAccountTransferRequest(WhitebirdModel):
+    """Request body of `client.ico.operations.transfer()`."""
+
+    client_id: str | None = None
+    """Client ID of the user."""
+
+    currency_from: str
+    account_type_from: IcoAccountType | str
+    """`ICO_BALANCE`."""
+
+    currency_to: str
+    account_type_to: IcoAccountType | str
+    """`USER_BALANCE`."""
+
+    amount: Decimal
+
+
+class IcoBalanceBuyRequest(WhitebirdModel):
+    """Request body of `client.ico.obligations.buy_with_balance()`."""
+
+    emission_id: str
+    account_type: IcoAccountType | str
+    """`USER_BALANCE` or `ICO_BALANCE`."""
+
+    asset: str
+    """Currency of the paying account."""
+
+    amount: Decimal
+    """Number of tokens."""
+
+
+class IcoBuyResult(WhitebirdModel):
+    """Ico buy result.
+
+    Returned by `client.ico.obligations.buy_with_card()` and
+    `client.ico.obligations.buy_with_balance()`.
+    """
+
+    link: str | None = None
+    """Card payment page (card purchase). Inferred from the web application; may be missing."""
+
+    tx_id: str | None = None
+    """Transaction ID (balance purchase). Inferred from the web application; may be missing."""
+
+
+class IcoBuybackApplication(WhitebirdModel):
+    """An investor's application to sell tokens back to the issuer under the emission's offer."""
+
+    buyback_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    emission_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    emission_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    issuer_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    buyback_date: str | None = None
+    """Application date (ISO-8601). Inferred from the web application; may be missing."""
+
+    value_request: Decimal | None = None
+    """Tokens requested. Inferred from the web application; may be missing."""
+
+    value: Decimal | None = None
+    """Tokens approved (meaningful once `APPROVED`/`COMPLETED`).
+
+    Inferred from the web application; may be missing.
+    """
+
+    status: IcoBuybackApplicationStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    buyback_request_date_from: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    buyback_request_date_to: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    buyback_date_from: str | None = None
+    """Payment window start (ISO-8601). Inferred from the web application; may be missing."""
+
+    buyback_date_to: str | None = None
+    """Payment window end (ISO-8601). Inferred from the web application; may be missing."""
+
+
+class IcoBuybackApplicationFilter(WhitebirdModel):
+    """Request body of `client.ico.buybacks.list()`."""
+
+    issuer_ids: list[str] | None = None
+    emission_ids: list[str] | None = None
+    statuses: list[IcoBuybackApplicationStatus | str] | None = None
+
+
+class IcoBuybackOffer(WhitebirdModel):
+    """One offer (buyback) window of an issuer's emission with its applications totals."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    emission_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    buyback_rate: Decimal | None = None
+    """Offer percentage as a fraction. Inferred from the web application; may be missing."""
+
+    request_date_from: str | None = None
+    """Request window start (ISO-8601). Inferred from the web application; may be missing."""
+
+    request_date_to: str | None = None
+    """Request window end (ISO-8601). Inferred from the web application; may be missing."""
+
+    status: IcoBuybackOfferStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    count: int | None = None
+    """Number of applications. Inferred from the web application; may be missing."""
+
+    value: Decimal | None = None
+    """Tokens requested. Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Amount requested. Inferred from the web application; may be missing."""
+
+    value_approved: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount_approved: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    calc_date: str | None = None
+    """Settlement date (ISO-8601). Inferred from the web application; may be missing."""
+
+    buyback_date_from: str | None = None
+    """Payment window start (ISO-8601). Inferred from the web application; may be missing."""
+
+    buyback_date_to: str | None = None
+    """Payment window end (ISO-8601). Inferred from the web application; may be missing."""
+
+    pay_date: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    amount_paid: Decimal | None = None
+    """Credited to investors, account currency.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class IcoBuybackOfferFilter(WhitebirdModel):
+    """Request body of `client.ico.buybacks.list_offers()`."""
+
+    emission_names: list[str] | None = None
+    currencies: list[str] | None = None
+    statuses: list[IcoBuybackOfferStatus | str] | None = None
+    buyback_rate_from: Decimal | None = None
+    """Fraction."""
+
+    buyback_rate_to: Decimal | None = None
+    """Fraction."""
+
+    from_request_date: DateTime | None = None
+    """Request window from."""
+
+    to_request_date: DateTime | None = None
+    """Request window to."""
+
+    from_date: DateTime | None = None
+    """Payment window from."""
+
+    to_date: DateTime | None = None
+    """Payment window to."""
+
+
+class IcoBuybackRequest(WhitebirdModel):
+    """Request body of `client.ico.buybacks.request()`."""
+
+    emission_id: str
+    value: Decimal
+    """Tokens to sell back (at least 1)."""
+
+    buyback_id: str | None = None
+    """Existing application to change."""
+
+
+class IcoCalculatorRequest(WhitebirdModel):
+    """Request body of `client.ico.emissions.calculate()`."""
+
+    emission_id: str | None = None
+    """Emission to evaluate (emission page)."""
+
+    currency: str | None = None
+    """Currency to evaluate (landing page)."""
+
+    amount: Decimal | None = None
+    """The web app sends 100."""
+
+
+class IcoCalculatorResult(WhitebirdModel):
+    """Returned by `client.ico.emissions.calculate()`."""
+
+    min_amount: Decimal | None = None
+    """Minimum investment. Inferred from the web application; may be missing."""
+
+    max_amount: Decimal | None = None
+    """Maximum investment. Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    rate: Decimal | None = None
+    """Annual interest rate as a fraction. Inferred from the web application; may be missing."""
+
+
+class IcoCardBuyCalculation(WhitebirdModel):
+    """Returned by `client.ico.obligations.calculate_card_buy()`."""
+
+    commission: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    total_amount: Decimal | None = None
+    """Amount charged to the card. Inferred from the web application; may be missing."""
+
+
+class IcoCardBuyCalculationRequest(WhitebirdModel):
+    """Request body of `client.ico.obligations.calculate_card_buy()`."""
+
+    emission_id: str
+    asset: str | None = None
+    """Emission currency."""
+
+    token_amount: Decimal
+    """Number of tokens."""
+
+    fiat_provider_type: str | None = None
+    payment_token: str | None = None
+
+
+class IcoCardBuyRequest(WhitebirdModel):
+    """Request body of `client.ico.obligations.buy_with_card()`."""
+
+    emission_id: str
+    to_client_id: str | None = None
+    """Buyer client ID (from `ico.statistics.client_info`)."""
+
+    account_type: IcoAccountType | str | None = None
+    """The web app sends `USER_PAYMENT`."""
+
+    asset: str | None = None
+    """Emission currency."""
+
+    token_amount: Decimal
+    """Number of tokens."""
+
+    fiat_provider_type: str | None = None
+    """Card provider type, e.g. `ALFA`."""
+
+    payment_token: str | None = None
+    """ID of the selected card provider / saved card."""
+
+    total_amount: Decimal | None = None
+    """Total from `calculate_card_buy`."""
+
+    return_url: str | None = None
+    """Return URL, sent for `ALFA`."""
+
+    fail_url: str | None = None
+    """Failure URL, sent for `ALFA`."""
+
+
+class IcoClientInfo(WhitebirdModel):
+    """Returned by `client.ico.statistics.client_info()`."""
+
+    client_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    client_type: IcoClientType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    client_status: IcoClientStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    is_blr: bool | None = Field(default=None, validation_alias="isBLR", serialization_alias="isBLR")
+    """Belarusian resident. Inferred from the web application; may be missing."""
+
+
+class IcoDebtPeriodRequest(WhitebirdModel):
+    """Request body of `client.ico.statistics.investor_redemptions()`."""
+
+    currency: str | None = None
+    asset: str | None = None
+    name: str | None = None
+    """Emission name."""
+
+    from_: DateTime | None = None
+    to: DateTime | None = None
+
+
+class IcoEmission(WhitebirdModel):
+    """An emission (token issue): a tranche of digital tokens a company sells to investors.
+
+    Each token has a nominal price `rate` in `currency`; holders earn interest at `feeRate` per
+    year, paid every `feeInterval`, may sell tokens back to the issuer under the offer
+    (`buybackRate`, every `buybackInterval`) and are repaid when the emission expires.
+    """
+
+    emission_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Emission number shown to users. Inferred from the web application; may be missing."""
+
+    client_id: str | None = None
+    """Issuer client ID. Inferred from the web application; may be missing."""
+
+    issuer_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    issuer_logo_id: str | None = None
+    """Document ID of the logo (see `ico.issuers.documents.download`).
+
+    Inferred from the web application; may be missing.
+    """
+
+    issuer_background_id: str | None = None
+    """Document ID of the page background. Inferred from the web application; may be missing."""
+
+    issuer_url: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    asset: str | None = None
+    """Token asset code. Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Currency of the token nominal and payments.
+
+    Inferred from the web application; may be missing.
+    """
+
+    rate: Decimal | None = None
+    """Nominal price of one token in `currency`.
+
+    Inferred from the web application; may be missing.
+    """
+
+    value: Decimal | None = None
+    """Number of tokens issued. Inferred from the web application; may be missing."""
+
+    available: Decimal | None = None
+    """Tokens still on sale. Inferred from the web application; may be missing."""
+
+    fee_rate: Decimal | None = None
+    """Annual interest rate as a fraction (0.15 = 15 %).
+
+    Inferred from the web application; may be missing.
+    """
+
+    fee_interval: IcoPaymentInterval | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    buyback_rate: Decimal | None = None
+    """Offer percentage as a fraction: share of tokens the issuer buys back per offer window.
+
+    Inferred from the web application; may be missing.
+    """
+
+    buyback_interval: IcoPaymentInterval | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    buyback_end_date: str | None = None
+    """Repayment date (ISO-8601). Inferred from the web application; may be missing."""
+
+    creation_date: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    primary_activation: str | None = None
+    """Start of the primary sale (ISO-8601). Inferred from the web application; may be missing."""
+
+    primary_deactivation: str | None = None
+    """End of the primary sale (ISO-8601). Inferred from the web application; may be missing."""
+
+    expiration_date: str | None = None
+    """End of circulation (ISO-8601). Inferred from the web application; may be missing."""
+
+    investors: int | None = None
+    """Number of investors. Inferred from the web application; may be missing."""
+
+    guarantee: IcoGuarantee | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    bankruptcy_risk: IcoBankruptcyRisk | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    net_assets: Decimal | None = None
+    """Net assets of the issuer, BYN. Inferred from the web application; may be missing."""
+
+    risk_coefficient: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    residence: bool | None = None
+    """Residency flag; the web app blocks purchases when it is false.
+
+    Inferred from the web application; may be missing.
+    """
+
+    restrict_to_existing_investors: bool | None = None
+    """Only clients who already invested in it may buy (see `is_investor`).
+
+    Inferred from the web application; may be missing.
+    """
+
+    white_paper: Any = None
+    """Present (truthy) when a white paper can be downloaded.
+
+    Inferred from the web application; may be missing.
+    """
+
+    status: IcoEmissionStatus | str | None = None
+    """Issuer cabinet only. Inferred from the web application; may be missing."""
+
+    exchange_rate: Decimal | None = None
+    """Rate to the issuer's account currency.
+
+    Issuer cabinet only. Inferred from the web application; may be missing.
+    """
+
+    buyback_value: Decimal | None = None
+    """Offer payments. Issuer cabinet only. Inferred from the web application; may be missing."""
+
+    fee_current_amount: Decimal | None = None
+    """Interest due in the current period.
+
+    Issuer cabinet only. Inferred from the web application; may be missing.
+    """
+
+    buyback_current_amount: Decimal | None = None
+    """Offer payments due in the current period.
+
+    Issuer cabinet only. Inferred from the web application; may be missing.
+    """
+
+
+class IcoEmissionFilter(WhitebirdModel):
+    """Request body of `client.ico.emissions.list()`."""
+
+    with_logo: bool | None = None
+    """The web app always sends true."""
+
+    token_type: str | None = None
+    """Token type; the web app sends `ICO`."""
+
+    currencies: list[str] | None = None
+    client_ids: list[str] | None = None
+    """Issuer client IDs."""
+
+    fee_rate_from: Decimal | None = None
+    """Minimum interest rate as a fraction."""
+
+    fee_rate_to: Decimal | None = None
+    """Maximum interest rate as a fraction."""
+
+    buyback_rate_from: Decimal | None = None
+    """Minimum offer percentage as a fraction."""
+
+    buyback_rate_to: Decimal | None = None
+    """Maximum offer percentage as a fraction."""
+
+
+class IcoEmissionSale(WhitebirdModel):
+    """One sale of the issuer's tokens."""
+
+    name: str | None = None
+    """Emission name. Inferred from the web application; may be missing."""
+
+    sell_date: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    status: IcoEmissionStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    sold_value: Decimal | None = None
+    """Tokens sold. Inferred from the web application; may be missing."""
+
+    sold_amount: Decimal | None = None
+    """Proceeds in `currency`. Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    sold_amount_usd: Decimal | None = None
+    """Proceeds in the account currency. Inferred from the web application; may be missing."""
+
+
+class IcoInvestedBalance(WhitebirdModel):
+    """Used in `IcoInvestedTotal.balances`."""
+
+    owner_id: str | None = None
+    """Issuer ID. Inferred from the web application; may be missing."""
+
+    owner_name: str | None = None
+    """Issuer name. Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoInvestedIncome(WhitebirdModel):
+    """Returned by `client.ico.statistics.invested_income()`."""
+
+    statistics: list[IcoInvestedIncomeItem] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoInvestedIncomeItem(WhitebirdModel):
+    """Used in `IcoInvestedIncome.statistics`."""
+
+    owner_id: str | None = None
+    """Issuer ID. Inferred from the web application; may be missing."""
+
+    owner_name: str | None = None
+    """Issuer name. Inferred from the web application; may be missing."""
+
+    total_fee: Decimal | None = None
+    """Interest paid out. Inferred from the web application; may be missing."""
+
+    total_remain: Decimal | None = None
+    """Interest still to be paid. Inferred from the web application; may be missing."""
+
+    total_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    from_date: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_date: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoInvestedIncomeRequest(WhitebirdModel):
+    """Request body of `client.ico.statistics.invested_income()`."""
+
+    currency: str | None = None
+    from_: DateTime | None = None
+    to: DateTime | None = None
+
+
+class IcoInvestedTotal(WhitebirdModel):
+    """Returned by `client.ico.statistics.invested_total()`."""
+
+    balances: list[IcoInvestedBalance] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoInvestedTotalRequest(WhitebirdModel):
+    """Request body of `client.ico.statistics.invested_total()`."""
+
+    currency: str | None = None
+    """Null for all currencies."""
+
+
+class IcoInvestorEmission(WhitebirdModel):
+    """Returned by `client.ico.emissions.list_invested()`."""
+
+    emission_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoInvestorObligations(WhitebirdModel):
+    """Returned by `client.ico.obligations.list()`."""
+
+    obligations: Page[IcoObligation] | None = None
+
+
+class IcoIssueRequest(WhitebirdModel):
+    """Form values are sent as strings, as typed by the user."""
+
+    currency: str | None = None
+    """Currency of the issue (`BYN`, `USD`, `EUR`, `RUB`)."""
+
+    amount: str | None = None
+    """Issue volume."""
+
+    expiration_date: str | None = None
+    """Circulation period in months: `24`, `36`, `48`, `60` or a custom value."""
+
+    primary_deactivation: str | None = None
+    """Sale period in months: `3`, `6` or `12`."""
+
+    fee_interval: IcoPaymentInterval | str | None = None
+    fee_rate: str | None = None
+    """Interest rate, percent."""
+
+    fee_day: str | None = None
+    """Interest payment day of month: `5`, `10`, `15`, `20` or `25`."""
+
+    buyback_interval: IcoPaymentInterval | str | None = None
+    buyback_rate: str | None = None
+    """Offer percentage."""
+
+    company_name: str | None = None
+    client_name: str | None = None
+    """Contact person."""
+
+    phone_number: str | None = None
+    email: str | None = None
+    company_url: str | None = None
+    comment: str | None = None
+    full_request: bool | None = None
+    """True for the full issuer-cabinet form; absent for the contact-only landing form."""
+
+
+class IcoIssuer(WhitebirdModel):
+    """An issuer: a company that issues tokens."""
+
+    client_id: str
+    name: str
+    type: str | None = None
+    """Profile type, e.g. `BASIC`."""
+
+    details: IcoIssuerDetails | None = None
+    files: IcoIssuerFiles | None = None
+
+
+class IcoIssuerDebt(WhitebirdModel):
+    """Returned by `client.ico.statistics.issuer_debt()`."""
+
+    amount: Decimal | None = None
+    """Principal debt of the current period. Inferred from the web application; may be missing."""
+
+    current_debt: Decimal | None = None
+    """Accrued interest of the current period. Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoIssuerDetails(WhitebirdModel):
+    """Used in `IcoIssuer.details`."""
+
+    description: str | None = None
+    website: str | None = None
+    unp: int | None = None
+    """Taxpayer number (UNP)."""
+
+    registration_date: str | None = None
+    """As entered, e.g. `10.07.2003`."""
+
+    registration_authority: str | None = None
+    legal_address: str | None = None
+    activity_type: str | None = None
+    employees_count: int | None = None
+    revenue: Decimal | None = None
+    """Thousands of `currency`."""
+
+    net_profit: Decimal | None = None
+    """Thousands of `currency`."""
+
+    currency: str | None = None
+    revenue_currency: str | None = None
+    return_on_assets: str | None = None
+    """Percent with a decimal comma, e.g. `0,10`."""
+
+    liquidity_k1: Decimal | None = None
+    solvency: IcoSolvency | str | None = None
+
+
+class IcoIssuerDocument(WhitebirdModel):
+    """Returned by `client.ico.issuers.documents.list()`."""
+
+    document_id: str
+    type: IcoIssuerDocumentType | str | None = None
+    name: str | None = None
+    """File name."""
+
+    size: int | None = None
+    """Bytes."""
+
+
+class IcoIssuerFiles(WhitebirdModel):
+    """Used in `IcoIssuer.files`."""
+
+    issuer_logo: str | None = None
+    """Document ID of the logo."""
+
+    issuer_background: str | None = None
+    """Document ID of the page background."""
+
+
+class IcoIssuerName(WhitebirdModel):
+    """Returned by `client.ico.issuers.names()`."""
+
+    client_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoIssuerStatistics(WhitebirdModel):
+    """Returned by `client.ico.issuers.statistics()`."""
+
+    currency: str | None = None
+    emission_amount: Decimal | None = None
+    """Total issued, in `currency`."""
+
+    fee_amount: Decimal | None = None
+    """Total interest paid, in `currency`."""
+
+    investors: int | None = None
+
+
+class IcoMyEmissionFilter(WhitebirdModel):
+    """Request body of `client.ico.emissions.list_mine()`."""
+
+    names: list[str] | None = None
+    """Emission names."""
+
+    currencies: list[str] | None = None
+    statuses: list[IcoEmissionStatus | str] | None = None
+    buyback_statuses: list[IcoBuybackPaymentStatus | str] | None = None
+    current_debt: bool | None = None
+    """Only emissions with (true) or without (false) current debt."""
+
+
+class IcoMyEmissionReportRequest(WhitebirdModel):
+    """Request body of `client.ico.emissions.download_mine()`."""
+
+    type: IcoReportFormat | str
+    names: list[str] | None = None
+    """Emission names."""
+
+    currencies: list[str] | None = None
+    statuses: list[IcoEmissionStatus | str] | None = None
+    buyback_statuses: list[IcoBuybackPaymentStatus | str] | None = None
+    current_debt: bool | None = None
+
+
+class IcoObligation(WhitebirdModel):
+    """An obligation: the investor's holding of tokens of one emission, i.e.
+
+    the issuer's debt to the investor.
+    """
+
+    uuid: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    emission_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    emission_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    issuer_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    issuer_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    issuer_logo_id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    value: Decimal | None = None
+    """Tokens held. Inferred from the web application; may be missing."""
+
+    exchange_rate: Decimal | None = None
+    """Token price in `currency`. Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    fee_rate: Decimal | None = None
+    """Annual interest rate as a fraction. Inferred from the web application; may be missing."""
+
+    remain_fee: Decimal | None = None
+    """Interest still to be received. Inferred from the web application; may be missing."""
+
+    buyback_request_date_from: str | None = None
+    """Start of the current offer request window (ISO-8601).
+
+    Inferred from the web application; may be missing.
+    """
+
+    buyback_request_date_to: str | None = None
+    """End of the current offer request window (ISO-8601).
+
+    Inferred from the web application; may be missing.
+    """
+
+    buyback_date_from: str | None = None
+    """Start of the offer payment window (ISO-8601).
+
+    Inferred from the web application; may be missing.
+    """
+
+    buyback_date_to: str | None = None
+    """End of the offer payment window (ISO-8601).
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class IcoObligationFilter(WhitebirdModel):
+    """Request body of `client.ico.obligations.list()`."""
+
+    currencies: list[str] | None = None
+    issuer_ids: list[str] | None = None
+    emission_ids: list[str] | None = None
+    statuses: list[IcoObligationStatus | str] | None = None
+
+
+class IcoOperation(WhitebirdModel):
+    """An operation on ICO or e-accounts caused by the token lifecycle."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    date: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    type: str | None = None
+    """Russian label, e.g.
+
+    `Покупка токенов` (buy tokens), `Получение дохода` (income received), `Выплата дохода` (income
+    paid), `Выкуп токенов по оферте` (buyback by offer), `Возврат по оферте` (offer refund),
+    `Продажа токенов` (token sale), `Выпуск токенов` (issue), `Перевод средств` (transfer),
+    `Погашение токенов` (redemption), `Пополнение счета` (top-up), fee and tax labels; see
+    `type_names`. Inferred from the web application; may be missing.
+    """
+
+    status: IcoOperationStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount_from: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    asset_from: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    account_type_from: IcoAccountType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount_to: Decimal | None = None
+    """Tokens for purchases. Inferred from the web application; may be missing."""
+
+    asset_to: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    account_type_to: IcoAccountType | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    details: IcoOperationDetails | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoOperationAccount(WhitebirdModel):
+    """Used in `IcoOperationFilter.accounts` and `IcoStatementRequest.accounts`."""
+
+    asset: str
+    type: IcoAccountType | str
+    """`ICO_BALANCE` (ICO account) or `USER_BALANCE` (e-account)."""
+
+
+class IcoOperationDetails(WhitebirdModel):
+    """Used in `IcoOperation.details`."""
+
+    issuer_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    emission_name: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    signature: str | None = None
+    """Transaction hash. Inferred from the web application; may be missing."""
+
+
+class IcoOperationFilter(WhitebirdModel):
+    """Request body of `client.ico.operations.list()`."""
+
+    date_from: Date | None = None
+    date_to: Date | None = None
+    name_types: list[str] | None = None
+    """Operation type names from `type_names`."""
+
+    issuer_ids: list[str] | None = None
+    emission_ids: list[str] | None = None
+    accounts: list[IcoOperationAccount] | None = None
+    statuses: list[IcoOperationStatus | str] | None = None
+
+
+class IcoPaymentSchedule(WhitebirdModel):
+    """Returned by `client.ico.statistics.issuer_payment_schedule()`."""
+
+    emissions: list[IcoScheduledPayment] | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoPaymentScheduleRequest(WhitebirdModel):
+    """Request body of `client.ico.statistics.issuer_payment_schedule()`."""
+
+    name: str
+    """Emission name."""
+
+    currency: str | None = None
+    from_: DateTime | None = None
+    to: DateTime | None = None
+
+
+class IcoRate(WhitebirdModel):
+    """Returned by `client.ico.obligations.rate()`."""
+
+    from_asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    to_asset: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    rate: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoRateRequest(WhitebirdModel):
+    """Request body of `client.ico.obligations.rate()`."""
+
+    from_asset: str
+    to_asset: str
+
+
+class IcoSalesAnalyticsFilter(WhitebirdModel):
+    """Ico sales analytics filter.
+
+    Request body of `client.ico.emissions.sales_analytics()` and
+    `client.ico.emissions.download_sales_analytics()`.
+    """
+
+    emission_names: list[str] | None = None
+    statuses: list[IcoEmissionStatus | str] | None = None
+    date_from: DateTime | None = None
+    """Sale date from."""
+
+    date_to: DateTime | None = None
+    """Sale date to."""
+
+
+class IcoScheduledPayment(WhitebirdModel):
+    """Used in `IcoPaymentSchedule.emissions`."""
+
+    date: str | None = None
+    """ISO-8601. Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    currency: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    unpaid: bool | None = None
+    """Overdue payment. Inferred from the web application; may be missing."""
+
+
+class IcoStatementRequest(WhitebirdModel):
+    """Request body of `client.ico.operations.statement()`."""
+
+    date_from: Date | None = None
+    date_to: Date | None = None
+    name_types: list[str] | None = None
+    """Operation type names from `type_names`."""
+
+    issuer_ids: list[str] | None = None
+    emission_ids: list[str] | None = None
+    accounts: list[IcoOperationAccount] | None = None
+    statuses: list[IcoOperationStatus | str] | None = None
+    type: IcoReportFormat | str | None = None
+
+
+class IcoStatistics(WhitebirdModel):
+    """Returned by `client.ico.statistics.get()`."""
+
+    currencies: list[str] | None = None
+    issuers: list[IcoStatisticsIssuer] | None = None
+
+
+class IcoStatisticsIssuer(WhitebirdModel):
+    """Used in `IcoStatistics.issuers`."""
+
+    issuer_id: str
+    name: str
+
+
+class IcoYearAmount(WhitebirdModel):
+    """Returned by `client.ico.statistics.investor_redemptions()`."""
+
+    year: int | None = None
+    """Inferred from the web application; may be missing."""
+
+    amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+
+class IcoYield(WhitebirdModel):
+    """Returned by `client.ico.statistics.investor_yield()`."""
+
+    current: Decimal | None = None
+    """Yield of the period as a fraction. Inferred from the web application; may be missing."""
+
+    last: Decimal | None = None
+    """Yield of the previous period as a fraction.
+
+    Inferred from the web application; may be missing.
+    """
+
+
+class IcoYieldRequest(WhitebirdModel):
+    """Request body of `client.ico.statistics.investor_yield()`."""
+
+    type: IcoYieldPeriod | str
+    currency: str | None = None
+    """`USD`, `EUR`, `RUB`, `BYN` or null for all."""
 
 
 class KycActualData(WhitebirdModel):

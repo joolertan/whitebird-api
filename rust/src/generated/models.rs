@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::enums::string_enum;
-use crate::{Decimal, Timestamp};
+use crate::{Decimal, Page, Timestamp};
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AccountingAccount {
@@ -1080,6 +1080,839 @@ pub struct ExchangeRateStat {
 /// Filter of the statistics; the web app always sends `{}`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, bon::Builder)]
 pub struct ExchangeRateStatsFilter {}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoBuyResult {
+    /// Card payment page (card purchase).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    /// Transaction ID (balance purchase).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_id: Option<String>,
+}
+
+/// An investor's application to sell tokens back to the issuer under the emission's offer.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoBuybackApplication {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_name: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_name: Option<String>,
+    /// Application date (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date: Option<String>,
+    /// Tokens requested.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_request: Option<Decimal>,
+    /// Tokens approved (meaningful once `APPROVED`/`COMPLETED`).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<IcoBuybackApplicationStatus>,
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_request_date_from: Option<String>,
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_request_date_to: Option<String>,
+    /// Payment window start (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date_from: Option<String>,
+    /// Payment window end (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date_to: Option<String>,
+}
+
+/// One offer (buyback) window of an issuer's emission with its applications totals.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoBuybackOffer {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_name: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Offer percentage as a fraction.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate: Option<Decimal>,
+    /// Request window start (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_date_from: Option<String>,
+    /// Request window end (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_date_to: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<IcoBuybackOfferStatus>,
+    /// Number of applications.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
+    /// Tokens requested.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Decimal>,
+    /// Amount requested.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_approved: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount_approved: Option<Decimal>,
+    /// Settlement date (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub calc_date: Option<String>,
+    /// Payment window start (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date_from: Option<String>,
+    /// Payment window end (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date_to: Option<String>,
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pay_date: Option<String>,
+    /// Credited to investors, account currency.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount_paid: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoCalculatorResult {
+    /// Minimum investment.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_amount: Option<Decimal>,
+    /// Maximum investment.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_amount: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Annual interest rate as a fraction.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoCardBuyCalculation {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commission: Option<Decimal>,
+    /// Amount charged to the card.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_amount: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoClientInfo {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_type: Option<IcoClientType>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_status: Option<IcoClientStatus>,
+    /// Belarusian resident.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(rename = "isBLR", skip_serializing_if = "Option::is_none")]
+    pub is_blr: Option<bool>,
+}
+
+/// An emission (token issue): a tranche of digital tokens a company sells to investors.
+/// Each token has a nominal price `rate` in `currency`; holders earn interest at `feeRate`
+/// per year, paid every `feeInterval`, may sell tokens back to the issuer under the offer
+/// (`buybackRate`, every `buybackInterval`) and are repaid when the emission expires.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmission {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_id: Option<String>,
+    /// Emission number shown to users.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Issuer client ID.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_name: Option<String>,
+    /// Document ID of the logo (see `ico.issuers.documents.download`).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_logo_id: Option<String>,
+    /// Document ID of the page background.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_background_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_url: Option<String>,
+    /// Token asset code.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    /// Currency of the token nominal and payments.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Nominal price of one token in `currency`.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate: Option<Decimal>,
+    /// Number of tokens issued.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Decimal>,
+    /// Tokens still on sale.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub available: Option<Decimal>,
+    /// Annual interest rate as a fraction (0.15 = 15 %).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_rate: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_interval: Option<IcoPaymentInterval>,
+    /// Offer percentage as a fraction: share of tokens the issuer buys back per offer window.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_interval: Option<IcoPaymentInterval>,
+    /// Repayment date (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_end_date: Option<String>,
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creation_date: Option<String>,
+    /// Start of the primary sale (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_activation: Option<String>,
+    /// End of the primary sale (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_deactivation: Option<String>,
+    /// End of circulation (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiration_date: Option<String>,
+    /// Number of investors.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub investors: Option<i64>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guarantee: Option<IcoGuarantee>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bankruptcy_risk: Option<IcoBankruptcyRisk>,
+    /// Net assets of the issuer, BYN.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_assets: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub risk_coefficient: Option<Decimal>,
+    /// Residency flag; the web app blocks purchases when it is false.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub residence: Option<bool>,
+    /// Only clients who already invested in it may buy (see `is_investor`).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restrict_to_existing_investors: Option<bool>,
+    /// Present (truthy) when a white paper can be downloaded.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub white_paper: Option<Value>,
+    /// Issuer cabinet only.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<IcoEmissionStatus>,
+    /// Rate to the issuer's account currency. Issuer cabinet only.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange_rate: Option<Decimal>,
+    /// Offer payments. Issuer cabinet only.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_value: Option<Decimal>,
+    /// Interest due in the current period. Issuer cabinet only.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_current_amount: Option<Decimal>,
+    /// Offer payments due in the current period. Issuer cabinet only.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_current_amount: Option<Decimal>,
+}
+
+/// One sale of the issuer's tokens.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionSale {
+    /// Emission name.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sell_date: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<IcoEmissionStatus>,
+    /// Tokens sold.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sold_value: Option<Decimal>,
+    /// Proceeds in `currency`.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sold_amount: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Proceeds in the account currency.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sold_amount_usd: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoInvestedBalance {
+    /// Issuer ID.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
+    /// Issuer name.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_name: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoInvestedIncome {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statistics: Option<Vec<IcoInvestedIncomeItem>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoInvestedIncomeItem {
+    /// Issuer ID.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
+    /// Issuer name.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_name: Option<String>,
+    /// Interest paid out.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_fee: Option<Decimal>,
+    /// Interest still to be paid.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_remain: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_amount: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_date: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoInvestedTotal {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balances: Option<Vec<IcoInvestedBalance>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoInvestorEmission {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoInvestorObligations {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub obligations: Option<Page<IcoObligation>>,
+}
+
+/// An issuer: a company that issues tokens.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuer {
+    pub client_id: String,
+    pub name: String,
+    /// Profile type, e.g. `BASIC`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<IcoIssuerDetails>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub files: Option<IcoIssuerFiles>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuerDebt {
+    /// Principal debt of the current period.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+    /// Accrued interest of the current period.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_debt: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuerDetails {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub website: Option<String>,
+    /// Taxpayer number (UNP).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unp: Option<i64>,
+    /// As entered, e.g. `10.07.2003`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub registration_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub registration_authority: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub legal_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub employees_count: Option<i64>,
+    /// Thousands of `currency`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revenue: Option<Decimal>,
+    /// Thousands of `currency`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_profit: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revenue_currency: Option<String>,
+    /// Percent with a decimal comma, e.g. `0,10`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub return_on_assets: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub liquidity_k1: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub solvency: Option<IcoSolvency>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuerDocument {
+    pub document_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<IcoIssuerDocumentType>,
+    /// File name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuerFiles {
+    /// Document ID of the logo.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_logo: Option<String>,
+    /// Document ID of the page background.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_background: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuerName {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoIssuerStatistics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Total issued, in `currency`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_amount: Option<Decimal>,
+    /// Total interest paid, in `currency`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_amount: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub investors: Option<i64>,
+}
+
+/// An obligation: the investor's holding of tokens of one emission, i.e. the issuer's debt
+/// to the investor.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoObligation {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uuid: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_name: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_id: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_name: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_logo_id: Option<String>,
+    /// Tokens held.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Decimal>,
+    /// Token price in `currency`.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange_rate: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Annual interest rate as a fraction.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_rate: Option<Decimal>,
+    /// Interest still to be received.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remain_fee: Option<Decimal>,
+    /// Start of the current offer request window (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_request_date_from: Option<String>,
+    /// End of the current offer request window (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_request_date_to: Option<String>,
+    /// Start of the offer payment window (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date_from: Option<String>,
+    /// End of the offer payment window (ISO-8601).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_date_to: Option<String>,
+}
+
+/// An operation on ICO or e-accounts caused by the token lifecycle.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoOperation {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// Russian label, e.g. `Покупка токенов` (buy tokens), `Получение дохода` (income
+    /// received), `Выплата дохода` (income paid), `Выкуп токенов по оферте` (buyback by offer),
+    /// `Возврат по оферте` (offer refund), `Продажа токенов` (token sale), `Выпуск токенов`
+    /// (issue), `Перевод средств` (transfer), `Погашение токенов` (redemption), `Пополнение
+    /// счета` (top-up), fee and tax labels; see `type_names`.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<IcoOperationStatus>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount_from: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_from: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_type_from: Option<IcoAccountType>,
+    /// Tokens for purchases.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount_to: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_to: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_type_to: Option<IcoAccountType>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<IcoOperationDetails>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoOperationAccount {
+    pub asset: String,
+    /// `ICO_BALANCE` (ICO account) or `USER_BALANCE` (e-account).
+    pub r#type: IcoAccountType,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoOperationDetails {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_name: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_name: Option<String>,
+    /// Transaction hash.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoPaymentSchedule {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emissions: Option<Vec<IcoScheduledPayment>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoRate {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_asset: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_asset: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoScheduledPayment {
+    /// ISO-8601.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Overdue payment.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unpaid: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoStatistics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currencies: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuers: Option<Vec<IcoStatisticsIssuer>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoStatisticsIssuer {
+    pub issuer_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoYearAmount {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub year: Option<i64>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcoYield {
+    /// Yield of the period as a fraction.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current: Option<Decimal>,
+    /// Yield of the previous period as a fraction.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last: Option<Decimal>,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2833,6 +3666,188 @@ string_enum! {
         Csv = "CSV",
         Pdf = "PDF",
         Xlsx = "XLSX",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Accounting account type. ICO flows use `USER_BALANCE` (e-account), `ICO_BALANCE` (ICO
+    /// account) and `USER_PAYMENT` (card payment).
+    pub enum IcoAccountType {
+        UserBalance = "USER_BALANCE",
+        UserPayment = "USER_PAYMENT",
+        UserExchange = "USER_EXCHANGE",
+        UserFees = "USER_FEES",
+        UserPaymentReserving = "USER_PAYMENT_RESERVING",
+        ReferrerBalance = "REFERRER_BALANCE",
+        IcoBalance = "ICO_BALANCE",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Bankruptcy risk level of the issuer.
+    pub enum IcoBankruptcyRisk {
+        Low = "LOW",
+        Medium = "MEDIUM",
+        High = "HIGH",
+        VeryHigh = "VERY_HIGH",
+        Other = "OTHER",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Buyback application state; `DELETED` means withdrawn.
+    pub enum IcoBuybackApplicationStatus {
+        Requested = "REQUESTED",
+        InReview = "IN_REVIEW",
+        Approved = "APPROVED",
+        Completed = "COMPLETED",
+        Deleted = "DELETED",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Offer window state: upcoming, collecting applications, being paid, completed.
+    pub enum IcoBuybackOfferStatus {
+        Future = "FUTURE",
+        Request = "REQUEST",
+        Execute = "EXECUTE",
+        Completed = "COMPLETED",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Whether an emission still has open offer payments.
+    pub enum IcoBuybackPaymentStatus {
+        Opened = "OPENED",
+        Closed = "CLOSED",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Client verification status.
+    pub enum IcoClientStatus {
+        New = "NEW",
+        EmailVerified = "EMAIL_VERIFIED",
+        Pending = "PENDING",
+        NotVerified = "NOT_VERIFIED",
+        Verified = "VERIFIED",
+        Frozen = "FROZEN",
+        Arrest = "ARREST",
+        ActualizationRequired = "ACTUALIZATION_REQUIRED",
+        Blocked = "BLOCKED",
+        Closed = "CLOSED",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Client type; legal entities act as issuers.
+    pub enum IcoClientType {
+        Individual = "INDIVIDUAL",
+        Organization = "ORGANIZATION",
+        Bank = "BANK",
+        IndividualEntrepreneur = "INDIVIDUAL_ENTREPRENEUR",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Emission state: on sale, sold out, closed (redeemed), disabled.
+    pub enum IcoEmissionStatus {
+        Opened = "OPENED",
+        Sold = "SOLD",
+        Closed = "CLOSED",
+        Disabled = "DISABLED",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Collateral of an emission.
+    pub enum IcoGuarantee {
+        None = "NONE",
+        Surety = "SURETY",
+        BankGuarantee = "BANK_GUARANTEE",
+        Pledge = "PLEDGE",
+        GuaranteeDeposit = "GUARANTEE_DEPOSIT",
+        Other = "OTHER",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Issuer document category: financial statements, constituent documents, other.
+    pub enum IcoIssuerDocumentType {
+        AccountingReports = "ACCOUNTING_REPORTS",
+        IncorporationDocuments = "INCORPORATION_DOCUMENTS",
+        Other = "OTHER",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Holding state used by the portfolio filter.
+    pub enum IcoObligationStatus {
+        Opened = "OPENED",
+        Sold = "SOLD",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// ICO operation state; `APPLIED` is success.
+    pub enum IcoOperationStatus {
+        Requested = "REQUESTED",
+        Approved = "APPROVED",
+        Partial = "PARTIAL",
+        Applied = "APPLIED",
+        Error = "ERROR",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Interest or offer period.
+    pub enum IcoPaymentInterval {
+        Month = "MONTH",
+        Quarter = "QUARTER",
+        Biannual = "BIANNUAL",
+        Annual = "ANNUAL",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Report file format.
+    pub enum IcoReportFormat {
+        Xlsx = "XLSX",
+        Pdf = "PDF",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Issuer solvency.
+    pub enum IcoSolvency {
+        Solvent = "SOLVENT",
+        Insolvent = "INSOLVENT",
+        PartiallySolvent = "PARTIALLY_SOLVENT",
+        SolventWithReservation = "SOLVENT_WITH_RESERVATION",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    /// Period of the average yield.
+    pub enum IcoYieldPeriod {
+        CurrentMonth = "CURRENT_MONTH",
+        PrevMonth = "PREV_MONTH",
         _ => Unknown,
     }
 }

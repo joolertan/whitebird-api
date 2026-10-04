@@ -16,6 +16,7 @@ from whitebird._generated.resources.current_account import (
     CurrentAccountResource,
 )
 from whitebird._generated.resources.exchange import AsyncExchangeResource, ExchangeResource
+from whitebird._generated.resources.ico import AsyncIcoResource, IcoResource
 from whitebird._generated.resources.kyc import AsyncKycResource, KycResource
 from whitebird._generated.resources.market import AsyncMarketResource, MarketResource
 from whitebird._generated.resources.merchant import AsyncMerchantResource, MerchantResource
@@ -75,6 +76,11 @@ class Resources:
     def exchange(self) -> ExchangeResource:
         """Operations of `client.exchange`."""
         return ExchangeResource(self._engine)
+
+    @cached_property
+    def ico(self) -> IcoResource:
+        """Operations of `client.ico`."""
+        return IcoResource(self._engine)
 
     @cached_property
     def kyc(self) -> KycResource:
@@ -176,6 +182,11 @@ class AsyncResources:
     def exchange(self) -> AsyncExchangeResource:
         """Operations of `client.exchange`."""
         return AsyncExchangeResource(self._engine)
+
+    @cached_property
+    def ico(self) -> AsyncIcoResource:
+        """Operations of `client.ico`."""
+        return AsyncIcoResource(self._engine)
 
     @cached_property
     def kyc(self) -> AsyncKycResource:

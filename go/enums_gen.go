@@ -331,6 +331,224 @@ const (
 	FileTypeXLSX FileType = "XLSX"
 )
 
+// IcoAccountType is used in [IcoObligationsBuyWithCardParams],
+// [IcoObligationsBuyWithBalanceParams], [IcoOperationsTransferParams], [IcoOperation] and 1 other.
+//
+// Accounting account type. ICO flows use `USER_BALANCE` (e-account), `ICO_BALANCE` (ICO account)
+// and `USER_PAYMENT` (card payment).
+type IcoAccountType string
+
+// Known values of [IcoAccountType].
+const (
+	IcoAccountTypeUserBalance          IcoAccountType = "USER_BALANCE"
+	IcoAccountTypeUserPayment          IcoAccountType = "USER_PAYMENT"
+	IcoAccountTypeUserExchange         IcoAccountType = "USER_EXCHANGE"
+	IcoAccountTypeUserFees             IcoAccountType = "USER_FEES"
+	IcoAccountTypeUserPaymentReserving IcoAccountType = "USER_PAYMENT_RESERVING"
+	IcoAccountTypeReferrerBalance      IcoAccountType = "REFERRER_BALANCE"
+	IcoAccountTypeIcoBalance           IcoAccountType = "ICO_BALANCE"
+)
+
+// IcoBankruptcyRisk is used in [IcoEmission].
+//
+// Bankruptcy risk level of the issuer.
+type IcoBankruptcyRisk string
+
+// Known values of [IcoBankruptcyRisk].
+const (
+	IcoBankruptcyRiskLow      IcoBankruptcyRisk = "LOW"
+	IcoBankruptcyRiskMedium   IcoBankruptcyRisk = "MEDIUM"
+	IcoBankruptcyRiskHigh     IcoBankruptcyRisk = "HIGH"
+	IcoBankruptcyRiskVeryHigh IcoBankruptcyRisk = "VERY_HIGH"
+	IcoBankruptcyRiskOther    IcoBankruptcyRisk = "OTHER"
+)
+
+// IcoBuybackApplicationStatus is used in [IcoBuybacksListParams] and [IcoBuybackApplication].
+//
+// Buyback application state; `DELETED` means withdrawn.
+type IcoBuybackApplicationStatus string
+
+// Known values of [IcoBuybackApplicationStatus].
+const (
+	IcoBuybackApplicationStatusRequested IcoBuybackApplicationStatus = "REQUESTED"
+	IcoBuybackApplicationStatusInReview  IcoBuybackApplicationStatus = "IN_REVIEW"
+	IcoBuybackApplicationStatusApproved  IcoBuybackApplicationStatus = "APPROVED"
+	IcoBuybackApplicationStatusCompleted IcoBuybackApplicationStatus = "COMPLETED"
+	IcoBuybackApplicationStatusDeleted   IcoBuybackApplicationStatus = "DELETED"
+)
+
+// IcoBuybackOfferStatus is used in [IcoBuybacksListOffersParams] and [IcoBuybackOffer].
+//
+// Offer window state: upcoming, collecting applications, being paid, completed.
+type IcoBuybackOfferStatus string
+
+// Known values of [IcoBuybackOfferStatus].
+const (
+	IcoBuybackOfferStatusFuture    IcoBuybackOfferStatus = "FUTURE"
+	IcoBuybackOfferStatusRequest   IcoBuybackOfferStatus = "REQUEST"
+	IcoBuybackOfferStatusExecute   IcoBuybackOfferStatus = "EXECUTE"
+	IcoBuybackOfferStatusCompleted IcoBuybackOfferStatus = "COMPLETED"
+)
+
+// IcoBuybackPaymentStatus is used in [IcoEmissionsListMineParams] and
+// [IcoEmissionsDownloadMineParams].
+//
+// Whether an emission still has open offer payments.
+type IcoBuybackPaymentStatus string
+
+// Known values of [IcoBuybackPaymentStatus].
+const (
+	IcoBuybackPaymentStatusOpened IcoBuybackPaymentStatus = "OPENED"
+	IcoBuybackPaymentStatusClosed IcoBuybackPaymentStatus = "CLOSED"
+)
+
+// IcoClientStatus is used in [IcoClientInfo].
+//
+// Client verification status.
+type IcoClientStatus string
+
+// Known values of [IcoClientStatus].
+const (
+	IcoClientStatusNew                   IcoClientStatus = "NEW"
+	IcoClientStatusEmailVerified         IcoClientStatus = "EMAIL_VERIFIED"
+	IcoClientStatusPending               IcoClientStatus = "PENDING"
+	IcoClientStatusNotVerified           IcoClientStatus = "NOT_VERIFIED"
+	IcoClientStatusVerified              IcoClientStatus = "VERIFIED"
+	IcoClientStatusFrozen                IcoClientStatus = "FROZEN"
+	IcoClientStatusArrest                IcoClientStatus = "ARREST"
+	IcoClientStatusActualizationRequired IcoClientStatus = "ACTUALIZATION_REQUIRED"
+	IcoClientStatusBlocked               IcoClientStatus = "BLOCKED"
+	IcoClientStatusClosed                IcoClientStatus = "CLOSED"
+)
+
+// IcoClientType is used in [IcoClientInfo].
+//
+// Client type; legal entities act as issuers.
+type IcoClientType string
+
+// Known values of [IcoClientType].
+const (
+	IcoClientTypeIndividual             IcoClientType = "INDIVIDUAL"
+	IcoClientTypeOrganization           IcoClientType = "ORGANIZATION"
+	IcoClientTypeBank                   IcoClientType = "BANK"
+	IcoClientTypeIndividualEntrepreneur IcoClientType = "INDIVIDUAL_ENTREPRENEUR"
+)
+
+// IcoEmissionStatus is used in [IcoEmissionsListMineParams], [IcoEmissionsDownloadMineParams],
+// [IcoEmissionsSalesAnalyticsParams], [IcoEmissionsDownloadSalesAnalyticsParams] and 2 others.
+//
+// Emission state: on sale, sold out, closed (redeemed), disabled.
+type IcoEmissionStatus string
+
+// Known values of [IcoEmissionStatus].
+const (
+	IcoEmissionStatusOpened   IcoEmissionStatus = "OPENED"
+	IcoEmissionStatusSold     IcoEmissionStatus = "SOLD"
+	IcoEmissionStatusClosed   IcoEmissionStatus = "CLOSED"
+	IcoEmissionStatusDisabled IcoEmissionStatus = "DISABLED"
+)
+
+// IcoGuarantee is used in [IcoEmission].
+//
+// Collateral of an emission.
+type IcoGuarantee string
+
+// Known values of [IcoGuarantee].
+const (
+	IcoGuaranteeNone             IcoGuarantee = "NONE"
+	IcoGuaranteeSurety           IcoGuarantee = "SURETY"
+	IcoGuaranteeBankGuarantee    IcoGuarantee = "BANK_GUARANTEE"
+	IcoGuaranteePledge           IcoGuarantee = "PLEDGE"
+	IcoGuaranteeGuaranteeDeposit IcoGuarantee = "GUARANTEE_DEPOSIT"
+	IcoGuaranteeOther            IcoGuarantee = "OTHER"
+)
+
+// IcoIssuerDocumentType is used in [IcoIssuerDocument].
+//
+// Issuer document category: financial statements, constituent documents, other.
+type IcoIssuerDocumentType string
+
+// Known values of [IcoIssuerDocumentType].
+const (
+	IcoIssuerDocumentTypeAccountingReports      IcoIssuerDocumentType = "ACCOUNTING_REPORTS"
+	IcoIssuerDocumentTypeIncorporationDocuments IcoIssuerDocumentType = "INCORPORATION_DOCUMENTS"
+	IcoIssuerDocumentTypeOther                  IcoIssuerDocumentType = "OTHER"
+)
+
+// IcoObligationStatus is used in [IcoObligationsListParams].
+//
+// Holding state used by the portfolio filter.
+type IcoObligationStatus string
+
+// Known values of [IcoObligationStatus].
+const (
+	IcoObligationStatusOpened IcoObligationStatus = "OPENED"
+	IcoObligationStatusSold   IcoObligationStatus = "SOLD"
+)
+
+// IcoOperationStatus is used in [IcoOperationsListParams], [IcoOperationsStatementParams] and
+// [IcoOperation].
+//
+// ICO operation state; `APPLIED` is success.
+type IcoOperationStatus string
+
+// Known values of [IcoOperationStatus].
+const (
+	IcoOperationStatusRequested IcoOperationStatus = "REQUESTED"
+	IcoOperationStatusApproved  IcoOperationStatus = "APPROVED"
+	IcoOperationStatusPartial   IcoOperationStatus = "PARTIAL"
+	IcoOperationStatusApplied   IcoOperationStatus = "APPLIED"
+	IcoOperationStatusError     IcoOperationStatus = "ERROR"
+)
+
+// IcoPaymentInterval is used in [IcoEmissionsRequestIssueParams] and [IcoEmission].
+//
+// Interest or offer period.
+type IcoPaymentInterval string
+
+// Known values of [IcoPaymentInterval].
+const (
+	IcoPaymentIntervalMonth    IcoPaymentInterval = "MONTH"
+	IcoPaymentIntervalQuarter  IcoPaymentInterval = "QUARTER"
+	IcoPaymentIntervalBiannual IcoPaymentInterval = "BIANNUAL"
+	IcoPaymentIntervalAnnual   IcoPaymentInterval = "ANNUAL"
+)
+
+// IcoReportFormat is used in [IcoEmissionsDownloadMineParams] and [IcoOperationsStatementParams].
+//
+// Report file format.
+type IcoReportFormat string
+
+// Known values of [IcoReportFormat].
+const (
+	IcoReportFormatXLSX IcoReportFormat = "XLSX"
+	IcoReportFormatPDF  IcoReportFormat = "PDF"
+)
+
+// IcoSolvency is used in [IcoIssuerDetails].
+//
+// Issuer solvency.
+type IcoSolvency string
+
+// Known values of [IcoSolvency].
+const (
+	IcoSolvencySolvent                IcoSolvency = "SOLVENT"
+	IcoSolvencyInsolvent              IcoSolvency = "INSOLVENT"
+	IcoSolvencyPartiallySolvent       IcoSolvency = "PARTIALLY_SOLVENT"
+	IcoSolvencySolventWithReservation IcoSolvency = "SOLVENT_WITH_RESERVATION"
+)
+
+// IcoYieldPeriod is used in [IcoStatisticsInvestorYieldParams].
+//
+// Period of the average yield.
+type IcoYieldPeriod string
+
+// Known values of [IcoYieldPeriod].
+const (
+	IcoYieldPeriodCurrentMonth IcoYieldPeriod = "CURRENT_MONTH"
+	IcoYieldPeriodPrevMonth    IcoYieldPeriod = "PREV_MONTH"
+)
+
 // KYCActualizationClientStatus is returned by [KYCActualizationResource.Status].
 type KYCActualizationClientStatus string
 

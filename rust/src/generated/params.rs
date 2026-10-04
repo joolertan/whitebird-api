@@ -9,7 +9,6 @@ use chrono::NaiveDate;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::Decimal;
 use crate::models::{
     AccountingAccountType, AccountingTransactionType, AssetFilter, AssistCardBindType,
     AuthDeviceFingerprintSource, AuthMediaCapabilities, AuthMfaOperation, AuthWebGlData,
@@ -17,8 +16,11 @@ use crate::models::{
     BalanceOperationStatus, BalanceOperationType, BalanceOrderStatus,
     BalanceRejectRequestOperationType, CurrentAccountDateFrame, CurrentAccountFiatOpType,
     DateFrame, ExchangeDateFrame, ExchangeDestination, ExchangeLegType, ExchangeLimitsLeg,
-    ExchangeOrderStatus, ExchangeQuoteLegRequest, FileType, KycProvider, KycSumsubLevelType,
-    MarketCategory, MarketKlineInterval, MerchantReportFileType, MtsCardCountry, Network,
+    ExchangeOrderStatus, ExchangeQuoteLegRequest, FileType, IcoAccountType,
+    IcoBuybackApplicationStatus, IcoBuybackOfferStatus, IcoBuybackPaymentStatus, IcoEmissionStatus,
+    IcoObligationStatus, IcoOperationAccount, IcoOperationStatus, IcoPaymentInterval,
+    IcoReportFormat, IcoYieldPeriod, KycProvider, KycSumsubLevelType, MarketCategory,
+    MarketKlineInterval, MerchantReportFileType, MtsCardCountry, Network,
     OrderUnifiedOperationType, OtcOrderStatus, PaymentCountryGroup, PaymentOrderType,
     PaymentProviderType, ProviderType, ReportDateFrame, ReportOperationType,
     StatusbankPaymentSystem, SubaccountAddressRequest, SubaccountDocType, SubaccountType,
@@ -26,6 +28,7 @@ use crate::models::{
     TradingReportFormat, TradingSortDirection, TradingTimeInForce, UserGender,
     VtbCortiMilliServiceType,
 };
+use crate::{Decimal, Timestamp};
 
 /// Parameters of [`AccountingAccounts::get`](crate::resources::AccountingAccounts::get).
 #[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
@@ -934,6 +937,585 @@ pub struct ExchangeQuotesCreateParams {
     /// Merchant id when quoting inside a merchant widget.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub merchant_id: Option<String>,
+}
+
+/// Parameters of [`IcoBuybacks::list`](crate::resources::IcoBuybacks::list).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoBuybacksListParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    ///
+    /// Defaults to `10` on the server.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoBuybackApplicationStatus>>,
+}
+
+/// Parameters of [`IcoBuybacks::request`](crate::resources::IcoBuybacks::request).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoBuybacksRequestParams {
+    pub emission_id: String,
+    /// Tokens to sell back (at least 1).
+    pub value: Decimal,
+    /// Existing application to change.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_id: Option<String>,
+}
+
+/// Parameters of [`IcoBuybacks::list_offers`](crate::resources::IcoBuybacks::list_offers).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoBuybacksListOffersParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    ///
+    /// Defaults to `10` on the server.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_names: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currencies: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoBuybackOfferStatus>>,
+    /// Fraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate_from: Option<Decimal>,
+    /// Fraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate_to: Option<Decimal>,
+    /// Request window from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_request_date: Option<Timestamp>,
+    /// Request window to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_request_date: Option<Timestamp>,
+    /// Payment window from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_date: Option<Timestamp>,
+    /// Payment window to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_date: Option<Timestamp>,
+}
+
+/// Parameters of [`IcoEmissions::list`](crate::resources::IcoEmissions::list).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsListParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    /// The web app always sends true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub with_logo: Option<bool>,
+    /// Token type; the web app sends `ICO`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currencies: Option<Vec<String>>,
+    /// Issuer client IDs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_ids: Option<Vec<String>>,
+    /// Minimum interest rate as a fraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_rate_from: Option<Decimal>,
+    /// Maximum interest rate as a fraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_rate_to: Option<Decimal>,
+    /// Minimum offer percentage as a fraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate_from: Option<Decimal>,
+    /// Maximum offer percentage as a fraction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate_to: Option<Decimal>,
+}
+
+/// Parameters of [`IcoEmissions::calculate`](crate::resources::IcoEmissions::calculate).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsCalculateParams {
+    /// Emission to evaluate (emission page).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_id: Option<String>,
+    /// Currency to evaluate (landing page).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// The web app sends 100.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+}
+
+/// Parameters of
+/// [`IcoEmissions::request_issue`](crate::resources::IcoEmissions::request_issue).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsRequestIssueParams {
+    /// Currency of the issue (`BYN`, `USD`, `EUR`, `RUB`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// Issue volume.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<String>,
+    /// Circulation period in months: `24`, `36`, `48`, `60` or a custom value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiration_date: Option<String>,
+    /// Sale period in months: `3`, `6` or `12`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_deactivation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_interval: Option<IcoPaymentInterval>,
+    /// Interest rate, percent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_rate: Option<String>,
+    /// Interest payment day of month: `5`, `10`, `15`, `20` or `25`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_day: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_interval: Option<IcoPaymentInterval>,
+    /// Offer percentage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_rate: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_name: Option<String>,
+    /// Contact person.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phone_number: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// True for the full issuer-cabinet form; absent for the contact-only landing form.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub full_request: Option<bool>,
+}
+
+/// Parameters of [`IcoEmissions::list_mine`](crate::resources::IcoEmissions::list_mine).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsListMineParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    ///
+    /// Defaults to `10` on the server.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    /// Emission names.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub names: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currencies: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoEmissionStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_statuses: Option<Vec<IcoBuybackPaymentStatus>>,
+    /// Only emissions with (true) or without (false) current debt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_debt: Option<bool>,
+}
+
+/// Parameters of
+/// [`IcoEmissions::download_mine`](crate::resources::IcoEmissions::download_mine).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsDownloadMineParams {
+    pub r#type: IcoReportFormat,
+    /// Emission names.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub names: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currencies: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoEmissionStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyback_statuses: Option<Vec<IcoBuybackPaymentStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_debt: Option<bool>,
+}
+
+/// Parameters of
+/// [`IcoEmissions::sales_analytics`](crate::resources::IcoEmissions::sales_analytics).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsSalesAnalyticsParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    ///
+    /// Defaults to `10` on the server.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"sellDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_names: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoEmissionStatus>>,
+    /// Sale date from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_from: Option<Timestamp>,
+    /// Sale date to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_to: Option<Timestamp>,
+}
+
+/// Parameters of
+/// [`IcoEmissions::download_sales_analytics`](crate::resources::IcoEmissions::download_sales_analytics).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoEmissionsDownloadSalesAnalyticsParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_names: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoEmissionStatus>>,
+    /// Sale date from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_from: Option<Timestamp>,
+    /// Sale date to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_to: Option<Timestamp>,
+}
+
+/// Parameters of
+/// [`IcoEmissions::list_invested`](crate::resources::IcoEmissions::list_invested).
+#[derive(Debug, Clone, Default, PartialEq, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoEmissionsListInvestedParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    pub page: Option<u32>,
+    /// Page size.
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    pub sort: Option<String>,
+}
+
+/// Parameters of
+/// [`IcoEmissions::stable_coin_availability`](crate::resources::IcoEmissions::stable_coin_availability).
+#[derive(Debug, Clone, PartialEq, bon::Builder)]
+pub struct IcoEmissionsStableCoinAvailabilityParams {
+    /// Assets to check.
+    pub assets: Vec<String>,
+}
+
+/// Parameters of
+/// [`IcoIssuersDocuments::list`](crate::resources::IcoIssuersDocuments::list).
+#[derive(Debug, Clone, Default, PartialEq, bon::Builder)]
+pub struct IcoIssuersDocumentsListParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    pub page: Option<u32>,
+    /// Page size.
+    pub size: Option<u32>,
+}
+
+/// Parameters of [`IcoObligations::list`](crate::resources::IcoObligations::list).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoObligationsListParams {
+    /// Zero-based page index.
+    ///
+    /// Defaults to `0` on the server.
+    #[serde(skip)]
+    pub page: Option<i64>,
+    /// Page size.
+    ///
+    /// Defaults to `10` on the server.
+    #[serde(skip)]
+    pub size: Option<i64>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currencies: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoObligationStatus>>,
+}
+
+/// Parameters of
+/// [`IcoObligations::buy_with_card`](crate::resources::IcoObligations::buy_with_card).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoObligationsBuyWithCardParams {
+    pub emission_id: String,
+    /// Buyer client ID (from `ico.statistics.client_info`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_client_id: Option<String>,
+    /// The web app sends `USER_PAYMENT`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_type: Option<IcoAccountType>,
+    /// Emission currency.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    /// Number of tokens.
+    pub token_amount: Decimal,
+    /// Card provider type, e.g. `ALFA`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fiat_provider_type: Option<String>,
+    /// ID of the selected card provider / saved card.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_token: Option<String>,
+    /// Total from `calculate_card_buy`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_amount: Option<Decimal>,
+    /// Return URL, sent for `ALFA`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub return_url: Option<String>,
+    /// Failure URL, sent for `ALFA`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fail_url: Option<String>,
+}
+
+/// Parameters of
+/// [`IcoObligations::calculate_card_buy`](crate::resources::IcoObligations::calculate_card_buy).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoObligationsCalculateCardBuyParams {
+    pub emission_id: String,
+    /// Emission currency.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    /// Number of tokens.
+    pub token_amount: Decimal,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fiat_provider_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_token: Option<String>,
+}
+
+/// Parameters of
+/// [`IcoObligations::buy_with_balance`](crate::resources::IcoObligations::buy_with_balance).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoObligationsBuyWithBalanceParams {
+    pub emission_id: String,
+    /// `USER_BALANCE` or `ICO_BALANCE`.
+    pub account_type: IcoAccountType,
+    /// Currency of the paying account.
+    pub asset: String,
+    /// Number of tokens.
+    pub amount: Decimal,
+}
+
+/// Parameters of [`IcoObligations::rate`](crate::resources::IcoObligations::rate).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoObligationsRateParams {
+    pub from_asset: String,
+    pub to_asset: String,
+}
+
+/// Parameters of
+/// [`IcoObligations::remaining_limit`](crate::resources::IcoObligations::remaining_limit).
+#[derive(Debug, Clone, PartialEq, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoObligationsRemainingLimitParams {
+    /// Currency of the limit.
+    pub asset: String,
+}
+
+/// Parameters of [`IcoOperations::list`](crate::resources::IcoOperations::list).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoOperationsListParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    ///
+    /// Defaults to `20` on the server.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Spring Data sort expression, `property,asc|desc`.
+    ///
+    /// Defaults to `"creationDate,desc"` on the server.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_from: Option<NaiveDate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_to: Option<NaiveDate>,
+    /// Operation type names from `type_names`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_types: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<IcoOperationAccount>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoOperationStatus>>,
+}
+
+/// Parameters of [`IcoOperations::statement`](crate::resources::IcoOperations::statement).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[serde(rename_all = "camelCase")]
+pub struct IcoOperationsStatementParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_from: Option<NaiveDate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_to: Option<NaiveDate>,
+    /// Operation type names from `type_names`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_types: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emission_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<IcoOperationAccount>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<IcoOperationStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<IcoReportFormat>,
+}
+
+/// Parameters of [`IcoOperations::transfer`](crate::resources::IcoOperations::transfer).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct IcoOperationsTransferParams {
+    /// Client ID of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    pub currency_from: String,
+    /// `ICO_BALANCE`.
+    pub account_type_from: IcoAccountType,
+    pub currency_to: String,
+    /// `USER_BALANCE`.
+    pub account_type_to: IcoAccountType,
+    pub amount: Decimal,
+}
+
+/// Parameters of
+/// [`IcoStatisticsResource::investor_yield`](crate::resources::IcoStatisticsResource::investor_yield).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoStatisticsInvestorYieldParams {
+    pub r#type: IcoYieldPeriod,
+    /// `USD`, `EUR`, `RUB`, `BYN` or null for all.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+}
+
+/// Parameters of
+/// [`IcoStatisticsResource::investor_redemptions`](crate::resources::IcoStatisticsResource::investor_redemptions).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoStatisticsInvestorRedemptionsParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    /// Emission name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<Timestamp>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<Timestamp>,
+}
+
+/// Parameters of
+/// [`IcoStatisticsResource::invested_total`](crate::resources::IcoStatisticsResource::invested_total).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoStatisticsInvestedTotalParams {
+    /// Null for all currencies.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+}
+
+/// Parameters of
+/// [`IcoStatisticsResource::invested_income`](crate::resources::IcoStatisticsResource::invested_income).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoStatisticsInvestedIncomeParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<Timestamp>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<Timestamp>,
+}
+
+/// Parameters of
+/// [`IcoStatisticsResource::issuer_payment_schedule`](crate::resources::IcoStatisticsResource::issuer_payment_schedule).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct IcoStatisticsIssuerPaymentScheduleParams {
+    /// Emission name.
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<Timestamp>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<Timestamp>,
 }
 
 /// Parameters of [`Kyc::agree_offer`](crate::resources::Kyc::agree_offer).

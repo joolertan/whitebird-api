@@ -12,6 +12,7 @@ type Client struct {
 	Client         *ClientResource
 	CurrentAccount *CurrentAccountResource
 	Exchange       *ExchangeResource
+	Ico            *IcoResource
 	KYC            *KYCResource
 	Market         *MarketResource
 	Merchant       *MerchantResource
@@ -62,6 +63,17 @@ func (c *Client) initResources() {
 		Orders:       &ExchangeOrdersResource{core: c.core},
 		Quotes:       &ExchangeQuotesResource{core: c.core},
 		Rates:        &ExchangeRatesResource{core: c.core},
+	}
+	c.Ico = &IcoResource{
+		Buybacks:  &IcoBuybacksResource{core: c.core},
+		Emissions: &IcoEmissionsResource{core: c.core},
+		Issuers: &IcoIssuersResource{
+			Documents: &IcoIssuersDocumentsResource{core: c.core},
+			core:      c.core,
+		},
+		Obligations: &IcoObligationsResource{core: c.core},
+		Operations:  &IcoOperationsResource{core: c.core},
+		Statistics:  &IcoStatisticsResource{core: c.core},
 	}
 	c.KYC = &KYCResource{
 		Actualization:  &KYCActualizationResource{core: c.core},

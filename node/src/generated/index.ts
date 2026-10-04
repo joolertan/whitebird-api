@@ -8,6 +8,7 @@ import { BrokerageResource } from './resources/brokerage.js';
 import { ClientResource } from './resources/client.js';
 import { CurrentAccountResource } from './resources/current-account.js';
 import { ExchangeResource } from './resources/exchange.js';
+import { IcoResource } from './resources/ico.js';
 import { KycResource } from './resources/kyc.js';
 import { MarketResource } from './resources/market.js';
 import { MerchantResource } from './resources/merchant.js';
@@ -29,6 +30,7 @@ export * from './resources/brokerage.js';
 export * from './resources/client.js';
 export * from './resources/current-account.js';
 export * from './resources/exchange.js';
+export * from './resources/ico.js';
 export * from './resources/kyc.js';
 export * from './resources/market.js';
 export * from './resources/merchant.js';
@@ -59,6 +61,8 @@ export class Resources extends APIResource {
   readonly currentAccount = new CurrentAccountResource(this._client);
   /** Endpoints under `client.exchange`. */
   readonly exchange = new ExchangeResource(this._client);
+  /** Endpoints under `client.ico`. */
+  readonly ico = new IcoResource(this._client);
   /** Endpoints under `client.kyc`. */
   readonly kyc = new KycResource(this._client);
   /** Endpoints under `client.market`. */

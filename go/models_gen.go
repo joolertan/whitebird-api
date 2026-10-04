@@ -738,6 +738,527 @@ type ExchangeRateStat struct {
 // Filter of the statistics; the web app always sends `{}`.
 type ExchangeRateStatsFilter map[string]any
 
+// IcoBuyResult is returned by [IcoObligationsResource.BuyWithCard] and
+// [IcoObligationsResource.BuyWithBalance].
+type IcoBuyResult struct {
+	// Card payment page (card purchase). Inferred from the web application; not yet observed in
+	// responses.
+	Link string `json:"link,omitzero"`
+	// Transaction ID (balance purchase). Inferred from the web application; not yet observed in
+	// responses.
+	TxID string `json:"txId,omitzero"`
+}
+
+// IcoBuybackApplication is returned by [IcoBuybacksResource.List].
+//
+// An investor's application to sell tokens back to the issuer under the emission's offer.
+type IcoBuybackApplication struct {
+	// Inferred from the web application; not yet observed in responses.
+	BuybackID string `json:"buybackId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmissionID string `json:"emissionId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmissionName string `json:"emissionName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IssuerName string `json:"issuerName,omitzero"`
+	// Application date (ISO-8601). Inferred from the web application; not yet observed in responses.
+	BuybackDate string `json:"buybackDate,omitzero"`
+	// Tokens requested. Inferred from the web application; not yet observed in responses.
+	ValueRequest Decimal `json:"valueRequest,omitzero"`
+	// Tokens approved (meaningful once `APPROVED`/`COMPLETED`). Inferred from the web application; not
+	// yet observed in responses.
+	Value Decimal `json:"value,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status IcoBuybackApplicationStatus `json:"status,omitzero"`
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	BuybackRequestDateFrom string `json:"buybackRequestDateFrom,omitzero"`
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	BuybackRequestDateTo string `json:"buybackRequestDateTo,omitzero"`
+	// Payment window start (ISO-8601). Inferred from the web application; not yet observed in
+	// responses.
+	BuybackDateFrom string `json:"buybackDateFrom,omitzero"`
+	// Payment window end (ISO-8601). Inferred from the web application; not yet observed in responses.
+	BuybackDateTo string `json:"buybackDateTo,omitzero"`
+}
+
+// IcoBuybackOffer is returned by [IcoBuybacksResource.ListOffers].
+//
+// One offer (buyback) window of an issuer's emission with its applications totals.
+type IcoBuybackOffer struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmissionName string `json:"emissionName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Offer percentage as a fraction. Inferred from the web application; not yet observed in
+	// responses.
+	BuybackRate Decimal `json:"buybackRate,omitzero"`
+	// Request window start (ISO-8601). Inferred from the web application; not yet observed in
+	// responses.
+	RequestDateFrom string `json:"requestDateFrom,omitzero"`
+	// Request window end (ISO-8601). Inferred from the web application; not yet observed in responses.
+	RequestDateTo string `json:"requestDateTo,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status IcoBuybackOfferStatus `json:"status,omitzero"`
+	// Number of applications. Inferred from the web application; not yet observed in responses.
+	Count int `json:"count,omitzero"`
+	// Tokens requested. Inferred from the web application; not yet observed in responses.
+	Value Decimal `json:"value,omitzero"`
+	// Amount requested. Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ValueApproved Decimal `json:"valueApproved,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AmountApproved Decimal `json:"amountApproved,omitzero"`
+	// Settlement date (ISO-8601). Inferred from the web application; not yet observed in responses.
+	CalcDate string `json:"calcDate,omitzero"`
+	// Payment window start (ISO-8601). Inferred from the web application; not yet observed in
+	// responses.
+	BuybackDateFrom string `json:"buybackDateFrom,omitzero"`
+	// Payment window end (ISO-8601). Inferred from the web application; not yet observed in responses.
+	BuybackDateTo string `json:"buybackDateTo,omitzero"`
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	PayDate string `json:"payDate,omitzero"`
+	// Credited to investors, account currency. Inferred from the web application; not yet observed in
+	// responses.
+	AmountPaid Decimal `json:"amountPaid,omitzero"`
+}
+
+// IcoCalculatorResult is returned by [IcoEmissionsResource.Calculate].
+type IcoCalculatorResult struct {
+	// Minimum investment. Inferred from the web application; not yet observed in responses.
+	MinAmount Decimal `json:"minAmount,omitzero"`
+	// Maximum investment. Inferred from the web application; not yet observed in responses.
+	MaxAmount Decimal `json:"maxAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Annual interest rate as a fraction. Inferred from the web application; not yet observed in
+	// responses.
+	Rate Decimal `json:"rate,omitzero"`
+}
+
+// IcoCardBuyCalculation is returned by [IcoObligationsResource.CalculateCardBuy].
+type IcoCardBuyCalculation struct {
+	// Inferred from the web application; not yet observed in responses.
+	Commission Decimal `json:"commission,omitzero"`
+	// Amount charged to the card. Inferred from the web application; not yet observed in responses.
+	TotalAmount Decimal `json:"totalAmount,omitzero"`
+}
+
+// IcoClientInfo is returned by [IcoStatisticsResource.ClientInfo].
+type IcoClientInfo struct {
+	// Inferred from the web application; not yet observed in responses.
+	ClientID string `json:"clientId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ClientType IcoClientType `json:"clientType,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ClientStatus IcoClientStatus `json:"clientStatus,omitzero"`
+	// Belarusian resident. Inferred from the web application; not yet observed in responses.
+	IsBlr bool `json:"isBLR,omitzero"`
+}
+
+// IcoEmission is returned by [IcoEmissionsResource.List], [IcoEmissionsResource.Get] and
+// [IcoEmissionsResource.ListMine].
+//
+// An emission (token issue): a tranche of digital tokens a company sells to investors. Each token
+// has a nominal price `rate` in `currency`; holders earn interest at `feeRate` per year, paid
+// every `feeInterval`, may sell tokens back to the issuer under the offer (`buybackRate`, every
+// `buybackInterval`) and are repaid when the emission expires.
+type IcoEmission struct {
+	// Inferred from the web application; not yet observed in responses.
+	EmissionID string `json:"emissionId,omitzero"`
+	// Emission number shown to users. Inferred from the web application; not yet observed in
+	// responses.
+	Name string `json:"name,omitzero"`
+	// Issuer client ID. Inferred from the web application; not yet observed in responses.
+	ClientID string `json:"clientId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IssuerName string `json:"issuerName,omitzero"`
+	// Document ID of the logo (see `ico.issuers.documents.download`). Inferred from the web
+	// application; not yet observed in responses.
+	IssuerLogoID string `json:"issuerLogoId,omitzero"`
+	// Document ID of the page background. Inferred from the web application; not yet observed in
+	// responses.
+	IssuerBackgroundID string `json:"issuerBackgroundId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IssuerURL string `json:"issuerUrl,omitzero"`
+	// Token asset code. Inferred from the web application; not yet observed in responses.
+	Asset string `json:"asset,omitzero"`
+	// Currency of the token nominal and payments. Inferred from the web application; not yet observed
+	// in responses.
+	Currency string `json:"currency,omitzero"`
+	// Nominal price of one token in `currency`. Inferred from the web application; not yet observed in
+	// responses.
+	Rate Decimal `json:"rate,omitzero"`
+	// Number of tokens issued. Inferred from the web application; not yet observed in responses.
+	Value Decimal `json:"value,omitzero"`
+	// Tokens still on sale. Inferred from the web application; not yet observed in responses.
+	Available Decimal `json:"available,omitzero"`
+	// Annual interest rate as a fraction (0.15 = 15 %). Inferred from the web application; not yet
+	// observed in responses.
+	FeeRate Decimal `json:"feeRate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FeeInterval IcoPaymentInterval `json:"feeInterval,omitzero"`
+	// Offer percentage as a fraction: share of tokens the issuer buys back per offer window. Inferred
+	// from the web application; not yet observed in responses.
+	BuybackRate Decimal `json:"buybackRate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	BuybackInterval IcoPaymentInterval `json:"buybackInterval,omitzero"`
+	// Repayment date (ISO-8601). Inferred from the web application; not yet observed in responses.
+	BuybackEndDate string `json:"buybackEndDate,omitzero"`
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	CreationDate string `json:"creationDate,omitzero"`
+	// Start of the primary sale (ISO-8601). Inferred from the web application; not yet observed in
+	// responses.
+	PrimaryActivation string `json:"primaryActivation,omitzero"`
+	// End of the primary sale (ISO-8601). Inferred from the web application; not yet observed in
+	// responses.
+	PrimaryDeactivation string `json:"primaryDeactivation,omitzero"`
+	// End of circulation (ISO-8601). Inferred from the web application; not yet observed in responses.
+	ExpirationDate string `json:"expirationDate,omitzero"`
+	// Number of investors. Inferred from the web application; not yet observed in responses.
+	Investors int `json:"investors,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Guarantee IcoGuarantee `json:"guarantee,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	BankruptcyRisk IcoBankruptcyRisk `json:"bankruptcyRisk,omitzero"`
+	// Net assets of the issuer, BYN. Inferred from the web application; not yet observed in responses.
+	NetAssets Decimal `json:"netAssets,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	RiskCoefficient Decimal `json:"riskCoefficient,omitzero"`
+	// Residency flag; the web app blocks purchases when it is false. Inferred from the web
+	// application; not yet observed in responses.
+	Residence bool `json:"residence,omitzero"`
+	// Only clients who already invested in it may buy (see `is_investor`). Inferred from the web
+	// application; not yet observed in responses.
+	RestrictToExistingInvestors bool `json:"restrictToExistingInvestors,omitzero"`
+	// Present (truthy) when a white paper can be downloaded. Inferred from the web application; not
+	// yet observed in responses.
+	WhitePaper any `json:"whitePaper,omitzero"`
+	// Issuer cabinet only. Inferred from the web application; not yet observed in responses.
+	Status IcoEmissionStatus `json:"status,omitzero"`
+	// Rate to the issuer's account currency. Issuer cabinet only. Inferred from the web application;
+	// not yet observed in responses.
+	ExchangeRate Decimal `json:"exchangeRate,omitzero"`
+	// Offer payments. Issuer cabinet only. Inferred from the web application; not yet observed in
+	// responses.
+	BuybackValue Decimal `json:"buybackValue,omitzero"`
+	// Interest due in the current period. Issuer cabinet only. Inferred from the web application; not
+	// yet observed in responses.
+	FeeCurrentAmount Decimal `json:"feeCurrentAmount,omitzero"`
+	// Offer payments due in the current period. Issuer cabinet only. Inferred from the web
+	// application; not yet observed in responses.
+	BuybackCurrentAmount Decimal `json:"buybackCurrentAmount,omitzero"`
+}
+
+// IcoEmissionSale is returned by [IcoEmissionsResource.SalesAnalytics].
+//
+// One sale of the issuer's tokens.
+type IcoEmissionSale struct {
+	// Emission name. Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	SellDate string `json:"sellDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status IcoEmissionStatus `json:"status,omitzero"`
+	// Tokens sold. Inferred from the web application; not yet observed in responses.
+	SoldValue Decimal `json:"soldValue,omitzero"`
+	// Proceeds in `currency`. Inferred from the web application; not yet observed in responses.
+	SoldAmount Decimal `json:"soldAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Proceeds in the account currency. Inferred from the web application; not yet observed in
+	// responses.
+	SoldAmountUsd Decimal `json:"soldAmountUsd,omitzero"`
+}
+
+// IcoInvestedBalance is used in [IcoInvestedTotal].
+type IcoInvestedBalance struct {
+	// Issuer ID. Inferred from the web application; not yet observed in responses.
+	OwnerID string `json:"ownerId,omitzero"`
+	// Issuer name. Inferred from the web application; not yet observed in responses.
+	OwnerName string `json:"ownerName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+}
+
+// IcoInvestedIncome is returned by [IcoStatisticsResource.InvestedIncome].
+type IcoInvestedIncome struct {
+	// Inferred from the web application; not yet observed in responses.
+	Statistics []IcoInvestedIncomeItem `json:"statistics,omitzero"`
+}
+
+// IcoInvestedIncomeItem is used in [IcoInvestedIncome].
+type IcoInvestedIncomeItem struct {
+	// Issuer ID. Inferred from the web application; not yet observed in responses.
+	OwnerID string `json:"ownerId,omitzero"`
+	// Issuer name. Inferred from the web application; not yet observed in responses.
+	OwnerName string `json:"ownerName,omitzero"`
+	// Interest paid out. Inferred from the web application; not yet observed in responses.
+	TotalFee Decimal `json:"totalFee,omitzero"`
+	// Interest still to be paid. Inferred from the web application; not yet observed in responses.
+	TotalRemain Decimal `json:"totalRemain,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	TotalAmount Decimal `json:"totalAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	FromDate string `json:"fromDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToDate string `json:"toDate,omitzero"`
+}
+
+// IcoInvestedTotal is returned by [IcoStatisticsResource.InvestedTotal].
+type IcoInvestedTotal struct {
+	// Inferred from the web application; not yet observed in responses.
+	Balances []IcoInvestedBalance `json:"balances,omitzero"`
+}
+
+// IcoInvestorEmission is returned by [IcoEmissionsResource.ListInvested].
+type IcoInvestorEmission struct {
+	// Inferred from the web application; not yet observed in responses.
+	EmissionID string `json:"emissionId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+}
+
+// IcoInvestorObligations is returned by [IcoObligationsResource.List].
+type IcoInvestorObligations struct {
+	Obligations Page[IcoObligation] `json:"obligations,omitzero"`
+}
+
+// IcoIssuer is returned by [IcoIssuersResource.Get].
+//
+// An issuer: a company that issues tokens.
+type IcoIssuer struct {
+	ClientID string `json:"clientId"`
+	Name     string `json:"name"`
+	// Profile type, e.g. `BASIC`.
+	Type    string            `json:"type,omitzero"`
+	Details *IcoIssuerDetails `json:"details,omitzero"`
+	Files   *IcoIssuerFiles   `json:"files,omitzero"`
+}
+
+// IcoIssuerDebt is returned by [IcoStatisticsResource.IssuerDebt].
+type IcoIssuerDebt struct {
+	// Principal debt of the current period. Inferred from the web application; not yet observed in
+	// responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Accrued interest of the current period. Inferred from the web application; not yet observed in
+	// responses.
+	CurrentDebt Decimal `json:"currentDebt,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+}
+
+// IcoIssuerDetails is used in [IcoIssuer].
+type IcoIssuerDetails struct {
+	Description string `json:"description,omitzero"`
+	Website     string `json:"website,omitzero"`
+	// Taxpayer number (UNP).
+	Unp int64 `json:"unp,omitzero"`
+	// As entered, e.g. `10.07.2003`.
+	RegistrationDate      string `json:"registrationDate,omitzero"`
+	RegistrationAuthority string `json:"registrationAuthority,omitzero"`
+	LegalAddress          string `json:"legalAddress,omitzero"`
+	ActivityType          string `json:"activityType,omitzero"`
+	EmployeesCount        int    `json:"employeesCount,omitzero"`
+	// Thousands of `currency`.
+	Revenue Decimal `json:"revenue,omitzero"`
+	// Thousands of `currency`.
+	NetProfit       Decimal `json:"netProfit,omitzero"`
+	Currency        string  `json:"currency,omitzero"`
+	RevenueCurrency string  `json:"revenueCurrency,omitzero"`
+	// Percent with a decimal comma, e.g. `0,10`.
+	ReturnOnAssets string      `json:"returnOnAssets,omitzero"`
+	LiquidityK1    Decimal     `json:"liquidityK1,omitzero"`
+	Solvency       IcoSolvency `json:"solvency,omitzero"`
+}
+
+// IcoIssuerDocument is returned by [IcoIssuersDocumentsResource.List].
+type IcoIssuerDocument struct {
+	DocumentID string                `json:"documentId"`
+	Type       IcoIssuerDocumentType `json:"type,omitzero"`
+	// File name.
+	Name string `json:"name,omitzero"`
+	// Bytes.
+	Size int64 `json:"size,omitzero"`
+}
+
+// IcoIssuerFiles is used in [IcoIssuer].
+type IcoIssuerFiles struct {
+	// Document ID of the logo.
+	IssuerLogo string `json:"issuerLogo,omitzero"`
+	// Document ID of the page background.
+	IssuerBackground string `json:"issuerBackground,omitzero"`
+}
+
+// IcoIssuerName is returned by [IcoIssuersResource.Names].
+type IcoIssuerName struct {
+	// Inferred from the web application; not yet observed in responses.
+	ClientID string `json:"clientId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Name string `json:"name,omitzero"`
+}
+
+// IcoIssuerStatistics is returned by [IcoIssuersResource.Statistics].
+type IcoIssuerStatistics struct {
+	Currency string `json:"currency,omitzero"`
+	// Total issued, in `currency`.
+	EmissionAmount Decimal `json:"emissionAmount,omitzero"`
+	// Total interest paid, in `currency`.
+	FeeAmount Decimal `json:"feeAmount,omitzero"`
+	Investors int     `json:"investors,omitzero"`
+}
+
+// IcoObligation is used in [IcoInvestorObligations].
+//
+// An obligation: the investor's holding of tokens of one emission, i.e. the issuer's debt to the
+// investor.
+type IcoObligation struct {
+	// Inferred from the web application; not yet observed in responses.
+	UUID string `json:"uuid,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmissionID string `json:"emissionId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmissionName string `json:"emissionName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IssuerID string `json:"issuerId,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IssuerName string `json:"issuerName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	IssuerLogoID string `json:"issuerLogoId,omitzero"`
+	// Tokens held. Inferred from the web application; not yet observed in responses.
+	Value Decimal `json:"value,omitzero"`
+	// Token price in `currency`. Inferred from the web application; not yet observed in responses.
+	ExchangeRate Decimal `json:"exchangeRate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Annual interest rate as a fraction. Inferred from the web application; not yet observed in
+	// responses.
+	FeeRate Decimal `json:"feeRate,omitzero"`
+	// Interest still to be received. Inferred from the web application; not yet observed in responses.
+	RemainFee Decimal `json:"remainFee,omitzero"`
+	// Start of the current offer request window (ISO-8601). Inferred from the web application; not yet
+	// observed in responses.
+	BuybackRequestDateFrom string `json:"buybackRequestDateFrom,omitzero"`
+	// End of the current offer request window (ISO-8601). Inferred from the web application; not yet
+	// observed in responses.
+	BuybackRequestDateTo string `json:"buybackRequestDateTo,omitzero"`
+	// Start of the offer payment window (ISO-8601). Inferred from the web application; not yet
+	// observed in responses.
+	BuybackDateFrom string `json:"buybackDateFrom,omitzero"`
+	// End of the offer payment window (ISO-8601). Inferred from the web application; not yet observed
+	// in responses.
+	BuybackDateTo string `json:"buybackDateTo,omitzero"`
+}
+
+// IcoOperation is returned by [IcoOperationsResource.List].
+//
+// An operation on ICO or e-accounts caused by the token lifecycle.
+type IcoOperation struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	Date string `json:"date,omitzero"`
+	// Russian label, e.g. `Покупка токенов` (buy tokens), `Получение дохода` (income received),
+	// `Выплата дохода` (income paid), `Выкуп токенов по оферте` (buyback by offer), `Возврат по
+	// оферте` (offer refund), `Продажа токенов` (token sale), `Выпуск токенов` (issue), `Перевод
+	// средств` (transfer), `Погашение токенов` (redemption), `Пополнение счета` (top-up), fee and tax
+	// labels; see `type_names`. Inferred from the web application; not yet observed in responses.
+	Type string `json:"type,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status IcoOperationStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AmountFrom Decimal `json:"amountFrom,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AssetFrom string `json:"assetFrom,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AccountTypeFrom IcoAccountType `json:"accountTypeFrom,omitzero"`
+	// Tokens for purchases. Inferred from the web application; not yet observed in responses.
+	AmountTo Decimal `json:"amountTo,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AssetTo string `json:"assetTo,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	AccountTypeTo IcoAccountType `json:"accountTypeTo,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Details *IcoOperationDetails `json:"details,omitzero"`
+}
+
+// IcoOperationAccount is used in [IcoOperationsListParams] and [IcoOperationsStatementParams].
+type IcoOperationAccount struct {
+	Asset string `json:"asset"`
+	// `ICO_BALANCE` (ICO account) or `USER_BALANCE` (e-account).
+	Type IcoAccountType `json:"type"`
+}
+
+// IcoOperationDetails is used in [IcoOperation].
+type IcoOperationDetails struct {
+	// Inferred from the web application; not yet observed in responses.
+	IssuerName string `json:"issuerName,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	EmissionName string `json:"emissionName,omitzero"`
+	// Transaction hash. Inferred from the web application; not yet observed in responses.
+	Signature string `json:"signature,omitzero"`
+}
+
+// IcoPaymentSchedule is returned by [IcoStatisticsResource.IssuerPaymentSchedule].
+type IcoPaymentSchedule struct {
+	// Inferred from the web application; not yet observed in responses.
+	Emissions []IcoScheduledPayment `json:"emissions,omitzero"`
+}
+
+// IcoRate is returned by [IcoObligationsResource.Rate].
+type IcoRate struct {
+	// Inferred from the web application; not yet observed in responses.
+	FromAsset string `json:"fromAsset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ToAsset string `json:"toAsset,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Rate Decimal `json:"rate,omitzero"`
+}
+
+// IcoScheduledPayment is used in [IcoPaymentSchedule].
+type IcoScheduledPayment struct {
+	// ISO-8601. Inferred from the web application; not yet observed in responses.
+	Date string `json:"date,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Currency string `json:"currency,omitzero"`
+	// Overdue payment. Inferred from the web application; not yet observed in responses.
+	Unpaid bool `json:"unpaid,omitzero"`
+}
+
+// IcoStatistics is returned by [IcoStatisticsResource.Get].
+type IcoStatistics struct {
+	Currencies []string              `json:"currencies,omitzero"`
+	Issuers    []IcoStatisticsIssuer `json:"issuers,omitzero"`
+}
+
+// IcoStatisticsIssuer is used in [IcoStatistics].
+type IcoStatisticsIssuer struct {
+	IssuerID string `json:"issuerId"`
+	Name     string `json:"name"`
+}
+
+// IcoYearAmount is returned by [IcoStatisticsResource.InvestorRedemptions].
+type IcoYearAmount struct {
+	// Inferred from the web application; not yet observed in responses.
+	Year int `json:"year,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Amount Decimal `json:"amount,omitzero"`
+}
+
+// IcoYield is returned by [IcoStatisticsResource.InvestorYield].
+type IcoYield struct {
+	// Yield of the period as a fraction. Inferred from the web application; not yet observed in
+	// responses.
+	Current Decimal `json:"current,omitzero"`
+	// Yield of the previous period as a fraction. Inferred from the web application; not yet observed
+	// in responses.
+	Last Decimal `json:"last,omitzero"`
+}
+
 // KYCActualData is returned by [KYCActualizationResource.ActualData].
 type KYCActualData struct {
 	// Inferred from the web application; not yet observed in responses.
