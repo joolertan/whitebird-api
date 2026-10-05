@@ -83,7 +83,19 @@ def test_operations(files: dict[str, str]) -> None:
     assert '.paginate(PageParam::Query("page"))' in resources
     assert ".public()\n            .envelope(Envelope::Retcode)" in resources
     assert "pub fn stream(&self) -> EventStream<Event> {" in resources
-    assert "Requires an operation MFA token for `WITHDRAWAL`" in resources
+    assert "Needs an operation MFA token for `WITHDRAWAL`" in resources
+    assert '.mfa_operation("WITHDRAWAL")\n            .form(params)' in resources
+
+
+def test_request_bodies(files: dict[str, str]) -> None:
+    resources = files["rust/src/generated/resources.rs"]
+    assert (
+        '.request(Service::Shop, Method::POST, "/api/v1/cart/clear")\n'
+        "            .json(Map::new())\n"
+    ) in resources
+    assert '.file("file", params.file)\n                    .json("crop", &params.crop),' in (
+        resources
+    )
     assert "# Errors" in resources
 
 

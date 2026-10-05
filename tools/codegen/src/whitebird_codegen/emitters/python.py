@@ -47,7 +47,9 @@ MODEL_ATTRIBUTES = frozenset(
 )
 # Keyword arguments that every method already takes through **options.
 OPTIONS = frozenset({"extra_headers", "idempotent", "max_retries", "options", "timeout"})
-CLIENT_MEMBERS = frozenset({"aclose", "close", "login", "mfa_token", "request"})
+CLIENT_MEMBERS = frozenset(
+    {"aclose", "close", "confirm_operation", "login", "mfa_token", "request"}
+)
 # Names imported by generated modules, which model and enum classes must not take.
 HELPERS = frozenset(
     {
@@ -561,12 +563,15 @@ def _method(op: Operation, types: Types) -> MethodView:
         method.doc.body.append("Public endpoint: works without credentials.")
     if op.envelope:
         method.arguments.append(f"envelope={op.envelope!r}")
+    if op.auth == "mfa" and op.mfa_operation:
+        method.arguments.append(f"mfa_operation={op.mfa_operation!r}")
     _notes(op, types, method)
     _output(op, types, method)
     if op.auth == "mfa":
-        method.doc.section(
-            "Raises", [("MFARequiredError", "The operation MFA token is missing or expired.")]
-        )
+        problem = "The operation MFA token is missing or expired"
+        if op.mfa_operation:
+            problem += ", and `otp` is not configured to obtain one"
+        method.doc.section("Raises", [("MFARequiredError", f"{problem}.")])
     method.arguments.append("options=options")
     return method
 
@@ -582,27 +587,30 @@ def _inputs(op: Operation, types: Types, method: MethodView) -> None:
     body = op.body
     reserved = OPTIONS | ({"body"} if body and not body.flattened else frozenset())
 
-    def send(target: str, pairs: list[tuple[str, Argument]]) -> None:
-        if pairs:
-            mapping = ", ".join(f"{wire!r}: {argument.name}" for wire, argument in pairs)
+    def send(target: str, pairs: Sequence[tuple[str, str]], always: bool = False) -> None:
+        if pairs or always:
+            mapping = ", ".join(f"{key!r}: {value}" for key, value in pairs)
             method.arguments.append(f"{target}={{{mapping}}}")
+
+    def names(pairs: list[tuple[str, Argument]]) -> list[tuple[str, str]]:
+        return [(wire, argument.name) for wire, argument in pairs]
 
     path = [(p.wire, _argument(p, types, reserved, "path parameter")) for p in op.path_params]
     method.positional = [argument for _, argument in path]
-    send("path_params", path)
+    send("path_params", names(path))
     query = [(p.wire, _argument(p, types, reserved, "query parameter")) for p in op.query_params]
-    send("params", query)
+    send("params", names(query))
     keyword = [argument for _, argument in query]
     if body and body.flattened:
         label = BODY_LABELS[body.kind]
         fields = [(f.wire, _argument(f, types, reserved, label)) for f in body.fields]
         keyword += [argument for _, argument in fields]
         if body.kind == "multipart":
-            binary = {f.wire for f in body.fields if f.type.kind == "binary"}
-            send("data", [pair for pair in fields if pair[0] not in binary])
-            send("files", [pair for pair in fields if pair[0] in binary])
+            send("files", names(fields))
+            media = [(f.wire, repr(f.content_type)) for f in body.fields if f.content_type]
+            send("content_types", media)
         else:
-            send("json" if body.kind == "json" else "data", fields)
+            send("json" if body.kind == "json" else "data", names(fields), always=True)
     elif body:
         annotation = types.render(body.type, "param")
         optional = not body.required
@@ -616,7 +624,7 @@ def _inputs(op: Operation, types: Types, method: MethodView) -> None:
         )
         method.arguments.append("json=body" if body.kind == "json" else "data=body")
     headers = [(p.wire, _argument(p, types, reserved, "header")) for p in op.header_params]
-    send("headers", headers)
+    send("headers", names(headers))
     keyword += [argument for _, argument in headers]
     method.keyword = sorted(keyword, key=lambda argument: argument.default is not None)
     method.doc.section(
@@ -651,9 +659,13 @@ def _notes(op: Operation, types: Types, method: MethodView) -> None:
         notes.append("Experimental: the endpoint may change or disappear without notice.")
     if op.source == "bundle":
         notes.append("Reconstructed from the Whitebird web application; fields may be missing.")
-    if op.auth == "mfa":
-        operation = f" for the `{op.mfa_operation}` operation" if op.mfa_operation else ""
-        notes.append(f"Requires an operation MFA token{operation}, see `Whitebird.mfa_token`.")
+    if op.auth == "mfa" and op.mfa_operation:
+        notes.append(
+            f"Requires an MFA token for the `{op.mfa_operation}` operation. With `otp` "
+            "configured the client obtains it, otherwise see `Whitebird.confirm_operation`."
+        )
+    elif op.auth == "mfa":
+        notes.append("Requires an operation MFA token, see `Whitebird.mfa_token`.")
     if notes:
         method.doc.section("Note", [(None, " ".join(notes))])
     if op.deprecated:

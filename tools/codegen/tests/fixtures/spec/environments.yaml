@@ -2,6 +2,12 @@ oauth:
   token_path: /oauth/token
   service: auth
   basic: Y2xpZW50OnNlY3JldA==
+  mfa_status_path: /api/v1/client/mfa
+  captcha_path: /api/v1/captcha/generate
+
+operation_mfa:
+  service: auth
+  token_path: /api/v1/mfa/token
 
 services:
   auth: {title: Authorization server, production: https://auth.example.test}

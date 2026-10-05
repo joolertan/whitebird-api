@@ -67,6 +67,7 @@ CLIENT_METHODS = frozenset(
         "block_on",
         "builder",
         "clear_mfa_token",
+        "confirm_operation",
         "environment",
         "login",
         "mfa_token",
@@ -78,6 +79,7 @@ CLIENT_METHODS = frozenset(
 COPY_TYPES = frozenset({"i32", "i64", "u32", "f64", "bool", "Decimal", "Timestamp", "NaiveDate"})
 PAGE_DOC = "Page to start from, 0-based; the following pages are fetched as items are consumed."
 DOC_WIDTH = 88
+JSON = "application/json"
 
 
 def emit(ir: IR) -> dict[str, str]:
@@ -316,6 +318,10 @@ class View:
         self.oauth_service = naming.pascal(ir.oauth.service)
         self.oauth_token_path = literal(ir.oauth.token_path)
         self.oauth_basic = literal(ir.oauth.basic)
+        self.oauth_mfa_status_path = literal(ir.oauth.mfa_status_path)
+        self.oauth_captcha_path = literal(ir.oauth.captcha_path)
+        self.operation_mfa_service = naming.pascal(ir.operation_mfa.service)
+        self.operation_mfa_token_path = literal(ir.operation_mfa.token_path)
 
         self.inputs = self._closure(self._input_types())
         reachable = self.inputs | self._closure(
@@ -686,10 +692,15 @@ class View:
         notes = []
         if op.status == "experimental":
             notes.append("**Experimental:** the endpoint may change without notice.")
-        if op.auth == "mfa":
-            target = f" for `{op.mfa_operation}`" if op.mfa_operation else ""
+        if op.auth == "mfa" and op.mfa_operation:
             notes.append(
-                f"Requires an operation MFA token{target}; see "
+                f"Needs an operation MFA token for `{op.mfa_operation}`, which the client "
+                "obtains with [`Client::confirm_operation`](crate::Client::confirm_operation) "
+                "when a one-time code provider is configured."
+            )
+        elif op.auth == "mfa":
+            notes.append(
+                "Needs an operation MFA token; see "
                 "[`Client::set_mfa_token`](crate::Client::set_mfa_token)."
             )
         if op.auth == "none":
@@ -709,7 +720,10 @@ class View:
             decoded = " or the response cannot be decoded" if op.response.kind == "json" else ""
             errors = ["# Errors", "", f"Returns an error if the request fails{decoded}."]
         return comment(
-            doc_lines(op.summary, op.description), [f"`{op.method} {op.path}`"], notes, errors
+            doc_lines(op.summary, op.description),
+            [f"`{op.method} {op.path}`"],
+            [line for note in notes for line in ("", note)][1:],
+            errors,
         )
 
     def _path(self, op: Operation) -> str:
@@ -734,11 +748,16 @@ class View:
             field = Field(param.name, param.wire, param.type)
             method = "query" if param.location == "query" else "header"
             chain.append(f".{method}({literal(param.wire)}, {self._argument(op, field, 'query')})")
+        if op.auth == "mfa" and op.mfa_operation:
+            chain.append(f".mfa_operation({literal(op.mfa_operation)})")
         body = op.body
         if body and body.flattened and body.kind == "multipart":
             self.resource_imports.add("crate::Multipart")
             parts = "".join(self._part(op, f) for f in body.fields)
             chain.append(f".multipart(Multipart::new(){parts})")
+        elif body and body.flattened and not body.fields:
+            self.resource_imports.add("serde_json::Map")
+            chain.append(f".{body.kind}(Map::new())")
         elif body:
             chain.append(f".{body.kind}({'params' if body.flattened else 'body'})")
         return chain
@@ -753,9 +772,20 @@ class View:
         return f"{'' if copy else '&'}params.{ident(f.name)}"
 
     def _part(self, op: Operation, f: Field) -> str:
+        name, value = literal(f.wire), f"params.{ident(f.name)}"
+        item = f.type.item if f.type.kind == "array" and f.type.item else f.type
         if f.type.kind == "binary":
-            return f".file({literal(f.wire)}, params.{ident(f.name)})"
-        return f".text({literal(f.wire)}, {self._argument(op, f, 'body')})"
+            part = f".file({name}, {value})"
+        elif item.kind == "binary":
+            files = value if f.required else f"{value}.into_iter().flatten()"
+            part = f".files({name}, {files})"
+        elif item.kind in ("model", "map", "any"):
+            part = f".json({name}, {self._argument(op, f, 'body')})"
+        else:
+            part = f".text({name}, {self._argument(op, f, 'body')})"
+        if f.content_type and not (part.startswith(".json(") and f.content_type == JSON):
+            part += f".content_type({name}, {literal(f.content_type)})"
+        return part
 
     @staticmethod
     def _paginate(pagination: Pagination) -> str:

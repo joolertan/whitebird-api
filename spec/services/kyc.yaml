@@ -188,9 +188,12 @@ paths:
                     $ref: '#/components/schemas/SupportRequest'
                   description: JSON-encoded `SupportRequest`.
                 files:
-                  type: string
-                  format: binary
-                  description: Attachment; the server accepts the part repeated once per file.
+                  type: array
+                  items: {type: string, format: binary}
+                  description: Attachments, sent as one part per file.
+            encoding:
+              request:
+                contentType: application/json
       responses:
         '200':
           description: OK

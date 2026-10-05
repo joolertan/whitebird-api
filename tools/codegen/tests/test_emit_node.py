@@ -52,7 +52,11 @@ export async function usage(): Promise<void> {
   const pdf: Uint8Array = await client.orders.documents.receipt('o-1', { format: 'PDF' });
   await client.orders.withdraw('o-1', { address: 'addr' }, { timeout: 5000 });
   const balances: Record<string, number> = await client.balances.get();
-  const text: string = await client.profile.uploadAvatar({ file: new Blob(['x']) });
+  const text: string = await client.profile.uploadAvatar({
+    file: new Blob(['x']),
+    crop: { size: 64 },
+  });
+  const cleared: void = await client.cart.clear();
   const tickers = await client.tickers.list({ symbol: 'BTCUSDT' });
   const stream = client.events.stream({ signal: AbortSignal.timeout(1000) });
   for await (const event of stream) {
@@ -63,7 +67,7 @@ export async function usage(): Promise<void> {
   await client.orders.documents.receipt('o-1', {});
   // @ts-expect-error quantity is required
   await client.orders.create({ productId: 1 });
-  console.log(removed, status, future, pdf, balances, text, tickers[0]?.lastPrice);
+  console.log(removed, status, future, pdf, balances, text, cleared, tickers[0]?.lastPrice);
 }
 """
 
@@ -82,6 +86,7 @@ def test_layout(files: dict[str, str]) -> None:
         "index.ts",
         "models.ts",
         "resources/balances.ts",
+        "resources/cart.ts",
         "resources/events.ts",
         "resources/orders.ts",
         "resources/products.ts",
@@ -124,6 +129,12 @@ def test_resources(files: dict[str, str]) -> None:
     assert "bodyType: 'form'" in orders
     assert "@experimental" in orders
     assert "export interface OrdersCreateParams extends OrderRequest {" in orders
+    assert "mfa: 'WITHDRAWAL'" in orders
+
+    cart = source(files, "resources/cart.ts")
+    assert "clear(options?: RequestOptions): Promise<void> {" in cart
+    assert "body: {}" in cart
+    assert "partTypes: { crop: 'application/json' }" in source(files, "resources/profile.ts")
 
     assert "envelope: 'retcode'" in source(files, "resources/tickers.ts")
     assert "AsyncIterable<ServerSentEvent<Event>>" in source(files, "resources/events.ts")
@@ -133,6 +144,11 @@ def test_services(files: dict[str, str]) -> None:
     services = source(files, "services.ts")
     assert "export type ServiceName = 'auth' | 'shop';" in services
     assert "demo: 'https://auth.example.test'," in services
+    assert "captchaPath: '/api/v1/captcha/generate'," in services
+    assert (
+        "export const OPERATION_MFA = {\n  service: 'auth',\n  tokenPath: '/api/v1/mfa/token',"
+        in (services)
+    )
 
 
 def test_typechecks(files: dict[str, str], tmp_path: Path) -> None:

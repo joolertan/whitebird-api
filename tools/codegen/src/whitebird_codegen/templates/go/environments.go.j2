@@ -26,9 +26,18 @@ var serviceURLs = map[Service]map[Environment]string{
 {% endfor %}
 }
 
-// The token endpoint and the public credentials of the web application's OAuth client.
+// The authorization server endpoints used to sign in, and the public credentials of the web
+// application's OAuth client.
 const (
 	tokenService      = {{ oauth_service }}
 	tokenPath         = {{ token_path }}
+	mfaStatusPath     = {{ mfa_status_path }}
+	captchaPath       = {{ captcha_path }}
 	clientCredentials = {{ basic }}
+)
+
+// The endpoint that exchanges a TOTP code for an operation MFA token.
+const (
+	operationMFAService = {{ operation_mfa_service }}
+	operationMFAPath    = {{ operation_mfa_path }}
 )

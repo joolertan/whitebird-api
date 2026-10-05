@@ -5,6 +5,15 @@ oauth:
   service: auth
   # Public credentials of the whitebird.io web client (VITE_AUTH_BASIC_TOKEN).
   basic: YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA=
+  # Sign-in helpers on the same service: whether an account has 2FA, and the slider captcha
+  # that accounts without 2FA must solve.
+  mfa_status_path: /api/v1/client/mfa
+  captcha_path: /api/v1/captcha/generate
+
+# Exchanges a TOTP code for the `x-mfa-token` that operations marked `x-wb-auth: mfa` need.
+operation_mfa:
+  service: api
+  token_path: /api/v2/auth/mfa/merchant/client/token
 
 services:
   accounting: {title: Accounting, production: https://accounting-service.whitebird.io}

@@ -1,5 +1,5 @@
 # {{ HEADER }}
-"""Hosts of the Whitebird services and the OAuth client of the web application."""
+"""Hosts of the Whitebird services and the authentication endpoints of the web application."""
 
 from typing import Final, Literal
 
@@ -21,3 +21,15 @@ OAUTH_TOKEN_PATH: Final = {{ ir.oauth.token_path | literal }}
 
 OAUTH_BASIC: Final = {{ ir.oauth.basic | literal }}
 """HTTP Basic credentials of the public web client, sent to the token endpoint."""
+
+OAUTH_MFA_STATUS_PATH: Final = {{ ir.oauth.mfa_status_path | literal }}
+"""Path on the OAuth service telling whether an account has two-factor authentication."""
+
+OAUTH_CAPTCHA_PATH: Final = {{ ir.oauth.captcha_path | literal }}
+"""Path on the OAuth service that generates the slider captcha of the sign-in form."""
+
+OPERATION_MFA_SERVICE: Final = {{ ir.operation_mfa.service | literal }}
+"""Service that issues operation MFA tokens."""
+
+OPERATION_MFA_TOKEN_PATH: Final = {{ ir.operation_mfa.token_path | literal }}
+"""Path exchanging a one-time code for the `x-mfa-token` of a sensitive operation."""

@@ -105,6 +105,15 @@ Method parameters:
   object in TypeScript, a params struct in Go and Rust);
 - every method accepts per-request options (timeout, extra headers, idempotency of retries).
 
+Request bodies:
+
+- a flattened JSON or form body is always sent, as `{}` when no field is set: Spring rejects a
+  missing `@RequestBody`. Operations without a request body send none;
+- a multipart field with a `content_type` (from `encoding.<field>.contentType`) is sent as a part
+  of that media type, JSON-encoded for `application/json`; other objects are JSON-encoded parts
+  too, scalars are text parts, binaries are file parts. An array of binaries is sent as one part
+  per file under the same name.
+
 ### Pagination
 
 A paginated method returns an object that is directly iterable over items and fetches the next
@@ -139,8 +148,8 @@ language.
 
 - OAuth2 password grant at `auth` `/oauth/token`, form-encoded, `Authorization: Basic <oauth.basic>`.
   Fields: `grant_type=password`, `username` (lowercased), `password`, optional `code` (TOTP).
-- `POST /api/v1/client/mfa {"username": ...}` on `auth` returns `{"mfaEnabled": bool}`; the web
-  app uses it to decide whether to ask for a code.
+- `POST <oauth.mfa_status_path> {"username": ...}` on `auth` returns `{"mfaEnabled": bool}`; the
+  web app uses it to decide whether to ask for a code or for a captcha.
 - A 200 response without `access_token` but with `mfaEnabled: true` means a code is required.
 - Refresh: same endpoint, `grant_type=refresh_token`, `refresh_token=...`. The client refreshes
   proactively when the JWT `exp` is less than 30 s away and reactively once on a 401. If refresh
@@ -149,23 +158,42 @@ language.
 - Tokens are kept in a pluggable token store (in-memory by default) so sessions survive restarts.
 - TOTP codes come from a code provider: a static code, a callback, or the `otp` extra that
   computes codes from the base32 secret.
-- Operation MFA: sensitive operations (withdrawals) need an MFA token sent as `x-mfa-token`.
-  The client stores it once obtained and attaches it to every request.
+- Captcha: the sign-in form makes accounts without 2FA solve a slider captcha. The client
+  generates a UUID v4 `requestId`, calls `GET <oauth.captcha_path>?requestId=...` on `auth`
+  (`{backgroundImage, puzzlePiece, positionY}`, images base64 PNG) and sends the answer with the
+  token request as header `captcha: base64(JSON {"sliderPosition": int, "requestId": str})`.
+  The SDKs never solve captchas themselves: a captcha solver callback (option `captcha`) receives
+  `{request_id, background_image: bytes, puzzle_piece: bytes, position_y}` and returns the slider
+  position. When the account has no 2FA and a solver is configured, the captcha is solved before
+  the token request; a rejection with status `INVALID_CAPTCHA` is retried with a fresh captcha, up
+  to 3 attempts. Without a solver the token request goes out without the header, and a rejection
+  whose `status` or `error` mentions `CAPTCHA` raises `CaptchaRequiredError`.
+- Operation MFA: operations marked `x-wb-auth: mfa` (withdrawals) need an MFA token sent as
+  `x-mfa-token`. `confirm_operation(operation, code=None)` posts
+  `{"operation": operation, "mfaCode": code}` to `operation_mfa.token_path` on
+  `operation_mfa.service` (the code comes from the OTP provider when omitted), takes the token from
+  the body field `mfaToken`, a body that is a bare (JSON or plain) string, or the `x-mfa-token`
+  response header, stores it on the client and returns it. Before an `mfa` operation the client
+  obtains a token this way when none is set and an OTP provider is configured; when the operation
+  is refused with `MFARequiredError` it obtains a new one and retries once. Without an OTP provider
+  the error propagates.
 - Every request sends `Authorization: Bearer <token>` unless the operation is `x-wb-auth: none`.
 
 ### Errors
 
-Whitebird services answer errors as `{"code": int, "status": "MACHINE_CODE", "message": str,
-"fields": [...]}`; the OAuth endpoint answers `{"error": ..., "error_description": ...}`.
+Whitebird services answer errors as `{"code": int, "status": "MACHINE_CODE", "subStatus": str,
+"message": str, "fields": [...]}`; the OAuth endpoint answers `{"error": ...,
+"error_description": ...}`.
 
 ```
 WhitebirdError
 ├── TransportError                 network failure, timeout
-└── APIError                       http status, code, error_code (status string), message, fields, raw body
+└── APIError                       http status, code, error_code (status), sub_status, message, fields, raw body
     ├── BadRequestError            400
     │   └── VerificationRequiredError   status SMS_VERIFICATION_REQUIRED / LIVENESS_VERIFICATION_REQUIRED
     ├── AuthenticationError        401, invalid_grant
-    │   └── MFARequiredError       login needs a TOTP code, or "requires mfa checking" / MFA_CHECKING_REQUIRED
+    │   ├── MFARequiredError       login needs a TOTP code, or "requires mfa checking" / MFA_CHECKING_REQUIRED
+    │   └── CaptchaRequiredError   login needs a solved captcha and no solver is configured
     ├── PermissionDeniedError      403
     ├── NotFoundError              404
     ├── ConflictError              409

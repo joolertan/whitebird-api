@@ -147,12 +147,30 @@ paths:
               type: object
               properties:
                 file: {type: string, format: binary}
+                crop:
+                  type: object
+                  properties:
+                    size: {type: integer}
+            encoding:
+              crop: {contentType: application/json}
       responses:
         "200":
           description: OK
           content:
             text/plain:
               schema: {type: string}
+  /api/v1/cart/clear:
+    post:
+      operationId: cartClear
+      x-wb-resource: cart
+      x-wb-name: clear
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, description: The web app sends an empty object.}
+      responses:
+        "204":
+          description: No content
   /api/v1/tickers:
     get:
       operationId: tickersList

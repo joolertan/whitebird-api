@@ -92,6 +92,11 @@ paths:
       description: >-
         Used when the status is `RETRY_NEEDED` or the QR code expired. Statuses
         `MAX_ATTEMPTS_EXCEEDED` and `LIVENESS_NOT_FOUND` mean no further attempt is possible.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: The web app sends an empty object.}
       responses:
         '200':
           description: OK
@@ -217,9 +222,9 @@ paths:
                     $ref: '#/components/schemas/KycQualificationRequest'
                   description: JSON-encoded `KycQualificationRequest`.
                 files:
-                  type: string
-                  format: binary
-                  description: Supporting document; the server accepts the part repeated once per file.
+                  type: array
+                  items: {type: string, format: binary}
+                  description: Supporting documents, sent as one part per file.
             encoding:
               request:
                 contentType: application/json

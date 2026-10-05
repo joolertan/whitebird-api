@@ -61,14 +61,14 @@ LOCALS = _words("ctx params opts r p page context http iter url strconv time fmt
 # Exported identifiers declared by the handwritten core.
 CORE_NAMES = _words(
     """
-    APIError Client CodeFunc CodeProvider Date DateOf Decimal DecimalFromFloat DecimalFromInt
-    Environment ErrAuthentication ErrBadRequest ErrConflict ErrMFARequired ErrNotFound
-    ErrPermissionDenied ErrRateLimited ErrServer ErrVerificationRequired FileTokenStore
-    MustDecimal NewClient NewDecimal Option Page Ptr RequestOption Service StaticCode
-    StreamEvent Time Token TokenStore TransportError Version WithBaseURL WithCodeProvider
-    WithCredentials WithEnvironment WithHTTPClient WithHeader WithIdempotent WithMaxRetries
-    WithQuery WithRequestMaxRetries WithRequestTimeout WithTimeout WithTokenStore WithUserAgent
-    WithoutAuth
+    APIError Captcha Client CodeFunc CodeProvider Date DateOf Decimal DecimalFromFloat
+    DecimalFromInt Environment ErrAuthentication ErrBadRequest ErrCaptchaRequired ErrConflict
+    ErrMFARequired ErrNotFound ErrPermissionDenied ErrRateLimited ErrServer
+    ErrVerificationRequired FileTokenStore MustDecimal NewClient NewDecimal Option Page Ptr
+    RequestOption Service StaticCode StreamEvent Time Token TokenStore TransportError Version
+    WithBaseURL WithCaptchaSolver WithCodeProvider WithCredentials WithEnvironment
+    WithHTTPClient WithHeader WithIdempotent WithMaxRetries WithQuery WithRequestMaxRetries
+    WithRequestTimeout WithRetcodeEnvelope WithTimeout WithTokenStore WithUserAgent WithoutAuth
     """
 )
 
@@ -93,7 +93,7 @@ OMIT_ZERO_TYPES = frozenset({"Decimal", "Time", "Date"})
 PATH_KINDS = frozenset(
     {"string", "integer", "number", "decimal", "boolean", "datetime", "date", "enum"}
 )
-CLIENT_METHODS = frozenset({"Login", "Request", "SetMFAToken"})
+CLIENT_METHODS = frozenset({"ConfirmOperation", "Login", "Request", "SetMFAToken"})
 
 PACKAGES = {
     "context": "context",
@@ -429,7 +429,7 @@ class Emitter:
         if kind == "integer":
             return INTEGERS.get(type_ref.format or "", "int")
         if kind == "array" and type_ref.item:
-            return "[]" + self.go_type(type_ref.item, request=request)
+            return "[]" + self.go_type(type_ref.item, request=request, form=form)
         if kind == "map" and type_ref.item:
             return "map[string]" + self.go_type(type_ref.item, request=request)
         if kind == "page" and type_ref.item:
@@ -497,10 +497,14 @@ class Emitter:
             go_name = self.enum_names[name]
             values = []
             used: set[str] = set()
+            # The type name prefix makes a leading digit acceptable: Priority1.
+            names = [go_name + "".join(map(_word, naming.words(v.name))) for v in enum.values]
+            if len(set(names)) < len(names):
+                # Values that differ only in case, such as 1m and 1M, keep their spelling.
+                names = [go_name + re.sub(r"\W", "", str(v.wire)) for v in enum.values]
             for index, value in enumerate(enum.values):
-                # The type name prefix makes a leading digit acceptable: Priority1.
-                const = go_name + "".join(_word(w) for w in naming.words(value.name))
-                if const == go_name or const in used:
+                const = names[index]
+                if const == go_name or const in used or not const.isidentifier():
                     const = f"{go_name}Value{index}"
                 used.add(const)
                 self._declare(const, f"value {value.wire!r} of {name}")
@@ -561,9 +565,11 @@ class Emitter:
         if struct and any(f.tag.startswith(("query:", "header:")) for f in struct.fields):
             fields.append(("params", "params"))
         if op.body:
-            fields.append(("body", self._body_expr(op.body)))
+            fields.append(("body", self._body_expr(op.body, struct)))
         if op.envelope:
             fields.append(("envelope", "true"))
+        if op.auth == "mfa" and op.mfa_operation:
+            fields.append(("mfaOperation", json.dumps(op.mfa_operation)))
 
         response = op.response
         paged = op.pagination is not None and response.type is not None
@@ -663,9 +669,12 @@ class Emitter:
             return f"url.PathEscape({arg}.String())"
         return f"url.PathEscape({arg})"
 
-    def _body_expr(self, body: Body) -> str:
+    def _body_expr(self, body: Body, struct: GoStruct | None) -> str:
         encoder = {"json": "jsonBody", "form": "formBody", "multipart": "multipartBody"}[body.kind]
-        return f"{encoder}(params)" if body.flattened else f"{encoder}(params.Body)"
+        if not body.flattened:
+            return f"{encoder}(params.Body)"
+        # A flattened body is always sent, as an empty object when the method has no parameters.
+        return f"{encoder}(params)" if struct else f"{encoder}(struct{{}}{{}})"
 
     def params(self, op: Operation, resource: str, method: str) -> GoStruct | None:
         name = exported("_".join([*op.resource, op.name])) + "Params"
@@ -717,6 +726,8 @@ class Emitter:
                 if form:
                     option = ",omitempty" if paging(f.wire) else _omitempty(required, type_)
                     tag = f'form:"{f.wire}{option}"'
+                    if form == "multipart" and f.content_type:
+                        tag += f' mime:"{f.content_type}"'
                 else:
                     tag = f'json:"{f.wire}{"" if required else ",omitzero"}"'
                 doc = comment(_field_doc(f.description, f))
@@ -754,7 +765,7 @@ class Emitter:
             endpoint += " without authentication"
         elif op.auth == "mfa":
             what = f" for {op.mfa_operation}" if op.mfa_operation else ""
-            endpoint += f" with an operation MFA token{what}, set by [Client.SetMFAToken]"
+            endpoint += f" with an operation MFA token{what} (see [Client.ConfirmOperation])"
         if first:
             result = [first, *map(sentence, rest), f"It calls {endpoint}."]
         else:
@@ -790,14 +801,19 @@ class Emitter:
         self._model_usages()
         models, enums = self.models(), self.enums()
 
+        oauth, mfa = self.ir.oauth, self.ir.operation_mfa
         rendered = {
             "client_gen.go": env.get_template("client.go.j2").render(resources=resources),
             "environments_gen.go": env.get_template("environments.go.j2").render(
                 environments=environments,
                 services=services,
-                oauth_service="Service" + exported(self.ir.oauth.service),
-                token_path=json.dumps(self.ir.oauth.token_path),
-                basic=json.dumps(self.ir.oauth.basic),
+                oauth_service=self._service(oauth.service, "oauth"),
+                token_path=json.dumps(oauth.token_path),
+                mfa_status_path=json.dumps(oauth.mfa_status_path),
+                captcha_path=json.dumps(oauth.captcha_path),
+                basic=json.dumps(oauth.basic),
+                operation_mfa_service=self._service(mfa.service, "operation_mfa"),
+                operation_mfa_path=json.dumps(mfa.token_path),
             ),
         }
         if models:
@@ -823,6 +839,11 @@ class Emitter:
         return {
             str(ROOT / name): _util.pipe(["gofmt"], source) for name, source in rendered.items()
         }
+
+    def _service(self, key: str, where: str) -> str:
+        if key not in self.ir.services:
+            raise EmitError(f"{where} refers to the unknown service {key}")
+        return "Service" + exported(key)
 
     def environments(self) -> list[GoConst]:
         result = []

@@ -17,9 +17,17 @@ export const SERVICE_URLS: Record<ServiceName, Record<Environment, string>> = {
 {% endfor %}
 };
 
-/** OAuth client of the whitebird.io web application, used to log in. */
+/** OAuth client of the whitebird.io web application and the sign-in endpoints it uses. */
 export const OAUTH = {
   service: {{ oauth.service | quote }},
   tokenPath: {{ oauth.token_path | quote }},
   basic: {{ oauth.basic | quote }},
+  mfaStatusPath: {{ oauth.mfa_status_path | quote }},
+  captchaPath: {{ oauth.captcha_path | quote }},
+} as const;
+
+/** Endpoint that exchanges a two-factor code for the token of operations such as withdrawals. */
+export const OPERATION_MFA = {
+  service: {{ operation_mfa.service | quote }},
+  tokenPath: {{ operation_mfa.token_path | quote }},
 } as const;

@@ -28,9 +28,19 @@ import pytest
 import respx
 
 from whitebird import AsyncWhitebird, MemoryTokenStore, ServerSentEvent, Tokens, Whitebird
-from whitebird.models import Category, Event, Order, OrderStatus, Priority, Product, Ticker
+from whitebird.models import (
+    Category,
+    Event,
+    Order,
+    OrderStatus,
+    Priority,
+    Product,
+    ProfileUploadAvatarRequestCrop,
+    Ticker,
+)
 
 SHOP = "https://shop.example.test"
+AUTH = "https://auth.example.test"
 
 
 def client() -> Whitebird:
@@ -86,13 +96,25 @@ def test_json_body_and_header(respx_mock: respx.MockRouter) -> None:
     assert request.headers["authorization"] == "Bearer token"
 
 
-def test_form_body_with_mfa_token(respx_mock: respx.MockRouter) -> None:
+def test_empty_body_is_sent_as_an_object(respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.post(f"{SHOP}/api/v1/cart/clear").respond(204)
+
+    assert client().cart.clear() is None
+
+    assert route.calls.last.request.content == b"{}"
+
+
+def test_mfa_operation_obtains_a_token(respx_mock: respx.MockRouter) -> None:
+    confirm = respx_mock.post(f"{AUTH}/api/v1/mfa/token").respond(json={"mfaToken": "mfa"})
     route = respx_mock.post(f"{SHOP}/api/v1/orders/o%201/withdraw").respond(200)
-    shop = client()
-    shop.mfa_token = "mfa"
+    shop = Whitebird(token_store=MemoryTokenStore(Tokens("token")), otp="123456")
 
     assert shop.orders.withdraw("o 1", address="addr") is None
 
+    assert json.loads(confirm.calls.last.request.content) == {
+        "operation": "WITHDRAWAL",
+        "mfaCode": "123456",
+    }
     request = route.calls.last.request
     assert request.content == b"address=addr"
     assert request.headers["x-mfa-token"] == "mfa"
@@ -112,8 +134,11 @@ def test_binary_text_map_and_envelope(respx_mock: respx.MockRouter) -> None:
     shop = client()
 
     assert shop.orders.documents.receipt("o", format="PDF") == b"%PDF"
-    assert shop.profile.upload_avatar(file=("a.png", b"img", "image/png")) == "ok"
-    assert b'filename="a.png"' in upload.calls.last.request.content
+    crop = ProfileUploadAvatarRequestCrop(size=2)
+    assert shop.profile.upload_avatar(file=("a.png", b"img", "image/png"), crop=crop) == "ok"
+    content = upload.calls.last.request.content
+    assert b'filename="a.png"' in content
+    assert b'name="crop"\\r\\nContent-Type: application/json\\r\\n\\r\\n{"size":2}' in content
     assert shop.balances.get() == {"BTC": Decimal("0.000000000000000001")}
     assert shop.tickers.list() == [Ticker(symbol="BTCUSDT", last_price="1")]
 
@@ -200,6 +225,7 @@ def test_files_are_owned_and_marked(files: dict[str, str]) -> None:
         "services.py",
         "resources/__init__.py",
         "resources/balances.py",
+        "resources/cart.py",
         "resources/events.py",
         "resources/orders.py",
         "resources/products.py",
@@ -226,6 +252,14 @@ def test_generated_code_reads_like_the_spec(files: dict[str, str]) -> None:
     products = files[f"{emitter.PACKAGE}/resources/products.py"]
     assert "    ) -> SyncPager[Product]:" in products
     assert "@deprecated(" in products
+    profile = files[f"{emitter.PACKAGE}/resources/profile.py"]
+    assert 'files={"file": file, "crop": crop},' in profile
+    assert 'content_types={"crop": "application/json"},' in profile
+    assert "            json={},\n" in files[f"{emitter.PACKAGE}/resources/cart.py"]
+    assert 'mfa_operation="WITHDRAWAL",' in files[f"{emitter.PACKAGE}/resources/orders.py"]
+    services = files[f"{emitter.PACKAGE}/services.py"]
+    assert 'OAUTH_CAPTCHA_PATH: Final = "/api/v1/captcha/generate"' in services
+    assert 'OPERATION_MFA_TOKEN_PATH: Final = "/api/v1/mfa/token"' in services
     tickers = files[f"{emitter.PACKAGE}/resources/tickers.py"]
     assert "    ) -> builtins.list[Ticker]:" in tickers
     assert "cast_to=list[Ticker]," in tickers

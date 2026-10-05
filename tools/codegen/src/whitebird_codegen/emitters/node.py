@@ -142,6 +142,7 @@ def emit(ir: IR) -> dict[str, str]:
             environments=ir.environments,
             services=[_service_view(service, ir.environments) for service in ir.services.values()],
             oauth=ir.oauth,
+            operation_mfa=ir.operation_mfa,
         ),
     }
     for top in tops:
@@ -264,6 +265,11 @@ class _Groups:
         return self.body is not None and not self.body.flattened
 
     @property
+    def empty_body(self) -> bool:
+        """True when the body is an object without fields, sent as `{}`."""
+        return self.body is not None and self.body.flattened and not self.body.fields
+
+    @property
     def rest(self) -> str | None:
         """The location that receives the members not picked out by name."""
         if self.body_fields:
@@ -338,7 +344,7 @@ def _method(op: Operation) -> _MethodView:
     args = [f"{name}: {_ts(p.type)}" for name, p in zip(path_args, op.path_params, strict=True)]
     groups = _Groups(op.query_params, op.header_params, op.body)
     params = None
-    if groups.query or groups.headers or groups.body:
+    if groups.query or groups.headers or groups.body_fields or groups.raw_body:
         params = _params_view(op, groups)
         args.append(_params_arg(params, groups))
     args.append(f"options?: {'StreamOptions' if op.response.kind == 'sse' else 'RequestOptions'}")
@@ -374,7 +380,8 @@ def _method_uses(op: Operation) -> _Uses:
     sse = op.response.kind == "sse"
     uses = _Uses(paginator=op.pagination is not None, stream=sse, options=not sse)
     result = op.pagination.item if op.pagination else op.response.type
-    for ref in [*(p.type for p in op.params), op.body.type if op.body else None, result]:
+    body = op.body.type if op.body and (op.body.fields or not op.body.flattened) else None
+    for ref in [*(p.type for p in op.params), body, result]:
         uses.add(ref)
     return uses
 
@@ -382,12 +389,14 @@ def _method_uses(op: Operation) -> _Uses:
 def _params_arg(params: _ParamsView | None, groups: _Groups) -> str:
     if params:
         return f"params: {params.name}" + ("" if groups.required else " = {}")
-    # The body model itself is the params type; an optional body may be left out entirely.
+    # The body model itself is the params type. The body is sent even when no field is set.
     assert groups.body
     model = _ts(groups.body.type)
-    if not groups.body.required:
-        return f"params?: {model}"
-    return f"params: {model}" + ("" if groups.required else " = {}")
+    if groups.required:
+        return f"params: {model}"
+    if any(f.required for f in groups.body.fields):
+        model = f"Partial<{model}>"
+    return f"params: {model} = {{}}"
 
 
 def _params_view(op: Operation, groups: _Groups) -> _ParamsView | None:
@@ -444,17 +453,27 @@ def _request(op: Operation, groups: _Groups) -> tuple[str | None, list[str]]:
             request.append(location if prelude else f"{location}: params")
         elif location == "body" and groups.raw_body:
             request.append("body" if prelude else "body: params.body")
+        elif location == "body" and groups.empty_body:
+            request.append("body: {}")
         elif picked.get(location):
             pairs = ", ".join(_binding(wire, local) for wire, local in picked[location])
             request.append(f"{location}: {{ {pairs} }}")
     if op.body and op.body.kind != "json":
         request.append(f"bodyType: {_quote(op.body.kind)}")
+    part_types = (
+        [(f.wire, f.content_type) for f in op.body.fields if f.content_type] if op.body else []
+    )
+    if part_types:
+        pairs = ", ".join(f"{_key(wire)}: {_quote(media)}" for wire, media in part_types)
+        request.append(f"partTypes: {{ {pairs} }}")
     if op.response.kind in RESPONSE_TYPES:
         request.append(f"responseType: {_quote(op.response.kind)}")
     if op.auth == "none":
         request.append("auth: false")
     if op.envelope:
         request.append(f"envelope: {_quote(op.envelope)}")
+    if op.mfa_operation:
+        request.append(f"mfa: {_quote(op.mfa_operation)}")
     return prelude, request
 
 
@@ -479,6 +498,12 @@ def _method_doc(op: Operation, path_args: list[str]) -> list[str]:
     lines.append(f"`{op.method} {op.path}`")
     if op.auth == "none":
         lines += ["", "Works without logging in."]
+    elif op.mfa_operation:
+        lines += [
+            "",
+            f"Needs an operation MFA token for `{op.mfa_operation}`: the client gets one with the "
+            "configured `otp`, or call {@link Whitebird.confirmOperation} first.",
+        ]
     elif op.auth == "mfa":
         lines += ["", "Needs an operation MFA token: set {@link Whitebird.mfaToken} first."]
     tags = [
@@ -497,7 +522,10 @@ def _method_doc(op: Operation, path_args: list[str]) -> list[str]:
             "`options.signal` aborts."
         )
     if op.auth == "mfa":
-        tags.append("@throws {@link MFARequiredError} if the operation MFA token is missing.")
+        tags.append(
+            "@throws {@link MFARequiredError} if the operation MFA token is missing and no `otp` "
+            "is configured."
+        )
     if op.status == "experimental":
         tags.append("@experimental")
     if op.deprecated:
@@ -629,7 +657,7 @@ def _check_names(ir: IR, tops: list[_ResourceView]) -> None:
             raise ValueError(f"{owner} and {owners[name]} both export {name}; rename one of them")
         owners[name] = owner
 
-    for name in ("Environment", "ServiceName", "SERVICE_URLS", "OAUTH"):
+    for name in ("Environment", "ServiceName", "SERVICE_URLS", "OAUTH", "OPERATION_MFA"):
         claim(name, "the services module")
     for name in [*ir.models, *ir.enums]:
         claim(name, f"schema {name}")

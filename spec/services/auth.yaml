@@ -638,6 +638,11 @@ paths:
         confirmation. (An API error `PHONE_CONFIRMATION_REQUIRED` is instead shown as "contact
         support".) The web app sends an empty JSON object. Errors `SMS_SENDING_ERROR`,
         `SMS_CODE_ERROR` (`subStatus` `TOO_MANY_ATTEMPTS`, `TOO_SOON`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: The web app sends an empty object.}
       responses:
         '200': {description: OK}
   /api/v1/user/phone/phone-confirmation/verify-code:
@@ -670,6 +675,11 @@ paths:
         unchanged. The web app sends an empty JSON object, allows 2 resends (30 s apart, codes
         valid 2 minutes) and 3 wrong codes. `SMS_VERIFICATION_FAILED` means the user is blocked
         and must contact support; `SMS_SENDING_ERROR` is a delivery failure.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: The web app sends an empty object.}
       responses:
         '200': {description: OK}
   /api/v1/user/phone/antifraud-verification/verify-code:

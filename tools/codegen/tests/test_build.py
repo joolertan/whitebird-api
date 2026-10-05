@@ -20,6 +20,7 @@ def operation(ir: IR, op_id: str) -> Operation:
 def test_resources_follow_x_wb_resource(ir: IR) -> None:
     assert sorted(ir.root.children) == [
         "balances",
+        "cart",
         "events",
         "orders",
         "products",
@@ -167,3 +168,64 @@ def test_operation_and_resource_names_must_differ(tmp_path: Path) -> None:
     )
     with pytest.raises(SpecError, match="both an operation and a resource"):
         load(tmp_path)
+
+
+def test_multipart_part_content_types(ir: IR) -> None:
+    body = operation(ir, "profileUploadAvatar").body
+    assert body is not None
+    assert body.flattened
+    assert {f.wire: f.content_type for f in body.fields} == {
+        "file": None,
+        "crop": "application/json",
+    }
+
+
+def test_object_body_without_properties_is_flattened(ir: IR) -> None:
+    body = operation(ir, "cartClear").body
+    assert body is not None
+    assert body.flattened
+    assert body.fields == []
+
+
+def test_sign_in_and_operation_mfa_paths(ir: IR) -> None:
+    assert ir.oauth.mfa_status_path == "/api/v1/client/mfa"
+    assert ir.oauth.captcha_path == "/api/v1/captcha/generate"
+    assert ir.operation_mfa.service == "auth"
+    assert ir.operation_mfa.token_path == "/api/v1/mfa/token"
+
+
+def test_json_string_with_content_schema_is_typed(tmp_path: Path) -> None:
+    (tmp_path / "services").mkdir()
+    (tmp_path / "environments.yaml").write_text((FIXTURE / "environments.yaml").read_text())
+    (tmp_path / "services" / "shop.yaml").write_text(
+        "x-wb-service: shop\n"
+        "paths:\n"
+        "  /a:\n"
+        "    post:\n"
+        "      operationId: a\n"
+        "      x-wb-resource: a\n"
+        "      x-wb-name: send\n"
+        "      requestBody:\n"
+        "        content:\n"
+        "          multipart/form-data:\n"
+        "            schema:\n"
+        "              properties:\n"
+        "                request:\n"
+        "                  type: string\n"
+        "                  contentMediaType: application/json\n"
+        "                  contentSchema: {$ref: '#/components/schemas/Note'}\n"
+        "                files: {type: array, items: {type: string, format: binary}}\n"
+        "            encoding:\n"
+        "              request: {contentType: application/json}\n"
+        "      responses: {}\n"
+        "components:\n"
+        "  schemas:\n"
+        "    Note: {properties: {text: {type: string}}}\n"
+    )
+    body = operation(load(tmp_path), "a").body
+    assert body is not None
+    fields = {f.wire: (f.type, f.content_type) for f in body.fields}
+    assert fields == {
+        "request": (TypeRef.model("Note"), "application/json"),
+        "files": (TypeRef.array(TypeRef("binary")), None),
+    }

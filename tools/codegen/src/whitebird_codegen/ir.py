@@ -72,6 +72,8 @@ class Field:
     inferred: bool = False
     deprecated: bool = False
     default: Any = None
+    content_type: str | None = None
+    """Media type of a multipart part (``encoding.<field>.contentType``); None means the default."""
 
 
 @dataclass
@@ -114,11 +116,9 @@ class Body:
     type: TypeRef
     fields: list[Field]
     required: bool = True
-
-    @property
-    def flattened(self) -> bool:
-        """True when the body is an object whose fields become method parameters."""
-        return bool(self.fields)
+    flattened: bool = False
+    """The body is an object whose fields become method parameters. With no fields the
+    method takes no body arguments and sends an empty object."""
 
 
 @dataclass
@@ -204,6 +204,16 @@ class OAuth:
     service: str
     token_path: str
     basic: str
+    mfa_status_path: str
+    captcha_path: str
+
+
+@dataclass
+class OperationMfa:
+    """Endpoint exchanging a TOTP code for the ``x-mfa-token`` of sensitive operations."""
+
+    service: str
+    token_path: str
 
 
 @dataclass
@@ -211,6 +221,7 @@ class IR:
     environments: list[str]
     services: dict[str, Service]
     oauth: OAuth
+    operation_mfa: OperationMfa
     root: Resource
     models: dict[str, Model]
     enums: dict[str, Enum]

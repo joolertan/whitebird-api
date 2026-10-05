@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast, get_args
 
@@ -22,6 +23,7 @@ from .ir import (
     Model,
     OAuth,
     Operation,
+    OperationMfa,
     Pagination,
     Param,
     Resource,
@@ -78,8 +80,14 @@ class Builder:
         }
         oauth = environments["oauth"]
         self.oauth = OAuth(
-            service=oauth["service"], token_path=oauth["token_path"], basic=oauth["basic"]
+            service=oauth["service"],
+            token_path=oauth["token_path"],
+            basic=oauth["basic"],
+            mfa_status_path=oauth["mfa_status_path"],
+            captcha_path=oauth["captcha_path"],
         )
+        mfa = environments["operation_mfa"]
+        self.operation_mfa = OperationMfa(service=mfa["service"], token_path=mfa["token_path"])
         self.root = Resource(())
         self.models: dict[str, Model] = {}
         self.enums: dict[str, Enum] = {}
@@ -99,6 +107,7 @@ class Builder:
             environments=self.environments,
             services=self.services,
             oauth=self.oauth,
+            operation_mfa=self.operation_mfa,
             root=self.root,
             models=dict(sorted(self.models.items())),
             enums=dict(sorted(self.enums.items())),
@@ -232,14 +241,25 @@ class Builder:
             self._problem(f"{where}: unsupported request media {sorted(content)}")
             return None
         media, kind = match
-        body_type = self._type(content[media].get("schema", {}), hint)
-        fields = (
-            self.models[body_type.name].fields
-            if body_type.kind == "model" and body_type.name
-            else []
-        )
+        schema = content[media].get("schema", {})
+        body_type = self._type(schema, hint)
+        if body_type.kind == "model" and body_type.name:
+            fields = self.models[body_type.name].fields
+        else:
+            fields = []
+        encoding: dict[str, Schema] = content[media].get("encoding") or {}
+        if encoding:
+            fields = [
+                replace(f, content_type=encoding.get(f.wire, {}).get("contentType")) for f in fields
+            ]
+        # An object without properties (`{}` is all the web app sends) still flattens.
+        plain_object = self._deref(schema).get("type") == "object" and body_type.kind == "any"
         return Body(
-            kind=kind, type=body_type, fields=fields, required=request.get("required", True)
+            kind=kind,
+            type=body_type,
+            fields=fields,
+            required=request.get("required", True),
+            flattened=body_type.kind == "model" or plain_object,
         )
 
     def _response(self, raw: Schema, hint: str) -> Response:
@@ -298,6 +318,11 @@ class Builder:
             return self._enum(naming.pascal(hint), schema)
         kind = schema.get("type")
         fmt = schema.get("format")
+        # A JSON document carried in a string, e.g. the JSON part of a multipart body.
+        if kind == "string" and "json" in schema.get("contentMediaType", ""):
+            content = schema.get("contentSchema")
+            if content:
+                return self._type(content, hint)
         if kind == "string":
             return STRING_FORMATS.get(fmt or "", TypeRef("string"))
         if kind == "integer":

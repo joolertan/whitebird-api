@@ -1,3 +1,4 @@
+import copy
 import fnmatch
 import os
 import shutil
@@ -9,7 +10,7 @@ import pytest
 from whitebird_codegen.build import load
 from whitebird_codegen.emitters import go
 from whitebird_codegen.emitters._util import HEADER
-from whitebird_codegen.ir import IR
+from whitebird_codegen.ir import IR, EnumValue
 
 FIXTURE = Path(__file__).parent / "fixtures" / "spec"
 MODULE = Path(__file__).resolve().parents[3] / "go"
@@ -32,6 +33,7 @@ def files(ir: IR) -> dict[str, str]:
 def test_files_are_owned_and_marked(files: dict[str, str]) -> None:
     assert sorted(files) == [
         "go/balances_gen.go",
+        "go/cart_gen.go",
         "go/client_gen.go",
         "go/enums_gen.go",
         "go/environments_gen.go",
@@ -79,8 +81,9 @@ def test_operation_docs(files: dict[str, str]) -> None:
     assert (
         "// Deprecated: Whitebird has deprecated this endpoint.\nfunc (r *ProductsResource) Delete("
     ) in products
-    assert "This endpoint is experimental" in files["go/orders_gen.go"]
-    assert "operation MFA token for\n// WITHDRAWAL" in files["go/orders_gen.go"]
+    orders = files["go/orders_gen.go"]
+    assert "This endpoint is experimental" in orders
+    assert "operation MFA token for WITHDRAWAL\n// (see [Client.ConfirmOperation])" in orders
 
 
 def test_type_rules(files: dict[str, str]) -> None:
@@ -92,10 +95,30 @@ def test_type_rules(files: dict[str, str]) -> None:
     assert 'Priority   *Priority `json:"priority,omitzero"`' in orders
     assert 'XRequestID *string   `header:"X-Request-Id" json:"-"`' in orders
     assert 'Page     int           `json:"page,omitzero"`' in orders
-    assert 'File io.Reader `form:"file"`' in files["go/profile_gen.go"]
+    profile = files["go/profile_gen.go"]
+    assert 'File io.Reader                       `form:"file"`' in profile
+    assert 'Crop *ProfileUploadAvatarRequestCrop `form:"crop" mime:"application/json"`' in profile
     # Flattened request bodies are not models.
     assert "type OrderRequest " not in models
     assert "Priority1 Priority = 1" in files["go/enums_gen.go"]
+
+
+def test_operation_details(files: dict[str, str]) -> None:
+    # A body without fields is still sent, as an empty object.
+    cart = files["go/cart_gen.go"]
+    assert "Clear(ctx context.Context, opts ...RequestOption) error" in cart
+    assert "body:    jsonBody(struct{}{})," in cart
+    assert 'mfaOperation: "WITHDRAWAL",' in files["go/orders_gen.go"]
+    environments = files["go/environments_gen.go"]
+    assert 'captchaPath       = "/api/v1/captcha/generate"' in environments
+    assert 'operationMFAPath    = "/api/v1/mfa/token"' in environments
+
+
+def test_enum_values_differing_in_case(ir: IR) -> None:
+    ir = copy.deepcopy(ir)
+    ir.enums["Category"].values = [EnumValue(wire, wire) for wire in ("1m", "1h", "1M")]
+    (enum,) = [e for e in go.Emitter(ir).enums() if e.name == "Category"]
+    assert [c.name for c in enum.values] == ["Category1m", "Category1h", "Category1M"]
 
 
 def test_core_name_clashes_are_renamed(ir: IR) -> None:
@@ -147,6 +170,7 @@ func fixtureClient(t *testing.T, mux *http.ServeMux) *Client {
 	t.Cleanup(srv.Close)
 	client, err := NewClient(
 		WithCredentials("user@example.test", "secret"),
+		WithCodeProvider(StaticCode("123456")),
 		WithBaseURL(ServiceAuth, srv.URL),
 		WithBaseURL(ServiceShop, srv.URL),
 	)
@@ -196,6 +220,11 @@ func TestFixtureOperations(t *testing.T) {
 		expect(t, "search body", string(body), `{"statuses":["NEW"]}`)
 		fmt.Fprint(w, `{"content":[{"id":"o1","status":"NEW"}],"totalElements":1}`)
 	})
+	mux.HandleFunc("POST /api/v1/mfa/token", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		expect(t, "MFA token request", string(body), `{"mfaCode":"123456","operation":"WITHDRAWAL"}`)
+		fmt.Fprint(w, `{"mfaToken":"mfa"}`)
+	})
 	mux.HandleFunc("POST /api/v1/orders/{id}/withdraw", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		expect(t, "withdraw form", r.PostForm.Encode(), "address=addr")
@@ -216,7 +245,13 @@ func TestFixtureOperations(t *testing.T) {
 			return
 		}
 		data, _ := io.ReadAll(file)
+		expect(t, "crop part", r.FormValue("crop"), `{"size":64}`)
 		fmt.Fprintf(w, "%s:%s", header.Filename, data)
+	})
+	mux.HandleFunc("POST /api/v1/cart/clear", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		expect(t, "clear body", string(body), "{}")
+		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /api/v1/tickers", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"retCode":0,"retMsg":"OK","result":[{"symbol":"BTCUSDT"}]}`)
@@ -261,7 +296,6 @@ func TestFixtureOperations(t *testing.T) {
 	}
 	expect(t, "search", found, []string{"o1"})
 
-	client.SetMFAToken("mfa")
 	if err := client.Orders.Withdraw(ctx, "a/b", OrdersWithdrawParams{Address: "addr"}); err != nil {
 		t.Fatal(err)
 	}
@@ -277,11 +311,14 @@ func TestFixtureOperations(t *testing.T) {
 	}
 	expect(t, "balance", balances["BTC"], "0.100000000000000000001")
 
-	text, err := client.Profile.UploadAvatar(ctx, ProfileUploadAvatarParams{File: strings.NewReader("png")})
+	text, err := client.Profile.UploadAvatar(ctx, ProfileUploadAvatarParams{File: strings.NewReader("png"), Crop: &ProfileUploadAvatarRequestCrop{Size: Ptr(64)}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	expect(t, "upload", text, "file:png")
+	if err := client.Cart.Clear(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	tickers, err := client.Tickers.List(ctx, TickersListParams{})
 	if err != nil {
