@@ -71,7 +71,13 @@ describe('error responses', () => {
 
   it('keeps the details of service errors', async () => {
     const fields = [{ field: 'amount', message: 'must be positive' }];
-    const body = { code: 4001, status: 'INVALID_AMOUNT', message: 'Invalid amount', fields };
+    const body = {
+      code: 4001,
+      status: 'INVALID_AMOUNT',
+      subStatus: 'BELOW_MINIMUM',
+      message: 'Invalid amount',
+      fields,
+    };
     const api = new MockApi({ [PUBLIC]: () => Response.json(body, { status: 400 }) });
 
     const error = await call(api).catch((e: unknown) => e);
@@ -81,6 +87,7 @@ describe('error responses', () => {
       status: 400,
       code: 4001,
       errorCode: 'INVALID_AMOUNT',
+      subStatus: 'BELOW_MINIMUM',
       fields,
       body,
     });

@@ -166,9 +166,17 @@ export const SERVICE_URLS: Record<ServiceName, Record<Environment, string>> = {
   },
 };
 
-/** OAuth client of the whitebird.io web application, used to log in. */
+/** OAuth client of the whitebird.io web application and the sign-in endpoints it uses. */
 export const OAUTH = {
   service: 'auth',
   tokenPath: '/oauth/token',
   basic: 'YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA=',
+  mfaStatusPath: '/api/v1/client/mfa',
+  captchaPath: '/api/v1/captcha/generate',
+} as const;
+
+/** Endpoint that exchanges a two-factor code for the token of operations such as withdrawals. */
+export const OPERATION_MFA = {
+  service: 'api',
+  tokenPath: '/api/v2/auth/mfa/merchant/client/token',
 } as const;

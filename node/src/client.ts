@@ -1,7 +1,14 @@
 import type { CodeProvider } from './auth.js';
+import type { CaptchaSolver } from './captcha.js';
 import { type ApiRequest, Core } from './core.js';
 import { Resources } from './generated/index.js';
-import { type Environment, OAUTH, SERVICE_URLS, type ServiceName } from './generated/services.js';
+import {
+  type Environment,
+  OAUTH,
+  OPERATION_MFA,
+  SERVICE_URLS,
+  type ServiceName,
+} from './generated/services.js';
 import type { RequestOptions } from './http.js';
 import { MemoryTokenStore, type TokenStore } from './tokens.js';
 
@@ -16,6 +23,12 @@ export interface WhitebirdOptions {
    * `totp(secret)` from `whitebird-api/otp` to compute codes from the authenticator secret.
    */
   otp?: CodeProvider;
+  /**
+   * Solves the slider captcha that accounts without two-factor authentication get when logging
+   * in. Without it such a login fails with {@link CaptchaRequiredError} when the captcha is
+   * enforced.
+   */
+  captcha?: CaptchaSolver;
   /**
    * Platform contour: `demo` is the sandbox for trading. Services without a demo host use
    * production.
@@ -83,17 +96,22 @@ export class Whitebird extends Resources {
         authService: OAUTH.service,
         tokenPath: OAUTH.tokenPath,
         basic: OAUTH.basic,
+        mfaStatusPath: OAUTH.mfaStatusPath,
+        captchaPath: OAUTH.captchaPath,
+        operationMfa: OPERATION_MFA,
         store: options.tokenStore ?? new MemoryTokenStore(),
         username: options.username,
         password: options.password,
         otp: options.otp,
+        captcha: options.captcha,
       }),
     );
   }
 
   /**
    * Operation MFA token, sent as `x-mfa-token` with every request while set. Sensitive
-   * operations such as withdrawals need it; set it to `undefined` to stop sending it.
+   * operations such as withdrawals need it: {@link Whitebird.confirmOperation} sets it, and so
+   * does the client on its own when `otp` is configured. Set it to `undefined` to stop sending it.
    */
   get mfaToken(): string | undefined {
     return this._client.mfaToken;
@@ -104,10 +122,35 @@ export class Whitebird extends Resources {
   }
 
   /**
+   * Confirms a sensitive operation with a two-factor code: exchanges the code for an operation
+   * MFA token, which is then sent with every request (see {@link Whitebird.mfaToken}).
+   *
+   * With `otp` configured there is no need to call this: operations that need a token get one
+   * before they are sent, and a new one when theirs is refused.
+   *
+   * @param operation - Operation to confirm, such as `WITHDRAWAL`.
+   * @param code - Current two-factor code. @defaultValue the next code of `otp`
+   * @returns The operation MFA token.
+   * @throws {@link MFARequiredError} if no code is given and no `otp` is configured.
+   * @throws {@link APIError} (or a subclass) when the code is rejected.
+   *
+   * @example
+   * ```ts
+   * await client.confirmOperation('WITHDRAWAL', '123456');
+   * await client.balance.withdrawals.createCrypto({ accountType: 'WALLET', calculationId });
+   * ```
+   */
+  confirmOperation(operation: string, code?: string): Promise<string> {
+    return this._client.confirmOperation(operation, code);
+  }
+
+  /**
    * Logs in now instead of on the first authenticated call.
    *
    * @throws {@link MFARequiredError} if the account has two-factor authentication and no `otp`
    * is configured.
+   * @throws {@link CaptchaRequiredError} if a captcha must be solved and no `captcha` solver is
+   * configured, or it failed three times.
    * @throws {@link AuthenticationError} if the credentials or the two-factor code are rejected.
    */
   login(): Promise<void> {

@@ -16,7 +16,6 @@ import type {
   ExchangeQuote,
   ExchangeQuoteRequest,
   ExchangeRateStat,
-  ExchangeRateStatsFilter,
 } from '../models.js';
 
 /** Endpoints under `client.exchange`. */
@@ -272,14 +271,9 @@ export class ExchangeRatesResource extends APIResource {
    *
    * @experimental
    */
-  stats(params: ExchangeRatesStatsParams, options?: RequestOptions): Promise<ExchangeRateStat[]> {
+  stats(options?: RequestOptions): Promise<ExchangeRateStat[]> {
     return this._client.call(
-      {
-        service: 'exchange',
-        method: 'POST',
-        path: '/api/v1/exchange/rate/stats',
-        body: params.body,
-      },
+      { service: 'exchange', method: 'POST', path: '/api/v1/exchange/rate/stats', body: {} },
       options,
     );
   }
@@ -304,10 +298,4 @@ export interface ExchangeOrdersHistoryParams extends ExchangeOrderHistoryFilter 
   size?: number;
   /** Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`. */
   sort?: string[];
-}
-
-/** Parameters of {@link ExchangeRatesResource.stats}. */
-export interface ExchangeRatesStatsParams {
-  /** Request body. */
-  body: ExchangeRateStatsFilter;
 }

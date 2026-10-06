@@ -230,9 +230,11 @@ export class BalanceWithdrawalsResource extends APIResource {
    *
    * `POST /api/v2/exchange/client/balance/crypto/withdrawal`
    *
-   * Needs an operation MFA token: set {@link Whitebird.mfaToken} first.
+   * Needs an operation MFA token for `WITHDRAWAL`: the client gets one with the configured `otp`,
+   * or call {@link Whitebird.confirmOperation} first.
    *
-   * @throws {@link MFARequiredError} if the operation MFA token is missing.
+   * @throws {@link MFARequiredError} if the operation MFA token is missing and no `otp` is
+   *   configured.
    * @experimental
    */
   createCrypto(params: BalanceCryptoWithdrawalRequest, options?: RequestOptions): Promise<unknown> {
@@ -242,6 +244,7 @@ export class BalanceWithdrawalsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/crypto/withdrawal',
         body: params,
+        mfa: 'WITHDRAWAL',
       },
       options,
     );
@@ -257,9 +260,11 @@ export class BalanceWithdrawalsResource extends APIResource {
    *
    * `POST /api/v2/exchange/client/balance/fiat/withdrawal`
    *
-   * Needs an operation MFA token: set {@link Whitebird.mfaToken} first.
+   * Needs an operation MFA token for `WITHDRAWAL`: the client gets one with the configured `otp`,
+   * or call {@link Whitebird.confirmOperation} first.
    *
-   * @throws {@link MFARequiredError} if the operation MFA token is missing.
+   * @throws {@link MFARequiredError} if the operation MFA token is missing and no `otp` is
+   *   configured.
    * @experimental
    */
   createFiat(params: BalanceFiatWithdrawalRequest, options?: RequestOptions): Promise<unknown> {
@@ -269,6 +274,7 @@ export class BalanceWithdrawalsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/fiat/withdrawal',
         body: params,
+        mfa: 'WITHDRAWAL',
       },
       options,
     );

@@ -52,6 +52,50 @@ describe('generated methods', () => {
     await expect(client(api).brokerage.cryptoAddresses.delete('a/b')).resolves.toBeUndefined();
   });
 
+  it('sends an empty object as the body of operations without body fields', async () => {
+    const api = new MockApi({ 'POST /api/v1/exchange/rate/stats': () => Response.json([]) });
+
+    await client(api).exchange.rates.stats();
+
+    const [request] = api.calls('POST /api/v1/exchange/rate/stats');
+    expect(request?.headers.get('content-type')).toBe('application/json');
+    expect(await request?.text()).toBe('{}');
+  });
+
+  it('sends an object body even when no field is set', async () => {
+    const api = new MockApi({ 'POST /api/v2/kyc/liveness/start': () => Response.json({}) });
+
+    await client(api).kyc.liveness.start();
+
+    expect(await api.calls('POST /api/v2/kyc/liveness/start')[0]?.text()).toBe('{}');
+  });
+
+  it('sends multipart parts with their declared media type', async () => {
+    const route = 'POST /api/v2/qualification';
+    const api = new MockApi({ [route]: () => new Response(null) });
+    const request = { requestedInvestorStatus: 'QUALIFIED_INVESTOR', certifiedExpert: true } as const;
+
+    await client(api).kyc.qualification.submit({
+      request,
+      files: [
+        new File(['%PDF'], 'diploma.pdf', { type: 'application/pdf' }),
+        new File(['%PDF'], 'contract.pdf', { type: 'application/pdf' }),
+      ],
+    });
+
+    const data = await api.calls(route)[0]?.formData();
+    const part = data?.get('request') as File;
+    const file = data?.get('files') as File;
+    expect(part.type).toBe('application/json');
+    expect(JSON.parse(await part.text())).toEqual(request);
+    expect(data?.getAll('files')).toHaveLength(2);
+    expect([file.name, file.type, await file.text()]).toEqual([
+      'diploma.pdf',
+      'application/pdf',
+      '%PDF',
+    ]);
+  });
+
   it('repeats array query parameters', async () => {
     const api = new MockApi({
       'GET /api/v1/brokerage/subaccount/page': () => Response.json({ content: [], last: true }),
@@ -156,6 +200,37 @@ describe('request()', () => {
     expect(api.calls('POST /form')[0]?.headers.get('content-type')).toMatch(
       /application\/x-www-form-urlencoded/,
     );
+  });
+
+  it('sends one part per file, and other objects as JSON parts', async () => {
+    const api = new MockApi({ 'POST /upload': () => new Response(null) });
+
+    await client(api).request('brokerage', 'POST', '/upload', {
+      body: {
+        files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')],
+        filter: { assets: ['BTC'] },
+        tags: ['x', 'y'],
+        none: [],
+        count: 2,
+      },
+      bodyType: 'multipart',
+      responseType: 'empty',
+    });
+
+    const data = (await api.calls('POST /upload')[0]?.formData()) as FormData;
+    const files = data.getAll('files') as File[];
+    expect(await Promise.all(files.map((f) => f.text()))).toEqual(['a', 'b']);
+    expect(files.map((f) => f.name)).toEqual(['a.txt', 'b.txt']);
+    for (const [name, json] of [
+      ['filter', { assets: ['BTC'] }],
+      ['tags', ['x', 'y']],
+    ] as const) {
+      const part = data.get(name) as File;
+      expect(part.type).toBe('application/json');
+      expect(JSON.parse(await part.text())).toEqual(json);
+    }
+    expect(data.has('none')).toBe(false);
+    expect(data.get('count')).toBe('2');
   });
 });
 

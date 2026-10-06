@@ -28,6 +28,7 @@ export class SupportResource extends APIResource {
         headers: { recaptcha },
         body,
         bodyType: 'multipart',
+        partTypes: { request: 'application/json' },
       },
       options,
     );

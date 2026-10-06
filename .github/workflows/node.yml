@@ -3,9 +3,9 @@ name: Node.js
 on:
   push:
     branches: [main]
-    paths: [node/**, .github/workflows/node.yml]
+    paths: [node/**, examples/node/**, .github/workflows/node.yml]
   pull_request:
-    paths: [node/**, .github/workflows/node.yml]
+    paths: [node/**, examples/node/**, .github/workflows/node.yml]
 
 permissions:
   contents: read
@@ -27,9 +27,14 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: node/package-lock.json
+          cache-dependency-path: |
+            node/package-lock.json
+            examples/node/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+      - name: Typecheck the examples
+        working-directory: examples/node
+        run: npm ci && npm run typecheck

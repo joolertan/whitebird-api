@@ -13,6 +13,7 @@ export interface APIErrorDetails {
   status?: number;
   code?: number;
   errorCode?: string;
+  subStatus?: string;
   fields?: unknown[];
   body?: unknown;
   headers?: Headers;
@@ -27,6 +28,8 @@ export class APIError extends WhitebirdError {
   readonly code: number | undefined;
   /** Machine-readable code: `status` of service errors (`SMS_VERIFICATION_REQUIRED`, ...), `error` of OAuth errors. */
   readonly errorCode: string | undefined;
+  /** Finer-grained machine-readable code that some service errors add (`subStatus`). */
+  readonly subStatus: string | undefined;
   /** Field validation errors, as sent by the server. */
   readonly fields: unknown[];
   /** Parsed response body, or its text when it is not JSON. */
@@ -39,6 +42,7 @@ export class APIError extends WhitebirdError {
     this.status = details.status;
     this.code = details.code;
     this.errorCode = details.errorCode;
+    this.subStatus = details.subStatus;
     this.fields = details.fields ?? [];
     this.body = details.body;
     this.headers = details.headers;
@@ -69,10 +73,18 @@ export class AuthenticationError extends APIError {
 
 /**
  * A two-factor code is needed: either to log in (configure `otp`), or as an operation MFA token
- * for a sensitive operation (set `client.mfaToken`).
+ * for a sensitive operation (configure `otp`, or call `client.confirmOperation`).
  */
 export class MFARequiredError extends AuthenticationError {
   override name = 'MFARequiredError';
+}
+
+/**
+ * Logging in needs a solved slider captcha: no `captcha` solver is configured, or the captchas
+ * it solved were rejected.
+ */
+export class CaptchaRequiredError extends AuthenticationError {
+  override name = 'CaptchaRequiredError';
 }
 
 /** HTTP 403: the account may not perform the operation. */
@@ -123,8 +135,8 @@ const STATUS_ERRORS: Record<number, typeof APIError> = {
 
 /**
  * Builds the error for an error response. Understands service errors
- * (`{code, status, message, fields}`), OAuth errors (`{error, error_description}`) and
- * `{retCode, retMsg}` envelopes.
+ * (`{code, status, subStatus, message, fields}`), OAuth errors (`{error, error_description}`)
+ * and `{retCode, retMsg}` envelopes.
  */
 export function errorFromResponse(status: number, body: unknown, headers?: Headers): APIError {
   const data = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
@@ -135,6 +147,7 @@ export function errorFromResponse(status: number, body: unknown, headers?: Heade
     status,
     code: integer(data.code) ?? integer(data.retCode),
     errorCode,
+    subStatus: text(data.subStatus),
     fields: Array.isArray(data.fields) ? data.fields : [],
     body,
     headers,

@@ -214,7 +214,10 @@ export class KycLivenessResource extends APIResource {
    *
    * @experimental
    */
-  start(params?: KycLivenessStartRequest, options?: RequestOptions): Promise<KycLivenessSession> {
+  start(
+    params: KycLivenessStartRequest = {},
+    options?: RequestOptions,
+  ): Promise<KycLivenessSession> {
     return this._client.call(
       { service: 'api', method: 'POST', path: '/api/v2/kyc/liveness/start', body: params },
       options,
@@ -233,7 +236,7 @@ export class KycLivenessResource extends APIResource {
    */
   retry(options?: RequestOptions): Promise<KycLivenessSession> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/kyc/liveness/retry' },
+      { service: 'api', method: 'POST', path: '/api/v2/kyc/liveness/retry', body: {} },
       options,
     );
   }
@@ -360,6 +363,7 @@ export class KycQualificationResource extends APIResource {
         path: '/api/v2/qualification',
         body: params,
         bodyType: 'multipart',
+        partTypes: { request: 'application/json' },
       },
       options,
     );

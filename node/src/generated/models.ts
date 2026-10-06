@@ -3593,11 +3593,28 @@ export interface KycProfileClosureConfirmRequest {
   token: string;
 }
 
+/**
+ * Content of the `request` part of `POST /api/v2/qualification`. The web app sends every criterion
+ * of the requested level, `true` for the ticked ones: `incomeOver80kByn`, `assetsOver150kByn` for
+ * `QUALIFIED_INVESTOR`, `incomeOver300kByn`, `assetsOver600kByn` for `HIGHLY_QUALIFIED_INVESTOR`,
+ * plus `certifiedExpert`, `experienceInOrganization` and `personalTradingExperience` for both.
+ */
+export interface KycQualificationRequest {
+  requestedInvestorStatus: KycInvestorStatus;
+  incomeOver80kByn?: boolean;
+  assetsOver150kByn?: boolean;
+  incomeOver300kByn?: boolean;
+  assetsOver600kByn?: boolean;
+  certifiedExpert?: boolean;
+  experienceInOrganization?: boolean;
+  personalTradingExperience?: boolean;
+}
+
 export interface KycQualificationSubmitRequest {
   /** JSON-encoded `KycQualificationRequest`. */
-  request: string;
-  /** Supporting document; the server accepts the part repeated once per file. */
-  files: Blob;
+  request: KycQualificationRequest;
+  /** Supporting documents, sent as one part per file. */
+  files: Blob[];
 }
 
 export interface KycSumsubToken {
@@ -4513,6 +4530,19 @@ export interface SubaccountResponse {
   status?: SubaccountStatus;
 }
 
+/** Content of the `request` part of `POST /api/v1/support`. */
+export interface SupportRequest {
+  name: string;
+  email: string;
+  /**
+   * Free text; the web form offers fixed topics in Russian (registration, documents, operations,
+   * individual exchange terms, withdrawal limit increase, swap limit increase, service error, legal
+   * entity, other, and settlement account binding).
+   */
+  topic: string;
+  message: string;
+}
+
 export interface SupportResponse {
   /**
    * `OK` on success.
@@ -4523,9 +4553,9 @@ export interface SupportResponse {
 
 export interface SupportSendRequest {
   /** JSON-encoded `SupportRequest`. */
-  request: string;
-  /** Attachment; the server accepts the part repeated once per file. */
-  files?: Blob;
+  request: SupportRequest;
+  /** Attachments, sent as one part per file. */
+  files?: Blob[];
 }
 
 export interface TradingDemoDepositRequest {

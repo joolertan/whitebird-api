@@ -527,14 +527,9 @@ export class IcoIssuersResource extends APIResource {
    *   every item.
    * @experimental
    */
-  names(params: IcoIssuersNamesParams, options?: RequestOptions): Paginator<IcoIssuerName> {
+  names(options?: RequestOptions): Paginator<IcoIssuerName> {
     return this._client.paginate(
-      {
-        service: 'ico',
-        method: 'POST',
-        path: '/api/v1/ico/statistic/issuer/names',
-        body: params.body,
-      },
+      { service: 'ico', method: 'POST', path: '/api/v1/ico/statistic/issuer/names', body: {} },
       options,
     );
   }
@@ -1050,12 +1045,6 @@ export interface IcoEmissionsListInvestedParams {
 export interface IcoEmissionsStableCoinAvailabilityParams {
   /** Assets to check. */
   assets: string[];
-}
-
-/** Parameters of {@link IcoIssuersResource.names}. */
-export interface IcoIssuersNamesParams {
-  /** Request body. */
-  body: unknown;
 }
 
 /** Parameters of {@link IcoIssuersDocumentsResource.list}. */

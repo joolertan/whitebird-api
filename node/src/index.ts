@@ -8,6 +8,7 @@
  */
 
 export type { CodeProvider } from './auth.js';
+export type { Captcha, CaptchaSolver } from './captcha.js';
 export { type RawRequest, Whitebird, type WhitebirdOptions } from './client.js';
 export type { ApiRequest } from './core.js';
 export {
@@ -15,6 +16,7 @@ export {
   type APIErrorDetails,
   AuthenticationError,
   BadRequestError,
+  CaptchaRequiredError,
   ConflictError,
   MFARequiredError,
   NotFoundError,

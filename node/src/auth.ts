@@ -1,4 +1,11 @@
-import { APIError, AuthenticationError, MFARequiredError } from './errors.js';
+import { type CaptchaSolver, solveCaptcha } from './captcha.js';
+import {
+  APIError,
+  type APIErrorDetails,
+  AuthenticationError,
+  CaptchaRequiredError,
+  MFARequiredError,
+} from './errors.js';
 import { type HttpClient, readJson } from './http.js';
 import { jwtExpiry, type TokenStore, type Tokens } from './tokens.js';
 
@@ -8,11 +15,18 @@ import { jwtExpiry, type TokenStore, type Tokens } from './tokens.js';
  */
 export type CodeProvider = string | (() => string | Promise<string>);
 
+/** Returns the current code of a provider. */
+export async function resolveCode(otp: CodeProvider | undefined): Promise<string | undefined> {
+  return typeof otp === 'function' ? otp() : otp;
+}
+
 export interface SessionConfig {
   http: HttpClient;
   /** Base URL of the authorization server. */
   authUrl: string;
   tokenPath: string;
+  mfaStatusPath: string;
+  captchaPath: string;
   /** Value of the `Authorization: Basic` header of the OAuth client. */
   basic: string;
   headers: Record<string, string>;
@@ -20,6 +34,7 @@ export interface SessionConfig {
   username?: string | undefined;
   password?: string | undefined;
   otp?: CodeProvider | undefined;
+  captcha?: CaptchaSolver | undefined;
 }
 
 interface TokenResponse {
@@ -29,11 +44,12 @@ interface TokenResponse {
   mfaEnabled?: boolean;
 }
 
-const MFA_CHECK_PATH = '/api/v1/client/mfa';
 const REFRESH_MARGIN = 30_000;
+const CAPTCHA_ATTEMPTS = 3;
 const MFA_HINT =
   'Two-factor authentication is enabled for this account: pass `otp` (a code, a function ' +
   "returning one, or totp(secret) from 'whitebird-api/otp')";
+const CAPTCHA_HINT = 'Logging in needs a solved captcha: pass a `captcha` solver';
 
 /**
  * Owns the OAuth tokens: logs in lazily, refreshes shortly before expiry or after a 401, and
@@ -123,46 +139,66 @@ export class Session {
   }
 
   async #passwordGrant(): Promise<Tokens> {
-    const { username, password, otp } = this.#config;
+    const { username, password, otp, captcha } = this.#config;
     if (!username || !password) {
       throw new AuthenticationError(
         'Not logged in: pass `username` and `password`, or a `tokenStore` holding a session',
       );
     }
-    const code = typeof otp === 'function' ? await otp() : otp;
-    // Asking first gives a clear error instead of an opaque invalid_grant.
-    const mfaEnabled = code === undefined ? await this.#mfaEnabled(username) : undefined;
-    if (mfaEnabled) throw new MFARequiredError(MFA_HINT);
+    const code = await resolveCode(otp);
+    // Like the web app: accounts with 2FA are asked for a code, the others for a captcha.
+    const mfaEnabled = code === undefined || captcha ? await this.#mfaEnabled(username) : undefined;
+    if (mfaEnabled && code === undefined) throw new MFARequiredError(MFA_HINT);
+    const form = {
+      grant_type: 'password',
+      username: username.toLowerCase(),
+      password,
+      ...(code !== undefined && { code }),
+    };
 
+    let solve = mfaEnabled === false;
+    for (let attempt = 1; ; attempt++) {
+      const answer = captcha && solve ? await this.#solveCaptcha(captcha) : undefined;
+      try {
+        return await this.#passwordToken(form, answer, mfaEnabled);
+      } catch (error) {
+        const rejected = error instanceof APIError ? error : undefined;
+        if (!rejected?.errorCode?.toUpperCase().includes('CAPTCHA')) throw error;
+        if (!captcha) {
+          throw new CaptchaRequiredError(`${rejected.message}. ${CAPTCHA_HINT}`, details(rejected));
+        }
+        if (rejected.errorCode !== 'INVALID_CAPTCHA' || attempt === CAPTCHA_ATTEMPTS) {
+          throw new CaptchaRequiredError(rejected.message, details(rejected));
+        }
+        solve = true;
+      }
+    }
+  }
+
+  async #passwordToken(
+    form: Record<string, string>,
+    captcha: string | undefined,
+    mfaEnabled: boolean | undefined,
+  ): Promise<Tokens> {
     let response: TokenResponse;
     try {
-      response = await this.#token({
-        grant_type: 'password',
-        username: username.toLowerCase(),
-        password,
-        ...(code !== undefined && { code }),
-      });
+      response = await this.#token(form, captcha === undefined ? {} : { captcha });
     } catch (error) {
-      // Without the MFA check result an invalid_grant may just mean a code was expected.
-      const unknownMfa = code === undefined && mfaEnabled === undefined;
+      // Without the MFA status an invalid_grant may just mean that a code was expected.
+      const unknownMfa = form.code === undefined && mfaEnabled === undefined;
       if (
         unknownMfa &&
         error instanceof AuthenticationError &&
         error.errorCode === 'invalid_grant'
       ) {
-        throw new MFARequiredError(`${error.message}. ${MFA_HINT}`, {
-          status: error.status,
-          errorCode: error.errorCode,
-          body: error.body,
-          headers: error.headers,
-        });
+        throw new MFARequiredError(`${error.message}. ${MFA_HINT}`, details(error));
       }
       throw error;
     }
 
     if (response.access_token) return toTokens(response.access_token, response);
     if (response.mfaEnabled) {
-      throw code === undefined
+      throw form.code === undefined
         ? new MFARequiredError(MFA_HINT, { status: 200, body: response })
         : new AuthenticationError('The two-factor code was rejected', {
             status: 200,
@@ -175,11 +211,16 @@ export class Session {
     });
   }
 
+  #solveCaptcha(solver: CaptchaSolver): Promise<string> {
+    const { http, authUrl, captchaPath, headers } = this.#config;
+    return solveCaptcha(http, authUrl + captchaPath, headers, solver);
+  }
+
   async #mfaEnabled(username: string): Promise<boolean | undefined> {
-    const { http, authUrl, headers } = this.#config;
+    const { http, authUrl, mfaStatusPath, headers } = this.#config;
     try {
       const result = await http.send(
-        authUrl + MFA_CHECK_PATH,
+        authUrl + mfaStatusPath,
         {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/json' },
@@ -195,13 +236,16 @@ export class Session {
     }
   }
 
-  async #token(form: Record<string, string>): Promise<TokenResponse> {
+  async #token(
+    form: Record<string, string>,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<TokenResponse> {
     const { http, authUrl, tokenPath, basic, headers } = this.#config;
     const response = await http.send(
       authUrl + tokenPath,
       {
         method: 'POST',
-        headers: { ...headers, Authorization: `Basic ${basic}` },
+        headers: { ...headers, ...extraHeaders, Authorization: `Basic ${basic}` },
         body: new URLSearchParams(form),
       },
       {},
@@ -219,6 +263,12 @@ function toTokens(accessToken: string, response: TokenResponse, refreshToken?: s
     expiresAt:
       jwtExpiry(accessToken) ?? (lifetime === undefined ? undefined : Date.now() + lifetime * 1000),
   };
+}
+
+/** Copies what the server said, to rethrow it as another error class with a better message. */
+function details(error: APIError): APIErrorDetails {
+  const { status, code, errorCode, subStatus, fields, body, headers } = error;
+  return { status, code, errorCode, subStatus, fields, body, headers };
 }
 
 function expiresSoon(tokens: Tokens): boolean {
