@@ -15,6 +15,7 @@ __all__ = [
     "APIError",
     "AuthenticationError",
     "BadRequestError",
+    "CaptchaRequiredError",
     "ConflictError",
     "MFARequiredError",
     "NotFoundError",
@@ -30,7 +31,8 @@ _VERIFICATIONS: dict[str, Literal["sms", "liveness"]] = {
     "SMS_VERIFICATION_REQUIRED": "sms",
     "LIVENESS_VERIFICATION_REQUIRED": "liveness",
 }
-_OAUTH_ERROR = re.compile(r"[a-z_]+")
+# Machine codes, unlike the reason phrases ("Bad Request") Spring puts in `error`.
+_MACHINE_CODE = re.compile(r"[a-z_]+|[A-Z_]+")
 
 
 class WhitebirdError(Exception):
@@ -49,6 +51,7 @@ class APIError(WhitebirdError):
         status_code: HTTP status of the response, if the error came from one.
         code: Numeric error code from the body (`code`, or `retCode` of enveloped responses).
         error_code: Machine-readable error, e.g. `SMS_VERIFICATION_REQUIRED` or `invalid_grant`.
+        sub_status: Refinement of `error_code` sent by some services as `subStatus`.
         fields: Per-field validation problems, exactly as sent by the server.
         body: Decoded response body (JSON value or text).
         response: The HTTP response, if the error came from one.
@@ -61,6 +64,7 @@ class APIError(WhitebirdError):
         status_code: int | None = None,
         code: int | None = None,
         error_code: str | None = None,
+        sub_status: str | None = None,
         fields: list[Any] | None = None,
         body: Any = None,
         response: httpx.Response | None = None,
@@ -70,6 +74,7 @@ class APIError(WhitebirdError):
         self.status_code = status_code
         self.code = code
         self.error_code = error_code
+        self.sub_status = sub_status
         self.fields = fields or []
         self.body = body
         self.response = response
@@ -103,7 +108,15 @@ class MFARequiredError(AuthenticationError):
     """A one-time code or an operation MFA token is required.
 
     Raised when logging in to an account with two-factor authentication without a code, and
-    when an operation answers that it requires MFA checking (see `Whitebird.mfa_token`).
+    when an operation answers that it requires MFA checking (see `Whitebird.confirm_operation`).
+    """
+
+
+class CaptchaRequiredError(AuthenticationError):
+    """Logging in needs a solved captcha.
+
+    Raised when the token endpoint asks for a captcha and the client has no `captcha` solver,
+    or when the answers of the solver were rejected three times.
     """
 
 
@@ -144,8 +157,14 @@ _BY_STATUS: dict[int, type[APIError]] = {
 }
 
 
-def error_from_response(response: httpx.Response) -> APIError:
-    """Builds the exception matching an error response; the body must have been read."""
+def error_from_response(response: httpx.Response, *, login: bool = False) -> APIError:
+    """Builds the exception matching an error response; the body must have been read.
+
+    Args:
+        response: The error response.
+        login: The response answers a token request, where a rejection that mentions a captcha
+            means `CaptchaRequiredError`.
+    """
     body = _decode(response)
     details: dict[str, Any] = {
         "status_code": response.status_code,
@@ -158,12 +177,16 @@ def error_from_response(response: httpx.Response) -> APIError:
         code = body.get("code")
         details["code"] = code if isinstance(code, int) else None
         details["fields"] = body.get("fields") if isinstance(body.get("fields"), list) else None
+        sub_status = body.get("subStatus")
+        details["sub_status"] = sub_status if isinstance(sub_status, str) else None
         error_code = _error_code(body)
         message = str(body.get("message") or body.get("error_description") or message)
     elif isinstance(body, str) and body.strip():
         message = body.strip()
     details["error_code"] = error_code
 
+    if login and captcha_status(body):
+        return CaptchaRequiredError(message, **details)
     if error_code in _VERIFICATIONS:
         return VerificationRequiredError(message, kind=_VERIFICATIONS[error_code], **details)
     if error_code == "MFA_CHECKING_REQUIRED" or "requires mfa checking" in message.lower():
@@ -195,6 +218,17 @@ def retry_after(response: httpx.Response) -> float | None:
     return max((when - datetime.now(UTC)).total_seconds(), 0.0)
 
 
+def captcha_status(body: object) -> str | None:
+    """Returns the `status` or `error` of an error body when it mentions a captcha."""
+    if not isinstance(body, dict):
+        return None
+    for key in ("status", "error"):
+        value = body.get(key)
+        if isinstance(value, str) and "CAPTCHA" in value.upper():
+            return value
+    return None
+
+
 def _decode(response: httpx.Response) -> Any:
     try:
         return _json.loads(response.content)
@@ -207,7 +241,6 @@ def _error_code(body: dict[str, Any]) -> str | None:
     if isinstance(status, str):
         return status
     error = body.get("error")
-    # Spring's default error body uses `error` for the reason phrase; OAuth uses snake_case codes.
-    if isinstance(error, str) and _OAUTH_ERROR.fullmatch(error):
+    if isinstance(error, str) and _MACHINE_CODE.fullmatch(error):
         return error
     return None

@@ -14,6 +14,7 @@ from ._exceptions import (
     APIError,
     AuthenticationError,
     BadRequestError,
+    CaptchaRequiredError,
     ConflictError,
     MFARequiredError,
     NotFoundError,
@@ -29,15 +30,26 @@ from ._version import __version__
 from .pagination import AsyncPager, Page, SyncPager
 from .streaming import AsyncEventStream, EventStream, ServerSentEvent
 from .tokens import FileTokenStore, MemoryTokenStore, Tokens, TokenStore
-from .types import CodeProvider, FileContent, RequestOptions
+from .types import (
+    AsyncCaptchaSolver,
+    Captcha,
+    CaptchaSolver,
+    CodeProvider,
+    FileContent,
+    RequestOptions,
+)
 
 __all__ = [
     "APIError",
+    "AsyncCaptchaSolver",
     "AsyncEventStream",
     "AsyncPager",
     "AsyncWhitebird",
     "AuthenticationError",
     "BadRequestError",
+    "Captcha",
+    "CaptchaRequiredError",
+    "CaptchaSolver",
     "CodeProvider",
     "ConflictError",
     "Environment",

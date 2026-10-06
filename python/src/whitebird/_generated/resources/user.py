@@ -143,6 +143,7 @@ class UserAntifraudResource(SyncResource):
             "auth",
             "POST",
             "/api/v1/user/phone/antifraud-verification/send-code",
+            json={},
             options=options,
         )
 
@@ -616,6 +617,7 @@ class UserPhoneResource(SyncResource):
             "auth",
             "POST",
             "/api/v1/user/phone/phone-confirmation/send-code",
+            json={},
             options=options,
         )
 
@@ -768,6 +770,7 @@ class AsyncUserAntifraudResource(AsyncResource):
             "auth",
             "POST",
             "/api/v1/user/phone/antifraud-verification/send-code",
+            json={},
             options=options,
         )
 
@@ -1241,6 +1244,7 @@ class AsyncUserPhoneResource(AsyncResource):
             "auth",
             "POST",
             "/api/v1/user/phone/phone-confirmation/send-code",
+            json={},
             options=options,
         )
 

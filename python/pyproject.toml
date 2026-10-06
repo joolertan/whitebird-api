@@ -73,7 +73,7 @@ convention = "google"
 
 [tool.mypy]
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "../examples/python"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

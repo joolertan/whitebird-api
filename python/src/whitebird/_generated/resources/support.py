@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from typing_extensions import Unpack
 
-from whitebird._generated.models import SupportResponse
+from whitebird._generated.models import SupportRequest, SupportResponse
 from whitebird._resource import AsyncResource, SyncResource
 from whitebird.types import FileContent, RequestOptions
 
@@ -16,8 +18,8 @@ class SupportResource(SyncResource):
     def send(
         self,
         *,
-        request: str,
-        files: FileContent | None = None,
+        request: SupportRequest,
+        files: Sequence[FileContent] | None = None,
         recaptcha: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> SupportResponse:
@@ -30,7 +32,7 @@ class SupportResource(SyncResource):
 
         Args:
             request: JSON-encoded `SupportRequest`.
-            files: Attachment; the server accepts the part repeated once per file.
+            files: Attachments, sent as one part per file.
             recaptcha: Google reCAPTCHA v3 token (public support form).
             **options: Per-request options, see `RequestOptions`.
 
@@ -45,8 +47,8 @@ class SupportResource(SyncResource):
             "kyc",
             "POST",
             "/api/v1/support",
-            data={"request": request},
-            files={"files": files},
+            files={"request": request, "files": files},
+            content_types={"request": "application/json"},
             headers={"recaptcha": recaptcha},
             cast_to=SupportResponse,
             options=options,
@@ -59,8 +61,8 @@ class AsyncSupportResource(AsyncResource):
     async def send(
         self,
         *,
-        request: str,
-        files: FileContent | None = None,
+        request: SupportRequest,
+        files: Sequence[FileContent] | None = None,
         recaptcha: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> SupportResponse:
@@ -73,7 +75,7 @@ class AsyncSupportResource(AsyncResource):
 
         Args:
             request: JSON-encoded `SupportRequest`.
-            files: Attachment; the server accepts the part repeated once per file.
+            files: Attachments, sent as one part per file.
             recaptcha: Google reCAPTCHA v3 token (public support form).
             **options: Per-request options, see `RequestOptions`.
 
@@ -88,8 +90,8 @@ class AsyncSupportResource(AsyncResource):
             "kyc",
             "POST",
             "/api/v1/support",
-            data={"request": request},
-            files={"files": files},
+            files={"request": request, "files": files},
+            content_types={"request": "application/json"},
             headers={"recaptcha": recaptcha},
             cast_to=SupportResponse,
             options=options,

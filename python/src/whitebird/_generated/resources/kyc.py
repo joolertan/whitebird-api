@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from functools import cached_property
 from typing import Any, cast
 
@@ -19,6 +19,7 @@ from whitebird._generated.models import (
     KycMsiRedirect,
     KycPersonalData,
     KycProvider,
+    KycQualificationRequest,
     KycSumsubLevelType,
     KycSumsubToken,
     KycVerification,
@@ -439,6 +440,7 @@ class KycLivenessResource(SyncResource):
             "api",
             "POST",
             "/api/v2/kyc/liveness/retry",
+            json={},
             cast_to=KycLivenessSession,
             options=options,
         )
@@ -622,8 +624,8 @@ class KycQualificationResource(SyncResource):
     def submit(
         self,
         *,
-        request: str,
-        files: FileContent,
+        request: KycQualificationRequest,
+        files: Sequence[FileContent],
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Request an investor qualification status.
@@ -637,7 +639,7 @@ class KycQualificationResource(SyncResource):
 
         Args:
             request: JSON-encoded `KycQualificationRequest`.
-            files: Supporting document; the server accepts the part repeated once per file.
+            files: Supporting documents, sent as one part per file.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -650,8 +652,8 @@ class KycQualificationResource(SyncResource):
             "api",
             "POST",
             "/api/v2/qualification",
-            data={"request": request},
-            files={"files": files},
+            files={"request": request, "files": files},
+            content_types={"request": "application/json"},
             options=options,
         )
 
@@ -1164,6 +1166,7 @@ class AsyncKycLivenessResource(AsyncResource):
             "api",
             "POST",
             "/api/v2/kyc/liveness/retry",
+            json={},
             cast_to=KycLivenessSession,
             options=options,
         )
@@ -1347,8 +1350,8 @@ class AsyncKycQualificationResource(AsyncResource):
     async def submit(
         self,
         *,
-        request: str,
-        files: FileContent,
+        request: KycQualificationRequest,
+        files: Sequence[FileContent],
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Request an investor qualification status.
@@ -1362,7 +1365,7 @@ class AsyncKycQualificationResource(AsyncResource):
 
         Args:
             request: JSON-encoded `KycQualificationRequest`.
-            files: Supporting document; the server accepts the part repeated once per file.
+            files: Supporting documents, sent as one part per file.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -1375,8 +1378,8 @@ class AsyncKycQualificationResource(AsyncResource):
             "api",
             "POST",
             "/api/v2/qualification",
-            data={"request": request},
-            files={"files": files},
+            files={"request": request, "files": files},
+            content_types={"request": "application/json"},
             options=options,
         )
 

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import json
 import logging
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,16 +19,25 @@ from ._config import USER_AGENT, Config
 from ._exceptions import (
     APIError,
     AuthenticationError,
+    CaptchaRequiredError,
     MFARequiredError,
     TransportError,
+    captcha_status,
     error_from_response,
 )
-from ._generated.services import OAUTH_BASIC, OAUTH_SERVICE, OAUTH_TOKEN_PATH
+from ._generated.services import (
+    OAUTH_BASIC,
+    OAUTH_CAPTCHA_PATH,
+    OAUTH_MFA_STATUS_PATH,
+    OAUTH_SERVICE,
+    OAUTH_TOKEN_PATH,
+)
 from .tokens import Tokens, TokenStore
-from .types import CodeProvider
+from .types import AsyncCaptchaSolver, Captcha, CaptchaSolver, CodeProvider
 
-MFA_CHECK_PATH = "/api/v1/client/mfa"
 REFRESH_MARGIN = 30.0
+CAPTCHA_ATTEMPTS = 3
+INVALID_CAPTCHA = "INVALID_CAPTCHA"
 
 _MFA_REQUIRED = (
     "Two-factor authentication is enabled for this account: pass otp= to the client "
@@ -67,7 +78,7 @@ class _Authenticator:
     ) -> None:
         self._build_request = http.build_request
         self._config = config
-        self._credentials = credentials
+        self.credentials = credentials
         self._store = store
         self._tokens = store.load()
 
@@ -87,38 +98,57 @@ class _Authenticator:
             return None
         return self._token_request({"grant_type": "refresh_token", "refresh_token": refresh_token})
 
-    def _password_request(self, code: str | None) -> httpx.Request:
-        username, password = self._username(), self._credentials.password
+    def _needs_code(self, mfa_enabled: bool | None) -> bool:
+        # An unknown status means 2FA exactly when a code provider is configured.
+        return self.credentials.otp is not None if mfa_enabled is None else mfa_enabled
+
+    def _password_request(self, code: str | None, answer: str | None = None) -> httpx.Request:
+        username, password = self._username(), self.credentials.password
         form = {"grant_type": "password", "username": username, "password": password or ""}
         if code:
             form["code"] = code
-        return self._token_request(form)
+        return self._token_request(form, {"captcha": answer} if answer else {})
 
     def _mfa_check_request(self) -> httpx.Request:
         return self._build_request(
             "POST",
-            self._config.url(OAUTH_SERVICE, MFA_CHECK_PATH),
+            self._config.url(OAUTH_SERVICE, OAUTH_MFA_STATUS_PATH),
             json={"username": self._username()},
             headers={"User-Agent": USER_AGENT},
             timeout=self._config.timeout,
         )
 
-    def _token_request(self, form: dict[str, str]) -> httpx.Request:
+    def _captcha_request(self, request_id: str) -> httpx.Request:
+        return self._build_request(
+            "GET",
+            self._config.url(OAUTH_SERVICE, OAUTH_CAPTCHA_PATH),
+            params={"requestId": request_id},
+            headers={"User-Agent": USER_AGENT},
+            timeout=self._config.timeout,
+        )
+
+    def _token_request(
+        self, form: dict[str, str], headers: dict[str, str] | None = None
+    ) -> httpx.Request:
         return self._build_request(
             "POST",
             self._config.url(OAUTH_SERVICE, OAUTH_TOKEN_PATH),
             data=form,
-            headers={"Authorization": f"Basic {OAUTH_BASIC}", "User-Agent": USER_AGENT},
+            headers={
+                "Authorization": f"Basic {OAUTH_BASIC}",
+                "User-Agent": USER_AGENT,
+                **(headers or {}),
+            },
             timeout=self._config.timeout,
         )
 
     def _username(self) -> str:
-        if not self._credentials.can_login:
+        if not self.credentials.can_login:
             raise AuthenticationError(
                 "Not logged in: pass username and password to the client, "
                 "or a token store that holds a session"
             )
-        return (self._credentials.username or "").lower()
+        return (self.credentials.username or "").lower()
 
     def _accept(self, response: httpx.Response, *, code_sent: bool) -> Tokens:
         tokens = _parse_tokens(response, code_sent=code_sent)
@@ -131,10 +161,16 @@ class SyncAuthenticator(_Authenticator):
     """Provides access tokens to the sync engine; thread-safe."""
 
     def __init__(
-        self, http: httpx.Client, config: Config, credentials: Credentials, store: TokenStore
+        self,
+        http: httpx.Client,
+        config: Config,
+        credentials: Credentials,
+        store: TokenStore,
+        captcha: CaptchaSolver | None = None,
     ) -> None:
         super().__init__(http, config, credentials, store)
         self._http = http
+        self._captcha = captcha
         self._lock = threading.Lock()
 
     def token(self) -> str:
@@ -162,32 +198,52 @@ class SyncAuthenticator(_Authenticator):
             try:
                 return self._accept(self._send(request), code_sent=False)
             except AuthenticationError:
-                if not self._credentials.can_login:
+                if not self.credentials.can_login:
                     raise
                 logger.info("Refresh token rejected, logging in again")
         return self._login(None)
 
     def _login(self, code: str | None) -> Tokens:
-        code = code or self._credentials.code()
-        request = self._password_request(code)
-        if code is None and self._mfa_enabled():
-            raise MFARequiredError(_MFA_REQUIRED)
-        return self._accept(self._send(request), code_sent=code is not None)
+        if code is None and self._needs_code(self._mfa_status()):
+            code = self.credentials.code()
+            if code is None:
+                raise MFARequiredError(_MFA_REQUIRED)
+        solver = self._captcha if code is None else None
+        attempt = 1
+        while True:
+            answer = self._solve_captcha(solver) if solver else None
+            request = self._password_request(code, answer)
+            try:
+                response = self._send(request, login=True)
+            except CaptchaRequiredError as error:
+                if not _retry_captcha(error, answer, attempt):
+                    raise
+            else:
+                return self._accept(response, code_sent=code is not None)
+            attempt += 1
 
-    def _mfa_enabled(self) -> bool:
+    def _solve_captcha(self, solver: CaptchaSolver) -> str:
+        request_id = str(uuid.uuid4())
+        captcha = _parse_captcha(request_id, self._send(self._captcha_request(request_id)))
+        return _captcha_answer(captcha, solver(captcha))
+
+    def _mfa_status(self) -> bool | None:
+        # Only asked when it decides something: without a code provider (2FA accounts then
+        # fail early) or with a captcha solver (captcha for accounts without 2FA, code otherwise).
+        if self.credentials.otp is not None and self._captcha is None:
+            return None
         try:
-            response = self._send(self._mfa_check_request())
+            return _mfa_enabled(self._send(self._mfa_check_request()))
         except APIError:
-            return False
-        return _mfa_enabled(response)
+            return None
 
-    def _send(self, request: httpx.Request) -> httpx.Response:
+    def _send(self, request: httpx.Request, *, login: bool = False) -> httpx.Response:
         try:
             response = self._http.send(request)
         except httpx.TransportError as error:
             raise TransportError(str(error) or type(error).__name__) from error
         if response.is_error:
-            raise error_from_response(response)
+            raise error_from_response(response, login=login)
         return response
 
 
@@ -195,10 +251,16 @@ class AsyncAuthenticator(_Authenticator):
     """Provides access tokens to the async engine; safe for concurrent tasks."""
 
     def __init__(
-        self, http: httpx.AsyncClient, config: Config, credentials: Credentials, store: TokenStore
+        self,
+        http: httpx.AsyncClient,
+        config: Config,
+        credentials: Credentials,
+        store: TokenStore,
+        captcha: AsyncCaptchaSolver | None = None,
     ) -> None:
         super().__init__(http, config, credentials, store)
         self._http = http
+        self._captcha = captcha
         self._lock = asyncio.Lock()
 
     async def token(self) -> str:
@@ -226,32 +288,55 @@ class AsyncAuthenticator(_Authenticator):
             try:
                 return self._accept(await self._send(request), code_sent=False)
             except AuthenticationError:
-                if not self._credentials.can_login:
+                if not self.credentials.can_login:
                     raise
                 logger.info("Refresh token rejected, logging in again")
         return await self._login(None)
 
     async def _login(self, code: str | None) -> Tokens:
-        code = code or self._credentials.code()
-        request = self._password_request(code)
-        if code is None and await self._mfa_enabled():
-            raise MFARequiredError(_MFA_REQUIRED)
-        return self._accept(await self._send(request), code_sent=code is not None)
+        if code is None and self._needs_code(await self._mfa_status()):
+            code = self.credentials.code()
+            if code is None:
+                raise MFARequiredError(_MFA_REQUIRED)
+        solver = self._captcha if code is None else None
+        attempt = 1
+        while True:
+            answer = await self._solve_captcha(solver) if solver else None
+            request = self._password_request(code, answer)
+            try:
+                response = await self._send(request, login=True)
+            except CaptchaRequiredError as error:
+                if not _retry_captcha(error, answer, attempt):
+                    raise
+            else:
+                return self._accept(response, code_sent=code is not None)
+            attempt += 1
 
-    async def _mfa_enabled(self) -> bool:
+    async def _solve_captcha(self, solver: AsyncCaptchaSolver) -> str:
+        request_id = str(uuid.uuid4())
+        captcha = _parse_captcha(request_id, await self._send(self._captcha_request(request_id)))
+        position = solver(captcha)
+        if inspect.isawaitable(position):
+            position = await position
+        return _captcha_answer(captcha, position)
+
+    async def _mfa_status(self) -> bool | None:
+        # Only asked when it decides something: without a code provider (2FA accounts then
+        # fail early) or with a captcha solver (captcha for accounts without 2FA, code otherwise).
+        if self.credentials.otp is not None and self._captcha is None:
+            return None
         try:
-            response = await self._send(self._mfa_check_request())
+            return _mfa_enabled(await self._send(self._mfa_check_request()))
         except APIError:
-            return False
-        return _mfa_enabled(response)
+            return None
 
-    async def _send(self, request: httpx.Request) -> httpx.Response:
+    async def _send(self, request: httpx.Request, *, login: bool = False) -> httpx.Response:
         try:
             response = await self._http.send(request)
         except httpx.TransportError as error:
             raise TransportError(str(error) or type(error).__name__) from error
         if response.is_error:
-            raise error_from_response(response)
+            raise error_from_response(response, login=login)
         return response
 
 
@@ -275,6 +360,43 @@ def _parse_tokens(response: httpx.Response, *, code_sent: bool) -> Tokens:
             raise AuthenticationError("The one-time code was rejected", **details)
         raise MFARequiredError(_MFA_REQUIRED, **details)
     raise AuthenticationError("The token endpoint answered without an access token", **details)
+
+
+def _parse_captcha(request_id: str, response: httpx.Response) -> Captcha:
+    body = _json_object(response)
+    try:
+        return Captcha(
+            request_id=request_id,
+            background_image=_image(body["backgroundImage"]),
+            puzzle_piece=_image(body["puzzlePiece"]),
+            position_y=int(body["positionY"]),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise APIError(
+            "The captcha endpoint answered with an unexpected body",
+            status_code=response.status_code,
+            body=body,
+            response=response,
+        ) from error
+
+
+def _image(value: object) -> bytes:
+    if not isinstance(value, str):
+        raise TypeError(f"expected a base64 image, got {type(value).__name__}")
+    return base64.b64decode(value.rpartition("base64,")[2])
+
+
+def _captcha_answer(captcha: Captcha, position: int) -> str:
+    answer = {"sliderPosition": position, "requestId": captcha.request_id}
+    return base64.b64encode(json.dumps(answer, separators=(",", ":")).encode()).decode()
+
+
+def _retry_captcha(error: CaptchaRequiredError, answer: str | None, attempt: int) -> bool:
+    status = captcha_status(error.body) or ""
+    if answer and attempt < CAPTCHA_ATTEMPTS and status.upper() == INVALID_CAPTCHA:
+        logger.info("Captcha answer rejected, solving a new captcha")
+        return True
+    return False
 
 
 def _mfa_enabled(response: httpx.Response) -> bool:

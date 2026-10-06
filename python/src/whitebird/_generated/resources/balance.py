@@ -395,20 +395,23 @@ class BalanceWithdrawalsResource(SyncResource):
 
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing. Requires an operation MFA token
-            for the `WITHDRAWAL` operation, see `Whitebird.mfa_token`.
+            the Whitebird web application; fields may be missing. Requires an MFA token for the
+            `WITHDRAWAL` operation. With `otp` configured the client obtains it, otherwise see
+            `Whitebird.confirm_operation`.
 
         Returns:
             The decoded JSON response.
 
         Raises:
-            MFARequiredError: The operation MFA token is missing or expired.
+            MFARequiredError: The operation MFA token is missing or expired, and `otp` is not
+                configured to obtain one.
         """
         return self._engine.request(
             "api",
             "POST",
             "/api/v2/exchange/client/balance/crypto/withdrawal",
             json={"accountType": account_type, "calculationId": calculation_id, "comment": comment},
+            mfa_operation="WITHDRAWAL",
             options=options,
         )
 
@@ -441,14 +444,16 @@ class BalanceWithdrawalsResource(SyncResource):
 
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing. Requires an operation MFA token
-            for the `WITHDRAWAL` operation, see `Whitebird.mfa_token`.
+            the Whitebird web application; fields may be missing. Requires an MFA token for the
+            `WITHDRAWAL` operation. With `otp` configured the client obtains it, otherwise see
+            `Whitebird.confirm_operation`.
 
         Returns:
             The decoded JSON response.
 
         Raises:
-            MFARequiredError: The operation MFA token is missing or expired.
+            MFARequiredError: The operation MFA token is missing or expired, and `otp` is not
+                configured to obtain one.
         """
         return self._engine.request(
             "api",
@@ -462,6 +467,7 @@ class BalanceWithdrawalsResource(SyncResource):
                 "commissionType": commission_type,
                 "bankIdentifier": bank_identifier,
             },
+            mfa_operation="WITHDRAWAL",
             options=options,
         )
 
@@ -905,20 +911,23 @@ class AsyncBalanceWithdrawalsResource(AsyncResource):
 
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing. Requires an operation MFA token
-            for the `WITHDRAWAL` operation, see `Whitebird.mfa_token`.
+            the Whitebird web application; fields may be missing. Requires an MFA token for the
+            `WITHDRAWAL` operation. With `otp` configured the client obtains it, otherwise see
+            `Whitebird.confirm_operation`.
 
         Returns:
             The decoded JSON response.
 
         Raises:
-            MFARequiredError: The operation MFA token is missing or expired.
+            MFARequiredError: The operation MFA token is missing or expired, and `otp` is not
+                configured to obtain one.
         """
         return await self._engine.request(
             "api",
             "POST",
             "/api/v2/exchange/client/balance/crypto/withdrawal",
             json={"accountType": account_type, "calculationId": calculation_id, "comment": comment},
+            mfa_operation="WITHDRAWAL",
             options=options,
         )
 
@@ -951,14 +960,16 @@ class AsyncBalanceWithdrawalsResource(AsyncResource):
 
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing. Requires an operation MFA token
-            for the `WITHDRAWAL` operation, see `Whitebird.mfa_token`.
+            the Whitebird web application; fields may be missing. Requires an MFA token for the
+            `WITHDRAWAL` operation. With `otp` configured the client obtains it, otherwise see
+            `Whitebird.confirm_operation`.
 
         Returns:
             The decoded JSON response.
 
         Raises:
-            MFARequiredError: The operation MFA token is missing or expired.
+            MFARequiredError: The operation MFA token is missing or expired, and `otp` is not
+                configured to obtain one.
         """
         return await self._engine.request(
             "api",
@@ -972,6 +983,7 @@ class AsyncBalanceWithdrawalsResource(AsyncResource):
                 "commissionType": commission_type,
                 "bankIdentifier": bank_identifier,
             },
+            mfa_operation="WITHDRAWAL",
             options=options,
         )
 

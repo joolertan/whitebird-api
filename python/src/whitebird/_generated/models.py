@@ -207,6 +207,7 @@ __all__ = [
     "KycPersonalData",
     "KycProfileClosureConfirmRequest",
     "KycProvider",
+    "KycQualificationRequest",
     "KycQualificationSubmitRequest",
     "KycSumsubLevelType",
     "KycSumsubToken",
@@ -311,6 +312,7 @@ __all__ = [
     "SubaccountResponse",
     "SubaccountStatus",
     "SubaccountType",
+    "SupportRequest",
     "SupportResponse",
     "SupportSendRequest",
     "TradingCategory",
@@ -811,7 +813,11 @@ class KycActualizationClientStatus(StrEnum):
 
 
 class KycInvestorStatus(StrEnum):
-    """Values of `KycInvestorData.investor_status`."""
+    """Kyc investor status.
+
+    Values of `KycInvestorData.investor_status` and
+    `KycQualificationRequest.requested_investor_status`.
+    """
 
     UNQUALIFIED_INVESTOR = "UNQUALIFIED_INVESTOR"
     QUALIFIED_INVESTOR = "QUALIFIED_INVESTOR"
@@ -4000,14 +4006,41 @@ class KycProfileClosureConfirmRequest(WhitebirdModel):
     """Confirmation token from the e-mail link."""
 
 
+class KycQualificationRequest(WhitebirdModel):
+    """Content of the `request` part of `POST /api/v2/qualification`.
+
+    The web app sends every criterion of the requested level, `true` for the ticked ones:
+    `incomeOver80kByn`, `assetsOver150kByn` for `QUALIFIED_INVESTOR`, `incomeOver300kByn`,
+    `assetsOver600kByn` for `HIGHLY_QUALIFIED_INVESTOR`, plus `certifiedExpert`,
+    `experienceInOrganization` and `personalTradingExperience` for both.
+    """
+
+    requested_investor_status: KycInvestorStatus | str
+    income_over80_k_byn: bool | None = Field(
+        default=None, validation_alias="incomeOver80kByn", serialization_alias="incomeOver80kByn"
+    )
+    assets_over150_k_byn: bool | None = Field(
+        default=None, validation_alias="assetsOver150kByn", serialization_alias="assetsOver150kByn"
+    )
+    income_over300_k_byn: bool | None = Field(
+        default=None, validation_alias="incomeOver300kByn", serialization_alias="incomeOver300kByn"
+    )
+    assets_over600_k_byn: bool | None = Field(
+        default=None, validation_alias="assetsOver600kByn", serialization_alias="assetsOver600kByn"
+    )
+    certified_expert: bool | None = None
+    experience_in_organization: bool | None = None
+    personal_trading_experience: bool | None = None
+
+
 class KycQualificationSubmitRequest(WhitebirdModel):
     """Request body of `client.kyc.qualification.submit()`."""
 
-    request: str
+    request: KycQualificationRequest
     """JSON-encoded `KycQualificationRequest`."""
 
-    files: bytes
-    """Supporting document; the server accepts the part repeated once per file."""
+    files: list[bytes]
+    """Supporting documents, sent as one part per file."""
 
 
 class KycSumsubToken(WhitebirdModel):
@@ -5200,6 +5233,20 @@ class SubaccountResponse(WhitebirdModel):
     status: SubaccountStatus | str | None = None
 
 
+class SupportRequest(WhitebirdModel):
+    """Content of the `request` part of `POST /api/v1/support`."""
+
+    name: str
+    email: str
+    topic: str
+    """Free text; the web form offers fixed topics in Russian (registration, documents, operations,
+    individual exchange terms, withdrawal limit increase, swap limit increase, service error,
+    legal entity, other, and settlement account binding).
+    """
+
+    message: str
+
+
 class SupportResponse(WhitebirdModel):
     """Returned by `client.support.send()`."""
 
@@ -5210,11 +5257,11 @@ class SupportResponse(WhitebirdModel):
 class SupportSendRequest(WhitebirdModel):
     """Request body of `client.support.send()`."""
 
-    request: str
+    request: SupportRequest
     """JSON-encoded `SupportRequest`."""
 
-    files: bytes | None = None
-    """Attachment; the server accepts the part repeated once per file."""
+    files: list[bytes] | None = None
+    """Attachments, sent as one part per file."""
 
 
 class TradingDemoDepositRequest(WhitebirdModel):

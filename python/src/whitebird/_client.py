@@ -16,7 +16,7 @@ from ._generated.resources import AsyncResources, Resources
 from ._generated.services import Environment
 from ._http import Envelope
 from .tokens import MemoryTokenStore, TokenStore
-from .types import CodeProvider, FileContent, RequestOptions
+from .types import AsyncCaptchaSolver, CaptchaSolver, CodeProvider, RequestOptions
 
 T = TypeVar("T")
 
@@ -31,8 +31,8 @@ class _Client:
     def mfa_token(self) -> str | None:
         """Operation MFA token, sent as `x-mfa-token` with every request while set.
 
-        Sensitive operations such as withdrawals answer with `MFARequiredError` until a valid
-        token is set. Assign None to stop sending it.
+        Sensitive operations such as withdrawals need one. `confirm_operation` sets it, and so
+        do these operations themselves when `otp` is configured. Assign None to stop sending it.
         """
         return self._engine.mfa_token
 
@@ -52,7 +52,12 @@ class Whitebird(_Client, Resources):
         username: E-mail of the account, needed to log in with a password.
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
-            callable returning a fresh code, or `whitebird.otp.TOTP`.
+            callable returning a fresh code, or `whitebird.otp.TOTP`. Also used to confirm
+            sensitive operations, see `confirm_operation`.
+        captcha: Solves the slider captcha that Whitebird asks of accounts without two-factor
+            authentication when they log in: called with a `Captcha`, returns the slider
+            position. The SDK does not solve captchas itself; without a solver such a login
+            raises `CaptchaRequiredError`.
         environment: `"production"`, or `"demo"` for the sandbox trading contour.
         base_urls: Base URL overrides by service key, e.g. `{"trading": "https://..."}`.
         token_store: Where the session is kept, in memory by default. A `FileTokenStore` keeps
@@ -72,6 +77,22 @@ class Whitebird(_Client, Resources):
             for order in client.brokerage.otc_orders.list(size=100):
                 print(order.uuid, order.status)
         ```
+
+        An account without two-factor authentication logs in through a captcha solver:
+
+        ```python
+        from pathlib import Path
+
+        from whitebird import Captcha, Whitebird
+
+
+        def solve(captcha: Captcha) -> int:
+            Path("captcha.png").write_bytes(captcha.background_image)
+            return int(input("Slider position in captcha.png: "))
+
+
+        client = Whitebird("me@example.com", "password", captcha=solve)
+        ```
     """
 
     _engine: SyncEngine
@@ -82,6 +103,7 @@ class Whitebird(_Client, Resources):
         password: str | None = None,
         *,
         otp: CodeProvider | None = None,
+        captcha: CaptchaSolver | None = None,
         environment: Environment = "production",
         base_urls: Mapping[str, str] | None = None,
         token_store: TokenStore | None = None,
@@ -97,6 +119,7 @@ class Whitebird(_Client, Resources):
             config,
             Credentials(username, password, otp),
             token_store or MemoryTokenStore(),
+            captcha,
         )
         self._engine = SyncEngine(self._http, config, self._auth)
 
@@ -108,9 +131,36 @@ class Whitebird(_Client, Resources):
 
         Raises:
             MFARequiredError: Two-factor authentication is enabled and no code is available.
+            CaptchaRequiredError: Whitebird asks for a captcha and no `captcha` solver is set.
             AuthenticationError: The credentials or the code were rejected.
         """
         self._auth.login(code)
+
+    def confirm_operation(self, operation: str, code: str | None = None) -> str:
+        """Obtains the MFA token that sensitive operations such as withdrawals require.
+
+        The token is kept in `mfa_token` and sent with the following requests. With `otp`
+        configured there is no need to call this: those operations obtain a token on their own
+        when none is set or the current one has expired.
+
+        Args:
+            operation: Kind of operation to confirm, e.g. `"WITHDRAWAL"`.
+            code: One-time code; by default one is taken from `otp`.
+
+        Returns:
+            The MFA token.
+
+        Raises:
+            MFARequiredError: No code was given and `otp` is not configured.
+            APIError: Whitebird rejected the code.
+
+        Examples:
+            ```python
+            client.confirm_operation("WITHDRAWAL", code=input("2FA code: "))
+            client.balance.withdrawals.create_crypto(...)
+            ```
+        """
+        return self._engine.confirm_operation(operation, code)
 
     @overload
     def request(
@@ -123,10 +173,11 @@ class Whitebird(_Client, Resources):
         params: Mapping[str, object] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
         headers: Mapping[str, str | None] | None = ...,
         authenticated: bool = ...,
         envelope: Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: type[T],
         **options: Unpack[RequestOptions],
     ) -> T: ...
@@ -142,10 +193,11 @@ class Whitebird(_Client, Resources):
         params: Mapping[str, object] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
         headers: Mapping[str, str | None] | None = ...,
         authenticated: bool = ...,
         envelope: Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: None = ...,
         **options: Unpack[RequestOptions],
     ) -> Any: ...
@@ -160,10 +212,11 @@ class Whitebird(_Client, Resources):
         params: Mapping[str, object] | None = None,
         json: object = None,
         data: Mapping[str, object] | None = None,
-        files: Mapping[str, FileContent | None] | None = None,
+        files: Mapping[str, object] | None = None,
         headers: Mapping[str, str | None] | None = None,
         authenticated: bool = True,
         envelope: Envelope | None = None,
+        mfa_operation: str | None = None,
         cast_to: Any = None,
         **options: Unpack[RequestOptions],
     ) -> Any:
@@ -179,11 +232,15 @@ class Whitebird(_Client, Resources):
             path_params: Values of the path placeholders; they are URL-quoted.
             params: Query parameters; list values are repeated.
             json: JSON body; models are written with their wire names.
-            data: Form fields, sent as multipart together with `files` if there are any.
-            files: Files to upload as multipart/form-data.
+            data: Form fields, sent form-encoded, or as text parts together with `files`.
+            files: Parts of a multipart/form-data body: files (bytes, a binary file or a
+                `(filename, content[, content_type])` tuple), lists of files sent as one part
+                each, models and mappings sent as JSON parts and other values as text parts.
             headers: Additional headers.
             authenticated: Whether to send the bearer token, logging in first if needed.
             envelope: `"retcode"` to unwrap `{"retCode", "retMsg", "result"}` responses.
+            mfa_operation: Kind of operation, e.g. `"WITHDRAWAL"`, if the endpoint requires an
+                MFA token; it is obtained as `confirm_operation` describes.
             cast_to: Type to validate the response against, e.g. a model or `list[Model]`.
             **options: Per-request options, see `RequestOptions`.
 
@@ -214,6 +271,7 @@ class Whitebird(_Client, Resources):
             files=files,
             authenticated=authenticated,
             envelope=envelope,
+            mfa_operation=mfa_operation,
             cast_to=cast_to,
             options=options,
         )
@@ -245,7 +303,10 @@ class AsyncWhitebird(_Client, AsyncResources):
         username: E-mail of the account, needed to log in with a password.
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
-            callable returning a fresh code, or `whitebird.otp.TOTP`.
+            callable returning a fresh code, or `whitebird.otp.TOTP`. Also used to confirm
+            sensitive operations, see `confirm_operation`.
+        captcha: Solves the login captcha of accounts without two-factor authentication, see
+            `Whitebird`: a function or a coroutine function.
         environment: `"production"`, or `"demo"` for the sandbox trading contour.
         base_urls: Base URL overrides by service key, e.g. `{"trading": "https://..."}`.
         token_store: Where the session is kept, in memory by default. A `FileTokenStore` keeps
@@ -274,6 +335,7 @@ class AsyncWhitebird(_Client, AsyncResources):
         password: str | None = None,
         *,
         otp: CodeProvider | None = None,
+        captcha: AsyncCaptchaSolver | None = None,
         environment: Environment = "production",
         base_urls: Mapping[str, str] | None = None,
         token_store: TokenStore | None = None,
@@ -289,6 +351,7 @@ class AsyncWhitebird(_Client, AsyncResources):
             config,
             Credentials(username, password, otp),
             token_store or MemoryTokenStore(),
+            captcha,
         )
         self._engine = AsyncEngine(self._http, config, self._auth)
 
@@ -300,9 +363,22 @@ class AsyncWhitebird(_Client, AsyncResources):
 
         Raises:
             MFARequiredError: Two-factor authentication is enabled and no code is available.
+            CaptchaRequiredError: Whitebird asks for a captcha and no `captcha` solver is set.
             AuthenticationError: The credentials or the code were rejected.
         """
         await self._auth.login(code)
+
+    async def confirm_operation(self, operation: str, code: str | None = None) -> str:
+        """Obtains the MFA token that sensitive operations such as withdrawals require.
+
+        See `Whitebird.confirm_operation`.
+
+        Examples:
+            ```python
+            await client.confirm_operation("WITHDRAWAL", code="123456")
+            ```
+        """
+        return await self._engine.confirm_operation(operation, code)
 
     @overload
     async def request(
@@ -315,10 +391,11 @@ class AsyncWhitebird(_Client, AsyncResources):
         params: Mapping[str, object] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
         headers: Mapping[str, str | None] | None = ...,
         authenticated: bool = ...,
         envelope: Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: type[T],
         **options: Unpack[RequestOptions],
     ) -> T: ...
@@ -334,10 +411,11 @@ class AsyncWhitebird(_Client, AsyncResources):
         params: Mapping[str, object] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
         headers: Mapping[str, str | None] | None = ...,
         authenticated: bool = ...,
         envelope: Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: None = ...,
         **options: Unpack[RequestOptions],
     ) -> Any: ...
@@ -352,10 +430,11 @@ class AsyncWhitebird(_Client, AsyncResources):
         params: Mapping[str, object] | None = None,
         json: object = None,
         data: Mapping[str, object] | None = None,
-        files: Mapping[str, FileContent | None] | None = None,
+        files: Mapping[str, object] | None = None,
         headers: Mapping[str, str | None] | None = None,
         authenticated: bool = True,
         envelope: Envelope | None = None,
+        mfa_operation: str | None = None,
         cast_to: Any = None,
         **options: Unpack[RequestOptions],
     ) -> Any:
@@ -375,6 +454,7 @@ class AsyncWhitebird(_Client, AsyncResources):
             files=files,
             authenticated=authenticated,
             envelope=envelope,
+            mfa_operation=mfa_operation,
             cast_to=cast_to,
             options=options,
         )

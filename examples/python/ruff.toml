@@ -1,0 +1,5 @@
+extend = "../../python/pyproject.toml"
+
+[lint]
+# Scripts: `main` needs no docstring beyond the module's.
+ignore = ["D103"]

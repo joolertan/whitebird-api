@@ -22,7 +22,6 @@ from whitebird._generated.models import (
     ExchangeQuote,
     ExchangeQuoteLegRequest,
     ExchangeRateStat,
-    ExchangeRateStatsFilter,
 )
 from whitebird._resource import AsyncResource, SyncResource
 from whitebird.pagination import AsyncPager, Page, SyncPager
@@ -483,8 +482,6 @@ class ExchangeRatesResource(SyncResource):
 
     def stats(
         self,
-        *,
-        body: ExchangeRateStatsFilter,
         **options: Unpack[RequestOptions],
     ) -> list[ExchangeRateStat]:
         """Get current and 24-hour-ago exchange rates.
@@ -492,7 +489,6 @@ class ExchangeRatesResource(SyncResource):
         Rates of the home-page ticker. The web app sends an empty filter.
 
         Args:
-            body: Request body.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -506,7 +502,7 @@ class ExchangeRatesResource(SyncResource):
             "exchange",
             "POST",
             "/api/v1/exchange/rate/stats",
-            json=body,
+            json={},
             cast_to=list[ExchangeRateStat],
             options=options,
         )
@@ -966,8 +962,6 @@ class AsyncExchangeRatesResource(AsyncResource):
 
     async def stats(
         self,
-        *,
-        body: ExchangeRateStatsFilter,
         **options: Unpack[RequestOptions],
     ) -> list[ExchangeRateStat]:
         """Get current and 24-hour-ago exchange rates.
@@ -975,7 +969,6 @@ class AsyncExchangeRatesResource(AsyncResource):
         Rates of the home-page ticker. The web app sends an empty filter.
 
         Args:
-            body: Request body.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -989,7 +982,7 @@ class AsyncExchangeRatesResource(AsyncResource):
             "exchange",
             "POST",
             "/api/v1/exchange/rate/stats",
-            json=body,
+            json={},
             cast_to=list[ExchangeRateStat],
             options=options,
         )

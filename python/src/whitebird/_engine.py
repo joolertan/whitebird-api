@@ -12,12 +12,13 @@ from typing import Any, Literal, TypeVar, overload
 import httpx
 
 from . import _http
-from ._auth import AsyncAuthenticator, SyncAuthenticator
+from ._auth import AsyncAuthenticator, Credentials, SyncAuthenticator
 from ._config import Config
-from ._exceptions import TransportError, error_from_response
+from ._exceptions import MFARequiredError, TransportError, error_from_response
+from ._generated.services import OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH
 from .pagination import AsyncPager, Page, SyncPager
 from .streaming import AsyncEventStream, EventStream
-from .types import FileContent, RequestOptions
+from .types import RequestOptions
 
 T = TypeVar("T")
 
@@ -29,9 +30,10 @@ _STREAM_HEADERS = {"Accept": "text/event-stream", "Cache-Control": "no-cache"}
 class _Engine:
     """State and request preparation shared by the sync and async engines."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, credentials: Credentials) -> None:
         self.config = config
         self.mfa_token: str | None = None
+        self._credentials = credentials
 
     def _prepare(
         self,
@@ -44,7 +46,8 @@ class _Engine:
         headers: Mapping[str, str | None] | None = None,
         json: object = None,
         data: Mapping[str, object] | None = None,
-        files: Mapping[str, FileContent | None] | None = None,
+        files: Mapping[str, object] | None = None,
+        content_types: Mapping[str, str] | None = None,
         options: RequestOptions,
     ) -> dict[str, Any]:
         return _http.prepare(
@@ -58,8 +61,24 @@ class _Engine:
             json=json,
             data=data,
             files=files,
+            content_types=content_types,
             options=options,
             mfa_token=self.mfa_token,
+        )
+
+    def _confirmation(self, operation: str, code: str | None) -> dict[str, Any]:
+        code = code or self._credentials.code()
+        if code is None:
+            raise MFARequiredError(
+                f"Confirming the {operation} operation needs a one-time code: pass code= or "
+                "configure otp on the client"
+            )
+        return self._prepare(
+            OPERATION_MFA_SERVICE,
+            "POST",
+            OPERATION_MFA_TOKEN_PATH,
+            json={"operation": operation, "mfaCode": code},
+            options={},
         )
 
     def _retries(self, method: str, options: RequestOptions) -> int:
@@ -106,7 +125,7 @@ class SyncEngine(_Engine):
     """Performs API calls for `Whitebird`."""
 
     def __init__(self, http: httpx.Client, config: Config, auth: SyncAuthenticator) -> None:
-        super().__init__(config)
+        super().__init__(config, auth.credentials)
         self._http = http
         self._auth = auth
 
@@ -122,9 +141,11 @@ class SyncEngine(_Engine):
         headers: Mapping[str, str | None] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
+        content_types: Mapping[str, str] | None = ...,
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: type[T],
         options: RequestOptions | None = ...,
     ) -> T: ...
@@ -141,9 +162,11 @@ class SyncEngine(_Engine):
         headers: Mapping[str, str | None] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
+        content_types: Mapping[str, str] | None = ...,
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> Any: ...
@@ -159,13 +182,19 @@ class SyncEngine(_Engine):
         headers: Mapping[str, str | None] | None = None,
         json: object = None,
         data: Mapping[str, object] | None = None,
-        files: Mapping[str, FileContent | None] | None = None,
+        files: Mapping[str, object] | None = None,
+        content_types: Mapping[str, str] | None = None,
         authenticated: bool = True,
         envelope: _http.Envelope | None = None,
+        mfa_operation: str | None = None,
         cast_to: Any = None,
         options: RequestOptions | None = None,
     ) -> Any:
-        """Sends a call and decodes its response (see `_http.prepare` and `_http.decode`)."""
+        """Sends a call and decodes its response (see `_http.prepare` and `_http.decode`).
+
+        A call with an `mfa_operation` sends the operation MFA token, obtaining one first when
+        none is set and again when the call is refused for MFA, if `otp` is configured.
+        """
         options = options or {}
         request = self._http.build_request(
             **self._prepare(
@@ -178,10 +207,14 @@ class SyncEngine(_Engine):
                 json=json,
                 data=data,
                 files=files,
+                content_types=content_types,
                 options=options,
             )
         )
-        response = self.send(request, authenticated=authenticated, options=options)
+        if mfa_operation is None:
+            response = self.send(request, authenticated=authenticated, options=options)
+        else:
+            response = self._send_confirmed(request, mfa_operation, options)
         return _http.decode(response, cast_to, envelope)
 
     def paginate(
@@ -285,6 +318,26 @@ class SyncEngine(_Engine):
 
         return EventStream(connect, functools.partial(_http.event_data, cast_to))
 
+    def confirm_operation(self, operation: str, code: str | None = None) -> str:
+        """Obtains an operation MFA token, sets it as `mfa_token` and returns it."""
+        request = self._http.build_request(**self._confirmation(operation, code))
+        response = self.send(request, authenticated=True, options={})
+        self.mfa_token = _http.operation_mfa_token(response)
+        return self.mfa_token
+
+    def _send_confirmed(
+        self, request: httpx.Request, operation: str, options: RequestOptions
+    ) -> httpx.Response:
+        if self.mfa_token is None and self._credentials.otp is not None:
+            request.headers[_http.MFA_HEADER] = self.confirm_operation(operation)
+        try:
+            return self.send(request, authenticated=True, options=options)
+        except MFARequiredError:
+            if self._credentials.otp is None:
+                raise
+        request.headers[_http.MFA_HEADER] = self.confirm_operation(operation)
+        return self.send(request, authenticated=True, options=options)
+
     def send(
         self,
         request: httpx.Request,
@@ -333,7 +386,7 @@ class AsyncEngine(_Engine):
     """Performs API calls for `AsyncWhitebird`."""
 
     def __init__(self, http: httpx.AsyncClient, config: Config, auth: AsyncAuthenticator) -> None:
-        super().__init__(config)
+        super().__init__(config, auth.credentials)
         self._http = http
         self._auth = auth
 
@@ -349,9 +402,11 @@ class AsyncEngine(_Engine):
         headers: Mapping[str, str | None] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
+        content_types: Mapping[str, str] | None = ...,
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: type[T],
         options: RequestOptions | None = ...,
     ) -> T: ...
@@ -368,9 +423,11 @@ class AsyncEngine(_Engine):
         headers: Mapping[str, str | None] | None = ...,
         json: object = ...,
         data: Mapping[str, object] | None = ...,
-        files: Mapping[str, FileContent | None] | None = ...,
+        files: Mapping[str, object] | None = ...,
+        content_types: Mapping[str, str] | None = ...,
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
+        mfa_operation: str | None = ...,
         cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> Any: ...
@@ -386,13 +443,19 @@ class AsyncEngine(_Engine):
         headers: Mapping[str, str | None] | None = None,
         json: object = None,
         data: Mapping[str, object] | None = None,
-        files: Mapping[str, FileContent | None] | None = None,
+        files: Mapping[str, object] | None = None,
+        content_types: Mapping[str, str] | None = None,
         authenticated: bool = True,
         envelope: _http.Envelope | None = None,
+        mfa_operation: str | None = None,
         cast_to: Any = None,
         options: RequestOptions | None = None,
     ) -> Any:
-        """Sends a call and decodes its response (see `_http.prepare` and `_http.decode`)."""
+        """Sends a call and decodes its response (see `_http.prepare` and `_http.decode`).
+
+        A call with an `mfa_operation` sends the operation MFA token, obtaining one first when
+        none is set and again when the call is refused for MFA, if `otp` is configured.
+        """
         options = options or {}
         request = self._http.build_request(
             **self._prepare(
@@ -405,10 +468,14 @@ class AsyncEngine(_Engine):
                 json=json,
                 data=data,
                 files=files,
+                content_types=content_types,
                 options=options,
             )
         )
-        response = await self.send(request, authenticated=authenticated, options=options)
+        if mfa_operation is None:
+            response = await self.send(request, authenticated=authenticated, options=options)
+        else:
+            response = await self._send_confirmed(request, mfa_operation, options)
         return _http.decode(response, cast_to, envelope)
 
     def paginate(
@@ -511,6 +578,26 @@ class AsyncEngine(_Engine):
             )
 
         return AsyncEventStream(connect, functools.partial(_http.event_data, cast_to))
+
+    async def confirm_operation(self, operation: str, code: str | None = None) -> str:
+        """Obtains an operation MFA token, sets it as `mfa_token` and returns it."""
+        request = self._http.build_request(**self._confirmation(operation, code))
+        response = await self.send(request, authenticated=True, options={})
+        self.mfa_token = _http.operation_mfa_token(response)
+        return self.mfa_token
+
+    async def _send_confirmed(
+        self, request: httpx.Request, operation: str, options: RequestOptions
+    ) -> httpx.Response:
+        if self.mfa_token is None and self._credentials.otp is not None:
+            request.headers[_http.MFA_HEADER] = await self.confirm_operation(operation)
+        try:
+            return await self.send(request, authenticated=True, options=options)
+        except MFARequiredError:
+            if self._credentials.otp is None:
+                raise
+        request.headers[_http.MFA_HEADER] = await self.confirm_operation(operation)
+        return await self.send(request, authenticated=True, options=options)
 
     async def send(
         self,

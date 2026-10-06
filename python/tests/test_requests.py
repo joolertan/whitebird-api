@@ -5,7 +5,7 @@ import httpx
 import pytest
 import respx
 
-from tests.support import API, BASE_URLS
+from tests.support import API, BASE_URLS, multipart
 from whitebird import (
     APIError,
     AsyncWhitebird,
@@ -126,7 +126,13 @@ def test_connection_error_then_success(client: Whitebird, respx_mock: respx.Mock
 def test_errors_by_status(
     client: Whitebird, respx_mock: respx.MockRouter, status: int, error: type[APIError]
 ) -> None:
-    body = {"code": 1001, "status": "SOMETHING_WRONG", "message": "Nope", "fields": [{"f": 1}]}
+    body = {
+        "code": 1001,
+        "status": "SOMETHING_WRONG",
+        "subStatus": "DETAIL",
+        "message": "Nope",
+        "fields": [{"f": 1}],
+    }
     respx_mock.post(f"{API}/items").respond(status, json=body)
 
     with pytest.raises(error) as raised:
@@ -136,10 +142,29 @@ def test_errors_by_status(
     assert raised.value.status_code == status
     assert raised.value.code == 1001
     assert raised.value.error_code == "SOMETHING_WRONG"
+    assert raised.value.sub_status == "DETAIL"
     assert raised.value.message == "Nope"
     assert raised.value.fields == [{"f": 1}]
     assert raised.value.body == body
     assert str(raised.value) == f"{status} SOMETHING_WRONG: Nope"
+
+
+@pytest.mark.parametrize(
+    ("error", "error_code"),
+    [
+        ("invalid_grant", "invalid_grant"),
+        ("INVALID_CAPTCHA", "INVALID_CAPTCHA"),
+        ("Not Found", None),
+    ],
+)
+def test_error_code_from_error_field(
+    client: Whitebird, respx_mock: respx.MockRouter, error: str, error_code: str | None
+) -> None:
+    respx_mock.get(f"{API}/items").respond(400, json={"error": error})
+
+    with pytest.raises(APIError) as raised:
+        client.request("api", "GET", "/items")
+    assert raised.value.error_code == error_code
 
 
 def test_rate_limit_error_has_retry_after(client: Whitebird, respx_mock: respx.MockRouter) -> None:
@@ -280,12 +305,55 @@ def test_form_and_multipart(client: Whitebird, respx_mock: respx.MockRouter) -> 
     assert b"img" in request.content
 
 
+def test_multipart_parts(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.post(f"{API}/upload").respond(204)
+
+    client._engine.request(
+        "api",
+        "POST",
+        "/upload",
+        files={
+            "request": '{"a":1}',
+            "item": Item(item_id="i"),
+            "files": [b"one", ("two.pdf", b"two")],
+            "note": "n",
+            "count": 2,
+            "skip": None,
+        },
+        content_types={"request": "application/json", "files": "application/pdf"},
+    )
+
+    assert multipart(route.calls.last.request) == [
+        ("request", "application/json", None, b'{"a":1}'),
+        ("item", "application/json", None, b'{"itemId":"i"}'),
+        ("files", "application/pdf", "upload", b"one"),
+        ("files", "application/pdf", "two.pdf", b"two"),
+        ("note", None, None, b"n"),
+        ("count", None, None, b"2"),
+    ]
+
+
 def test_form_body(client: Whitebird, respx_mock: respx.MockRouter) -> None:
     route = respx_mock.post(f"{API}/form").respond(204)
 
     client.request("api", "POST", "/form", data={"amount": Decimal("1.50"), "memo": None})
 
     assert route.calls.last.request.content == b"amount=1.50"
+
+
+def test_empty_bodies_are_sent(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.post(f"{API}/x").respond(204)
+
+    client.request("api", "POST", "/x", json={"memo": None})
+    client.request("api", "POST", "/x", data={"memo": None})
+    client.request("api", "POST", "/x")
+
+    json_body, form_body, no_body = (call.request for call in route.calls)
+    assert (json_body.content, json_body.headers["content-type"]) == (b"{}", "application/json")
+    assert form_body.content == b""
+    assert form_body.headers["content-type"] == "application/x-www-form-urlencoded"
+    assert no_body.content == b""
+    assert "content-type" not in no_body.headers
 
 
 def test_timeout_option(client: Whitebird, respx_mock: respx.MockRouter) -> None:

@@ -858,8 +858,6 @@ class IcoIssuersResource(SyncResource):
 
     def names(
         self,
-        *,
-        body: Any,
         **options: Unpack[RequestOptions],
     ) -> SyncPager[IcoIssuerName]:
         """List issuer names.
@@ -867,7 +865,6 @@ class IcoIssuersResource(SyncResource):
         Issuers available as filter options in the operation history. The web app sends `{}`.
 
         Args:
-            body: Request body.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -881,7 +878,7 @@ class IcoIssuersResource(SyncResource):
             "ico",
             "POST",
             "/api/v1/ico/statistic/issuer/names",
-            json=body,
+            json={},
             cast_to=Page[IcoIssuerName],
             options=options,
         )
@@ -2462,8 +2459,6 @@ class AsyncIcoIssuersResource(AsyncResource):
 
     def names(
         self,
-        *,
-        body: Any,
         **options: Unpack[RequestOptions],
     ) -> AsyncPager[IcoIssuerName]:
         """List issuer names.
@@ -2471,7 +2466,6 @@ class AsyncIcoIssuersResource(AsyncResource):
         Issuers available as filter options in the operation history. The web app sends `{}`.
 
         Args:
-            body: Request body.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -2485,7 +2479,7 @@ class AsyncIcoIssuersResource(AsyncResource):
             "ico",
             "POST",
             "/api/v1/ico/statistic/issuer/names",
-            json=body,
+            json={},
             cast_to=Page[IcoIssuerName],
             options=options,
         )
