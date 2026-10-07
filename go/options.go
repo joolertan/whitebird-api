@@ -1,6 +1,7 @@
 package whitebird
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"time"
@@ -17,6 +18,7 @@ type config struct {
 	password    string
 	tokens      TokenStore
 	codes       CodeProvider
+	captcha     func(ctx context.Context, captcha Captcha) (int, error)
 	maxRetries  int
 	timeout     time.Duration
 	userAgent   string
@@ -79,6 +81,28 @@ func WithCodeProvider(provider CodeProvider) Option {
 	}
 }
 
+// WithCaptchaSolver sets the function that solves the slider captcha the authorization server
+// requires when an account without two-factor authentication signs in. A rejected answer is
+// retried with a fresh captcha, for up to three attempts. Without a solver, such a login may fail
+// with [ErrCaptchaRequired].
+//
+// The solver returns the horizontal position of the puzzle piece in background pixels, for
+// example as entered by a person shown the images:
+//
+//	whitebird.WithCaptchaSolver(func(ctx context.Context, c whitebird.Captcha) (int, error) {
+//		os.WriteFile("background.png", c.BackgroundImage, 0o600)
+//		os.WriteFile("piece.png", c.PuzzlePiece, 0o600)
+//		fmt.Print("Slider position: ")
+//		var x int
+//		_, err := fmt.Scan(&x)
+//		return x, err
+//	})
+func WithCaptchaSolver(solve func(ctx context.Context, captcha Captcha) (int, error)) Option {
+	return func(c *config) {
+		c.captcha = solve
+	}
+}
+
 // WithMaxRetries sets how many times an idempotent request is retried after a network error or
 // a 429, 502, 503 or 504 response. The default is 2; 0 disables retries.
 func WithMaxRetries(n int) Option {
@@ -112,6 +136,7 @@ type callConfig struct {
 	maxRetries int
 	idempotent bool
 	public     bool
+	envelope   bool
 }
 
 // WithHeader adds a header to the request.
@@ -155,5 +180,14 @@ func WithIdempotent(idempotent bool) RequestOption {
 func WithoutAuth() RequestOption {
 	return func(c *callConfig) {
 		c.public = true
+	}
+}
+
+// WithRetcodeEnvelope unwraps a response of the form {"retCode", "retMsg", "result"}, as market
+// data endpoints answer, for a call through [Client.Request]: the result is decoded, and a
+// non-zero retCode fails the call with an [*APIError].
+func WithRetcodeEnvelope() RequestOption {
+	return func(c *callConfig) {
+		c.envelope = true
 	}
 }

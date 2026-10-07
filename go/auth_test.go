@@ -37,7 +37,7 @@ func TestLoginWithoutCode(t *testing.T) {
 	if jwtExpiry(token).IsZero() {
 		t.Errorf("request sent token %q, want the issued JWT", token)
 	}
-	form := auth.form(0)
+	form := auth.firstForm()
 	want := url.Values{"grant_type": {"password"}, "username": {"trader@example.com"}, "password": {"secret"}}
 	if form.Encode() != want.Encode() {
 		t.Errorf("login form = %v, want %v", form, want)
@@ -62,7 +62,7 @@ func TestLoginWithCode(t *testing.T) {
 	if err := client.Login(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if code := auth.form(0).Get("code"); code != "123456" {
+	if code := auth.firstForm().Get("code"); code != "123456" {
 		t.Errorf("code = %q, want 123456", code)
 	}
 	if checks := auth.checks(); checks != 0 {
@@ -188,7 +188,7 @@ func TestProactiveRefresh(t *testing.T) {
 	if got := auth.grants(); !slices.Equal(got, []string{"refresh_token"}) {
 		t.Fatalf("grants = %v, want a single refresh", got)
 	}
-	if form := auth.form(0); form.Get("refresh_token") != "refresh-old" {
+	if form := auth.firstForm(); form.Get("refresh_token") != "refresh-old" {
 		t.Errorf("refresh form = %v", form)
 	}
 	if token == old {

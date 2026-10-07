@@ -34,6 +34,8 @@ type operation struct {
 	body   encoder
 	// envelope is set for responses wrapped in {"retCode", "retMsg", "result"}.
 	envelope bool
+	// mfaOperation names the operation an operation MFA token is needed for, if any.
+	mfaOperation string
 }
 
 // An encoder produces a request body and its content type.
@@ -85,6 +87,7 @@ type prepared struct {
 	timeout    time.Duration
 	maxRetries int
 	idempotent bool
+	envelope   bool
 }
 
 func (c *core) prepare(op *operation, accept string, opts []RequestOption) (*prepared, error) {
@@ -95,6 +98,7 @@ func (c *core) prepare(op *operation, accept string, opts []RequestOption) (*pre
 		maxRetries: c.cfg.maxRetries,
 		idempotent: idempotentMethods[op.method],
 		public:     op.public,
+		envelope:   op.envelope,
 	}
 	for _, opt := range opts {
 		opt(&call)
@@ -119,6 +123,7 @@ func (c *core) prepare(op *operation, accept string, opts []RequestOption) (*pre
 		timeout:    call.timeout,
 		maxRetries: call.maxRetries,
 		idempotent: call.idempotent,
+		envelope:   call.envelope,
 	}
 	for key, values := range call.query {
 		query[key] = append(query[key], values...)
@@ -151,11 +156,11 @@ func (c *core) send(ctx context.Context, op *operation, accept string, opts []Re
 	if err != nil {
 		return nil, err
 	}
-	r, err := c.do(ctx, p, false)
+	r, err := c.doConfirmed(ctx, op, p)
 	if err != nil {
 		return nil, err
 	}
-	if op.envelope {
+	if p.envelope {
 		return unwrapEnvelope(r.body)
 	}
 	return r.body, nil

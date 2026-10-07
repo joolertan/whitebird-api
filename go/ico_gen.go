@@ -574,11 +574,9 @@ type IcoIssuersResource struct {
 // [IcoIssuersResource.NamesPage].
 type IcoIssuersNamesParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty"`
+	Page int `query:"page,omitempty" json:"-"`
 	// Page size.
-	Size int `query:"size,omitempty"`
-	// Body is the request body.
-	Body any
+	Size int `query:"size,omitempty" json:"-"`
 }
 
 // Get gets an issuer profile.
@@ -633,7 +631,7 @@ func (r *IcoIssuersResource) NamesPage(ctx context.Context, params IcoIssuersNam
 		method:  http.MethodPost,
 		path:    "/api/v1/ico/statistic/issuer/names",
 		params:  params,
-		body:    jsonBody(params.Body),
+		body:    jsonBody(params),
 	}, opts)
 }
 

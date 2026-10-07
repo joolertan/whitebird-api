@@ -12,10 +12,6 @@ import (
 	"time"
 )
 
-// mfaCheckPath answers whether an account has two-factor authentication enabled. It lives on
-// the same service as the token endpoint.
-const mfaCheckPath = "/api/v1/client/mfa"
-
 const mfaHint = "a TOTP code is required; set a code provider with WithCodeProvider"
 
 var errNoCredentials = fmt.Errorf("%w: no valid token and no credentials; use WithCredentials", ErrAuthentication)
@@ -121,7 +117,7 @@ func (c *core) obtain(ctx context.Context, current *Token) (*Token, error) {
 		token, err := c.grant(ctx, url.Values{
 			"grant_type":    {"refresh_token"},
 			"refresh_token": {current.RefreshToken},
-		})
+		}, "")
 		var apiErr *APIError
 		if err == nil || c.cfg.password == "" || !errors.As(err, &apiErr) {
 			return token, err
@@ -139,33 +135,61 @@ func (c *core) login(ctx context.Context) (*Token, error) {
 		"username":   {strings.ToLower(c.cfg.email)},
 		"password":   {c.cfg.password},
 	}
-	mfaOff := false
-	if c.cfg.codes != nil {
+	// Accounts with two-factor authentication sign in with a TOTP code, the others by solving
+	// a captcha. Ask which applies unless a code provider is all there is to choose from.
+	mfa, known := false, false
+	if c.cfg.codes == nil || c.cfg.captcha != nil {
+		enabled, err := c.mfaEnabled(ctx)
+		mfa, known = enabled, err == nil
+	}
+	captcha := known && !mfa && c.cfg.captcha != nil
+	switch {
+	case known && mfa && c.cfg.codes == nil:
+		return nil, &APIError{ErrorCode: errorCodeMFARequired, Message: mfaHint}
+	case c.cfg.codes != nil && !captcha:
 		code, err := c.cfg.codes.Code(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("whitebird: get TOTP code: %w", err)
 		}
 		form.Set("code", code)
-	} else {
-		// Without a code provider, find out up front whether a code is needed so that the
-		// error says so instead of reporting bad credentials.
-		enabled, err := c.mfaEnabled(ctx)
-		if err == nil && enabled {
-			return nil, &APIError{ErrorCode: errorCodeMFARequired, Message: mfaHint}
+	}
+	for attempt := 1; ; attempt++ {
+		var answer string
+		if captcha {
+			var err error
+			if answer, err = c.solveCaptcha(ctx); err != nil {
+				return nil, err
+			}
 		}
-		mfaOff = err == nil
+		token, err := c.grant(ctx, form, answer)
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) {
+			return token, err
+		}
+		switch {
+		case captcha && strings.EqualFold(apiErr.ErrorCode, "INVALID_CAPTCHA") && attempt < captchaAttempts:
+			continue
+		case c.cfg.captcha == nil && strings.Contains(strings.ToUpper(apiErr.ErrorCode), "CAPTCHA"):
+			apiErr.sentinel = ErrCaptchaRequired
+			apiErr.Message = withHint(captchaHint, apiErr.Message)
+		case apiErr.ErrorCode == "invalid_grant" && !form.Has("code") && !known:
+			// The account may have two-factor authentication: the check did not tell.
+			apiErr.ErrorCode = errorCodeMFARequired
+			apiErr.Message = withHint(mfaHint, apiErr.Message)
+		}
+		return nil, err
 	}
-	token, err := c.grant(ctx, form)
-	var apiErr *APIError
-	if errors.As(err, &apiErr) && apiErr.ErrorCode == "invalid_grant" && !form.Has("code") && !mfaOff {
-		apiErr.ErrorCode = errorCodeMFARequired
-		apiErr.Message = strings.TrimSuffix(mfaHint+": "+apiErr.Message, ": ")
-	}
-	return token, err
 }
 
-// grant posts form to the token endpoint.
-func (c *core) grant(ctx context.Context, form url.Values) (*Token, error) {
+func withHint(hint, message string) string {
+	if message == "" {
+		return hint
+	}
+	return hint + ": " + message
+}
+
+// grant posts form to the token endpoint, with the answer to a captcha if not empty.
+func (c *core) grant(ctx context.Context, form url.Values, captcha string) (*Token, error) {
 	p := &prepared{
 		method: http.MethodPost,
 		url:    c.baseURLs[tokenService] + tokenPath,
@@ -177,6 +201,9 @@ func (c *core) grant(ctx context.Context, form url.Values) (*Token, error) {
 		body:    []byte(form.Encode()),
 		public:  true,
 		timeout: c.cfg.timeout,
+	}
+	if captcha != "" {
+		p.header.Set("Captcha", captcha)
 	}
 	r, err := c.do(ctx, p, false)
 	if err != nil {
@@ -219,7 +246,7 @@ func (c *core) mfaEnabled(ctx context.Context) (bool, error) {
 	}
 	p := &prepared{
 		method: http.MethodPost,
-		url:    c.baseURLs[tokenService] + mfaCheckPath,
+		url:    c.baseURLs[tokenService] + mfaStatusPath,
 		header: http.Header{
 			"Accept":       {"application/json"},
 			"Content-Type": {"application/json"},

@@ -9,8 +9,8 @@ import (
 )
 
 var sentinels = []error{
-	ErrBadRequest, ErrVerificationRequired, ErrAuthentication, ErrMFARequired, ErrPermissionDenied,
-	ErrNotFound, ErrConflict, ErrRateLimited, ErrServer,
+	ErrBadRequest, ErrVerificationRequired, ErrAuthentication, ErrMFARequired, ErrCaptchaRequired,
+	ErrPermissionDenied, ErrNotFound, ErrConflict, ErrRateLimited, ErrServer,
 }
 
 func TestErrorClasses(t *testing.T) {
@@ -62,12 +62,12 @@ func TestErrorClasses(t *testing.T) {
 func TestAPIErrorFields(t *testing.T) {
 	err := newAPIError(&reply{
 		status: http.StatusBadRequest,
-		body:   []byte(`{"code":"1001","status":"VALIDATION_FAILED","message":"invalid","fields":[{"field":"amount"}]}`),
+		body:   []byte(`{"code":"1001","status":"VALIDATION_FAILED","subStatus":"AMOUNT_TOO_LOW","message":"invalid","fields":[{"field":"amount"}]}`),
 	})
-	if err.Code != 1001 || err.ErrorCode != "VALIDATION_FAILED" || err.Message != "invalid" || string(err.Fields) != `[{"field":"amount"}]` {
+	if err.Code != 1001 || err.ErrorCode != "VALIDATION_FAILED" || err.SubStatus != "AMOUNT_TOO_LOW" || err.Message != "invalid" || string(err.Fields) != `[{"field":"amount"}]` {
 		t.Errorf("newAPIError() = %+v", err)
 	}
-	if got, want := err.Error(), "whitebird: 400 Bad Request (VALIDATION_FAILED, code 1001): invalid"; got != want {
+	if got, want := err.Error(), "whitebird: 400 Bad Request (VALIDATION_FAILED, AMOUNT_TOO_LOW, code 1001): invalid"; got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 

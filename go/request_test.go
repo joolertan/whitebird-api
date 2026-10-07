@@ -1,11 +1,17 @@
 package whitebird
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -99,6 +105,60 @@ func TestFormAndMultipartBodies(t *testing.T) {
 	}
 }
 
+func TestMultipartParts(t *testing.T) {
+	type crop struct {
+		Size int `json:"size"`
+	}
+	type params struct {
+		Request string      `form:"request" mime:"application/json"`
+		Crop    *crop       `form:"crop"`
+		Note    string      `form:"note"`
+		Amount  Decimal     `form:"amount"`
+		Photo   io.Reader   `form:"photo" mime:"image/png"`
+		Files   []io.Reader `form:"files"`
+	}
+	contentType, data, err := multipartBody(params{
+		Request: `{"criteria":["a"]}`,
+		Crop:    &crop{Size: 64},
+		Note:    "hi",
+		Amount:  MustDecimal("1.5"),
+		Photo:   strings.NewReader("png"),
+		Files:   []io.Reader{strings.NewReader("one"), strings.NewReader("two")},
+	})()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, mediaParams, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := multipart.NewReader(bytes.NewReader(data), mediaParams["boundary"])
+	var parts []string
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(part)
+		parts = append(parts, fmt.Sprintf("%s %q %s %s", part.FormName(), part.FileName(), part.Header.Get("Content-Type"), body))
+	}
+	want := []string{
+		`request "" application/json {"criteria":["a"]}`,
+		`crop "" application/json {"size":64}`,
+		`note ""  hi`,
+		`amount ""  1.5`,
+		`photo "photo" image/png png`,
+		`files "files" application/octet-stream one`,
+		`files "files" application/octet-stream two`,
+	}
+	if !slices.Equal(parts, want) {
+		t.Errorf("parts = %q\nwant %q", parts, want)
+	}
+}
+
 func TestEnvelope(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /tickers", func(w http.ResponseWriter, _ *http.Request) {
@@ -117,6 +177,40 @@ func TestEnvelope(t *testing.T) {
 	}
 	if len(tickers) != 1 || tickers[0].Symbol != "BTCUSDT" || tickers[0].LastPrice.String() != "97000.5" {
 		t.Errorf("tickers = %+v", tickers)
+	}
+}
+
+func TestRequestRetcodeEnvelope(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /instruments", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("category") == "bad" {
+			w.Write([]byte(`{"retCode":10001,"retMsg":"params error","result":{}}`))
+			return
+		}
+		w.Write([]byte(`{"retCode":0,"retMsg":"OK","result":{"list":[{"symbol":"BTCUSDT"}]}}`))
+	})
+	client := newTestClient(t, mux)
+	ctx := context.Background()
+
+	var out struct {
+		List []struct{ Symbol string }
+	}
+	if err := client.Request(ctx, testService, http.MethodGet, "/instruments", nil, &out, WithoutAuth(), WithRetcodeEnvelope()); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.List) != 1 || out.List[0].Symbol != "BTCUSDT" {
+		t.Errorf("result = %+v", out)
+	}
+
+	err := client.Request(ctx, testService, http.MethodGet, "/instruments", nil, &out, WithoutAuth(), WithRetcodeEnvelope(), WithQuery("category", "bad"))
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Code != 10001 {
+		t.Errorf("Request() = %v, want the retCode error", err)
+	}
+
+	var raw []byte
+	if err := client.Request(ctx, testService, http.MethodGet, "/instruments", nil, &raw, WithoutAuth()); err != nil || !bytes.HasPrefix(raw, []byte(`{"retCode":0`)) {
+		t.Errorf("without the option, body = %s, %v; want the envelope", raw, err)
 	}
 }
 

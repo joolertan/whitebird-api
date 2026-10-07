@@ -567,7 +567,7 @@ const (
 	KYCActualizationClientStatusActualizationRequired KYCActualizationClientStatus = "ACTUALIZATION_REQUIRED"
 )
 
-// KYCInvestorStatus is used in [KYCInvestorData].
+// KYCInvestorStatus is used in [KYCInvestorData] and [KYCQualificationRequest].
 type KYCInvestorStatus string
 
 // Known values of [KYCInvestorStatus].
@@ -628,17 +628,17 @@ type MarketKlineInterval string
 
 // Known values of [MarketKlineInterval].
 const (
-	MarketKlineInterval1M      MarketKlineInterval = "1m"
-	MarketKlineInterval5M      MarketKlineInterval = "5m"
-	MarketKlineInterval15M     MarketKlineInterval = "15m"
-	MarketKlineInterval30M     MarketKlineInterval = "30m"
-	MarketKlineInterval1H      MarketKlineInterval = "1h"
-	MarketKlineInterval4H      MarketKlineInterval = "4h"
-	MarketKlineInterval6H      MarketKlineInterval = "6h"
-	MarketKlineInterval12H     MarketKlineInterval = "12h"
-	MarketKlineInterval1D      MarketKlineInterval = "1D"
-	MarketKlineInterval1W      MarketKlineInterval = "1W"
-	MarketKlineIntervalValue10 MarketKlineInterval = "1M"
+	MarketKlineInterval1m  MarketKlineInterval = "1m"
+	MarketKlineInterval5m  MarketKlineInterval = "5m"
+	MarketKlineInterval15m MarketKlineInterval = "15m"
+	MarketKlineInterval30m MarketKlineInterval = "30m"
+	MarketKlineInterval1h  MarketKlineInterval = "1h"
+	MarketKlineInterval4h  MarketKlineInterval = "4h"
+	MarketKlineInterval6h  MarketKlineInterval = "6h"
+	MarketKlineInterval12h MarketKlineInterval = "12h"
+	MarketKlineInterval1D  MarketKlineInterval = "1D"
+	MarketKlineInterval1W  MarketKlineInterval = "1W"
+	MarketKlineInterval1M  MarketKlineInterval = "1M"
 )
 
 // MerchantClientStatus is used in [MerchantClientCounts].

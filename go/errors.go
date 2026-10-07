@@ -14,12 +14,13 @@ import (
 
 // Sentinel errors classify an [*APIError]; test for them with [errors.Is]. An error matches its
 // own class and the class above it: [ErrVerificationRequired] is also an [ErrBadRequest], and
-// [ErrMFARequired] is also an [ErrAuthentication].
+// [ErrMFARequired] and [ErrCaptchaRequired] are also an [ErrAuthentication].
 var (
 	ErrBadRequest           = errors.New("whitebird: bad request")
 	ErrVerificationRequired = errors.New("whitebird: verification required")
 	ErrAuthentication       = errors.New("whitebird: authentication failed")
 	ErrMFARequired          = errors.New("whitebird: MFA required")
+	ErrCaptchaRequired      = errors.New("whitebird: captcha required")
 	ErrPermissionDenied     = errors.New("whitebird: permission denied")
 	ErrNotFound             = errors.New("whitebird: not found")
 	ErrConflict             = errors.New("whitebird: conflict")
@@ -29,9 +30,9 @@ var (
 
 // APIError is an error answered by the API.
 //
-// Services answer errors as {"code", "status", "message", "fields"}, the authorization server
-// as {"error", "error_description"}, and market data with a non-zero retCode in an HTTP 200
-// response.
+// Services answer errors as {"code", "status", "subStatus", "message", "fields"}, the
+// authorization server as {"error", "error_description"}, and market data with a non-zero
+// retCode in an HTTP 200 response.
 type APIError struct {
 	// StatusCode is the HTTP status code.
 	StatusCode int
@@ -40,6 +41,8 @@ type APIError struct {
 	// ErrorCode is the machine-readable error, such as "SMS_VERIFICATION_REQUIRED" or
 	// "invalid_grant".
 	ErrorCode string
+	// SubStatus refines ErrorCode for some errors.
+	SubStatus string
 	// Message is the human-readable description.
 	Message string
 	// Fields holds the per-field validation errors as sent by the server.
@@ -48,6 +51,10 @@ type APIError struct {
 	RetryAfter time.Duration
 	// Body is the raw response body.
 	Body []byte
+
+	// sentinel is the class of an error that the client recognizes from the context of the
+	// request rather than from the response alone.
+	sentinel error
 }
 
 func (e *APIError) Error() string {
@@ -58,13 +65,18 @@ func (e *APIError) Error() string {
 	} else {
 		b.WriteString("API error")
 	}
-	switch {
-	case e.ErrorCode != "" && e.Code != 0:
-		fmt.Fprintf(&b, " (%s, code %d)", e.ErrorCode, e.Code)
-	case e.ErrorCode != "":
-		fmt.Fprintf(&b, " (%s)", e.ErrorCode)
-	case e.Code != 0:
-		fmt.Fprintf(&b, " (code %d)", e.Code)
+	var details []string
+	if e.ErrorCode != "" {
+		details = append(details, e.ErrorCode)
+	}
+	if e.SubStatus != "" {
+		details = append(details, e.SubStatus)
+	}
+	if e.Code != 0 {
+		details = append(details, "code "+strconv.Itoa(e.Code))
+	}
+	if len(details) > 0 {
+		fmt.Fprintf(&b, " (%s)", strings.Join(details, ", "))
 	}
 	if e.Message != "" {
 		b.WriteString(": ")
@@ -82,10 +94,13 @@ func (e *APIError) Is(target error) bool {
 var parentClass = map[error]error{
 	ErrVerificationRequired: ErrBadRequest,
 	ErrMFARequired:          ErrAuthentication,
+	ErrCaptchaRequired:      ErrAuthentication,
 }
 
 func (e *APIError) class() error {
 	switch {
+	case e.sentinel != nil:
+		return e.sentinel
 	case e.ErrorCode == "SMS_VERIFICATION_REQUIRED" || e.ErrorCode == "LIVENESS_VERIFICATION_REQUIRED":
 		return ErrVerificationRequired
 	case e.ErrorCode == "MFA_CHECKING_REQUIRED" || e.ErrorCode == errorCodeMFARequired ||
@@ -131,6 +146,7 @@ func newAPIError(r *reply) *APIError {
 		// Spring's default error body puts the reason phrase in "error".
 		e.ErrorCode = ""
 	}
+	e.SubStatus = firstString(fields, "subStatus")
 	e.Message = firstString(fields, "message", "error_description", "detail")
 	if f := fields["fields"]; len(f) > 0 && !bytes.Equal(f, []byte("null")) {
 		e.Fields = f

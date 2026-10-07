@@ -305,12 +305,6 @@ type ExchangeRatesResource struct {
 	core *core
 }
 
-// ExchangeRatesStatsParams holds the parameters of [ExchangeRatesResource.Stats].
-type ExchangeRatesStatsParams struct {
-	// Body is the request body.
-	Body ExchangeRateStatsFilter
-}
-
 // Stats gets current and 24-hour-ago exchange rates.
 //
 // Rates of the home-page ticker. The web app sends an empty filter.
@@ -318,11 +312,11 @@ type ExchangeRatesStatsParams struct {
 // It calls POST /api/v1/exchange/rate/stats.
 //
 // This endpoint is experimental and may change without notice.
-func (r *ExchangeRatesResource) Stats(ctx context.Context, params ExchangeRatesStatsParams, opts ...RequestOption) ([]ExchangeRateStat, error) {
+func (r *ExchangeRatesResource) Stats(ctx context.Context, opts ...RequestOption) ([]ExchangeRateStat, error) {
 	return call[[]ExchangeRateStat](ctx, r.core, &operation{
 		service: ServiceExchange,
 		method:  http.MethodPost,
 		path:    "/api/v1/exchange/rate/stats",
-		body:    jsonBody(params.Body),
+		body:    jsonBody(struct{}{}),
 	}, opts)
 }

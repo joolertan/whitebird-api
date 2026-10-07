@@ -86,6 +86,7 @@ func (r *UserAntifraudResource) SendCode(ctx context.Context, opts ...RequestOpt
 		service: ServiceAuth,
 		method:  http.MethodPost,
 		path:    "/api/v1/user/phone/antifraud-verification/send-code",
+		body:    jsonBody(struct{}{}),
 	}, opts)
 }
 
@@ -425,6 +426,7 @@ func (r *UserPhoneResource) SendConfirmationCode(ctx context.Context, opts ...Re
 		service: ServiceAuth,
 		method:  http.MethodPost,
 		path:    "/api/v1/user/phone/phone-confirmation/send-code",
+		body:    jsonBody(struct{}{}),
 	}, opts)
 }
 

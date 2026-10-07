@@ -249,6 +249,7 @@ func (r *KYCLivenessResource) Retry(ctx context.Context, opts ...RequestOption) 
 		service: ServiceAPI,
 		method:  http.MethodPost,
 		path:    "/api/v2/kyc/liveness/retry",
+		body:    jsonBody(struct{}{}),
 	}, opts)
 }
 
@@ -365,9 +366,9 @@ type KYCQualificationResource struct {
 // KYCQualificationSubmitParams holds the parameters of [KYCQualificationResource.Submit].
 type KYCQualificationSubmitParams struct {
 	// JSON-encoded `KycQualificationRequest`.
-	Request string `form:"request"`
-	// Supporting document; the server accepts the part repeated once per file.
-	Files io.Reader `form:"files"`
+	Request KYCQualificationRequest `form:"request" mime:"application/json"`
+	// Supporting documents, sent as one part per file.
+	Files []io.Reader `form:"files"`
 }
 
 // Submit requests an investor qualification status.

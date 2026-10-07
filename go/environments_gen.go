@@ -71,9 +71,18 @@ var serviceURLs = map[Service]map[Environment]string{
 	ServiceWebmoney:           {Production: "https://webmoney-service.whitebird.io"},
 }
 
-// The token endpoint and the public credentials of the web application's OAuth client.
+// The authorization server endpoints used to sign in, and the public credentials of the web
+// application's OAuth client.
 const (
 	tokenService      = ServiceAuth
 	tokenPath         = "/oauth/token"
+	mfaStatusPath     = "/api/v1/client/mfa"
+	captchaPath       = "/api/v1/captcha/generate"
 	clientCredentials = "YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA="
+)
+
+// The endpoint that exchanges a TOTP code for an operation MFA token.
+const (
+	operationMFAService = ServiceAPI
+	operationMFAPath    = "/api/v2/auth/mfa/merchant/client/token"
 )

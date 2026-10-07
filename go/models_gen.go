@@ -733,11 +733,6 @@ type ExchangeRateStat struct {
 	Value24H Decimal `json:"value24h,omitzero"`
 }
 
-// ExchangeRateStatsFilter is used in [ExchangeRatesStatsParams].
-//
-// Filter of the statistics; the web app always sends `{}`.
-type ExchangeRateStatsFilter map[string]any
-
 // IcoBuyResult is returned by [IcoObligationsResource.BuyWithCard] and
 // [IcoObligationsResource.BuyWithBalance].
 type IcoBuyResult struct {
@@ -1409,6 +1404,23 @@ type KYCPersonalData struct {
 	DocExpirationDate string `json:"docExpirationDate,omitzero"`
 }
 
+// KYCQualificationRequest is used in [KYCQualificationSubmitParams].
+//
+// Content of the `request` part of `POST /api/v2/qualification`. The web app sends every criterion
+// of the requested level, `true` for the ticked ones: `incomeOver80kByn`, `assetsOver150kByn` for
+// `QUALIFIED_INVESTOR`, `incomeOver300kByn`, `assetsOver600kByn` for `HIGHLY_QUALIFIED_INVESTOR`,
+// plus `certifiedExpert`, `experienceInOrganization` and `personalTradingExperience` for both.
+type KYCQualificationRequest struct {
+	RequestedInvestorStatus   KYCInvestorStatus `json:"requestedInvestorStatus"`
+	IncomeOver80KByn          *bool             `json:"incomeOver80kByn,omitzero"`
+	AssetsOver150KByn         *bool             `json:"assetsOver150kByn,omitzero"`
+	IncomeOver300KByn         *bool             `json:"incomeOver300kByn,omitzero"`
+	AssetsOver600KByn         *bool             `json:"assetsOver600kByn,omitzero"`
+	CertifiedExpert           *bool             `json:"certifiedExpert,omitzero"`
+	ExperienceInOrganization  *bool             `json:"experienceInOrganization,omitzero"`
+	PersonalTradingExperience *bool             `json:"personalTradingExperience,omitzero"`
+}
+
 // KYCSumsubToken is returned by [KYCSumsubResource.Token].
 type KYCSumsubToken struct {
 	// SumSub WebSDK access token. Inferred from the web application; not yet observed in responses.
@@ -2012,6 +2024,19 @@ type SubaccountResponse struct {
 	BrokerIdentity string             `json:"brokerIdentity,omitzero"`
 	Balances       map[string]Decimal `json:"balances,omitzero"`
 	Status         SubaccountStatus   `json:"status,omitzero"`
+}
+
+// SupportRequest is used in [SupportSendParams].
+//
+// Content of the `request` part of `POST /api/v1/support`.
+type SupportRequest struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	// Free text; the web form offers fixed topics in Russian (registration, documents, operations,
+	// individual exchange terms, withdrawal limit increase, swap limit increase, service error, legal
+	// entity, other, and settlement account binding).
+	Topic   string `json:"topic"`
+	Message string `json:"message"`
 }
 
 // SupportResponse is returned by [SupportResource.Send].

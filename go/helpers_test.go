@@ -8,19 +8,25 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 )
 
-// testService is served by the test server, alongside the token endpoint.
+// testService is served by the test server, alongside the authorization server and the
+// operation MFA endpoint.
 const testService Service = "test"
 
 func newTestClient(t *testing.T, handler http.Handler, opts ...Option) *Client {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	opts = append([]Option{WithBaseURL(tokenService, srv.URL), WithBaseURL(testService, srv.URL)}, opts...)
+	opts = append([]Option{
+		WithBaseURL(tokenService, srv.URL),
+		WithBaseURL(operationMFAService, srv.URL),
+		WithBaseURL(testService, srv.URL),
+	}, opts...)
 	client, err := NewClient(opts...)
 	if err != nil {
 		t.Fatal(err)
@@ -42,20 +48,24 @@ type authServer struct {
 	// mfa is the answer of the MFA check; mfaFails makes the check fail.
 	mfa      bool
 	mfaFails bool
-	// reply, if set, answers token requests instead of issuing a token.
+	// reply, if set, answers token requests instead of issuing a token, unless it returns
+	// status 0.
 	reply func(form url.Values) (status int, body string)
 	delay time.Duration
 
-	mu        sync.Mutex
-	forms     []url.Values
-	mfaChecks int
-	issued    int
+	mu         sync.Mutex
+	forms      []url.Values
+	answers    []string // captcha headers of the token requests
+	captchaIDs []string
+	mfaChecks  int
+	issued     int
 }
 
 func newAuthServer(t *testing.T, mux *http.ServeMux) *authServer {
 	a := &authServer{t: t, ttl: time.Hour}
 	mux.HandleFunc("POST "+tokenPath, a.token)
-	mux.HandleFunc("POST "+mfaCheckPath, a.mfaCheck)
+	mux.HandleFunc("POST "+mfaStatusPath, a.mfaCheck)
+	mux.HandleFunc("GET "+captchaPath, a.captcha)
 	return a
 }
 
@@ -69,15 +79,17 @@ func (a *authServer) token(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(a.delay)
 	a.mu.Lock()
 	a.forms = append(a.forms, r.PostForm)
+	a.answers = append(a.answers, r.Header.Get("Captcha"))
 	reply := a.reply
 	a.issued++
 	n := a.issued
 	a.mu.Unlock()
 	if reply != nil {
-		status, body := reply(r.PostForm)
-		w.WriteHeader(status)
-		fmt.Fprint(w, body)
-		return
+		if status, body := reply(r.PostForm); status != 0 {
+			w.WriteHeader(status)
+			fmt.Fprint(w, body)
+			return
+		}
 	}
 	writeJSON(w, map[string]any{
 		"access_token":  testJWT(fmt.Sprint("access-", n), time.Now().Add(a.ttl)),
@@ -102,10 +114,31 @@ func (a *authServer) mfaCheck(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"mfaEnabled": a.mfa})
 }
 
-func (a *authServer) form(i int) url.Values {
+func (a *authServer) captcha(w http.ResponseWriter, r *http.Request) {
+	a.mu.Lock()
+	a.captchaIDs = append(a.captchaIDs, r.URL.Query().Get("requestId"))
+	a.mu.Unlock()
+	enc := base64.StdEncoding
+	writeJSON(w, map[string]any{
+		"backgroundImage": enc.EncodeToString([]byte("background")),
+		"puzzlePiece":     "data:image/png;base64," + enc.EncodeToString([]byte("piece")),
+		"positionY":       42,
+	})
+}
+
+// firstForm returns the form of the first token request.
+func (a *authServer) firstForm() url.Values {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.forms[i]
+	return a.forms[0]
+}
+
+// captchas returns the request IDs of the captchas generated and the captcha headers of the
+// token requests.
+func (a *authServer) captchas() (ids, answers []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.captchaIDs), slices.Clone(a.answers)
 }
 
 func (a *authServer) checks() int {

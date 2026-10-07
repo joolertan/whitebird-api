@@ -292,15 +292,16 @@ type BalanceWithdrawalsCalculateFiatParams struct {
 // `BALANCE_OPERATION_PROCESSING_ERROR`.
 //
 // It calls POST /api/v2/exchange/client/balance/crypto/withdrawal with an operation MFA token for
-// WITHDRAWAL, set by [Client.SetMFAToken].
+// WITHDRAWAL (see [Client.ConfirmOperation]).
 //
 // This endpoint is experimental and may change without notice.
 func (r *BalanceWithdrawalsResource) CreateCrypto(ctx context.Context, params BalanceWithdrawalsCreateCryptoParams, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceAPI,
-		method:  http.MethodPost,
-		path:    "/api/v2/exchange/client/balance/crypto/withdrawal",
-		body:    jsonBody(params),
+		service:      ServiceAPI,
+		method:       http.MethodPost,
+		path:         "/api/v2/exchange/client/balance/crypto/withdrawal",
+		body:         jsonBody(params),
+		mfaOperation: "WITHDRAWAL",
 	}, opts)
 }
 
@@ -312,15 +313,16 @@ func (r *BalanceWithdrawalsResource) CreateCrypto(ctx context.Context, params Ba
 // withdrawal.
 //
 // It calls POST /api/v2/exchange/client/balance/fiat/withdrawal with an operation MFA token for
-// WITHDRAWAL, set by [Client.SetMFAToken].
+// WITHDRAWAL (see [Client.ConfirmOperation]).
 //
 // This endpoint is experimental and may change without notice.
 func (r *BalanceWithdrawalsResource) CreateFiat(ctx context.Context, params BalanceWithdrawalsCreateFiatParams, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceAPI,
-		method:  http.MethodPost,
-		path:    "/api/v2/exchange/client/balance/fiat/withdrawal",
-		body:    jsonBody(params),
+		service:      ServiceAPI,
+		method:       http.MethodPost,
+		path:         "/api/v2/exchange/client/balance/fiat/withdrawal",
+		body:         jsonBody(params),
+		mfaOperation: "WITHDRAWAL",
 	}, opts)
 }
 

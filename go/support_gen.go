@@ -18,9 +18,9 @@ type SupportSendParams struct {
 	// Google reCAPTCHA v3 token (public support form).
 	Recaptcha *string `header:"recaptcha"`
 	// JSON-encoded `SupportRequest`.
-	Request string `form:"request"`
-	// Attachment; the server accepts the part repeated once per file.
-	Files io.Reader `form:"files"`
+	Request SupportRequest `form:"request" mime:"application/json"`
+	// Attachments, sent as one part per file.
+	Files []io.Reader `form:"files"`
 }
 
 // Send sends a message to support.

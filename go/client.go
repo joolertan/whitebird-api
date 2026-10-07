@@ -33,6 +33,22 @@ func (c *Client) Login(ctx context.Context) error {
 	return err
 }
 
+// ConfirmOperation exchanges a TOTP code for the operation MFA token that sensitive operations
+// such as withdrawals require, sets it on the client like [Client.SetMFAToken] and returns it.
+// With an empty code, the code comes from the provider set with [WithCodeProvider].
+//
+// The generated methods of these operations call ConfirmOperation on their own when the client
+// has a code provider: before the first request if no token is set, and again if the API refuses
+// the token. Without a code provider, confirm the operation before calling them:
+//
+//	if _, err := client.ConfirmOperation(ctx, "WITHDRAWAL", code); err != nil {
+//		return err
+//	}
+//	err := client.Balance.Withdrawals.CreateCrypto(ctx, params)
+func (c *Client) ConfirmOperation(ctx context.Context, operation, code string) (string, error) {
+	return c.core.confirmOperation(ctx, operation, code)
+}
+
 // SetMFAToken sets the operation MFA token that sensitive operations such as withdrawals
 // require. The client sends it in the x-mfa-token header of every request until it is replaced
 // or cleared with an empty token.
@@ -51,7 +67,12 @@ func (c *Client) SetMFAToken(token string) {
 //
 // A nil body sends none; [net/url.Values] is sent as a form, []byte and [io.Reader] as is, and
 // anything else as JSON. The response is decoded as JSON into result unless result is nil or a
-// *[]byte, which receives the raw body.
+// *[]byte, which receives the raw body. [WithRetcodeEnvelope] unwraps the envelope of market
+// data responses first:
+//
+//	var out struct{ List []json.RawMessage }
+//	err := client.Request(ctx, whitebird.ServiceMarketData, http.MethodGet, "/api/v1/market/instruments",
+//		nil, &out, whitebird.WithoutAuth(), whitebird.WithRetcodeEnvelope())
 func (c *Client) Request(ctx context.Context, service Service, method, path string, body, result any, opts ...RequestOption) error {
 	op := &operation{service: service, method: method, path: path, body: anyBody(body)}
 	data, err := c.core.send(ctx, op, "application/json", opts)
