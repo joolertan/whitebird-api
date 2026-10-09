@@ -112,3 +112,19 @@ fn iterates_pages_and_events() {
         Some(ErrorKind::PermissionDenied)
     );
 }
+
+#[test]
+fn confirms_operations() {
+    let server = Server::start();
+    server.mount(password_grant().respond_with(grant(&jwt("me", 3600), "refresh-1")));
+    server
+        .mount(Mock::given(path(MFA_TOKEN_PATH)).respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "mfaToken": "mfa-1" })),
+        ));
+    let client = server.client();
+
+    let token = client.confirm_operation("WITHDRAWAL", None).unwrap();
+
+    assert_eq!(token, "mfa-1");
+    assert_eq!(client.mfa_token().as_deref(), Some("mfa-1"));
+}

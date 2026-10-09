@@ -3,9 +3,9 @@ name: Rust
 on:
   push:
     branches: [main]
-    paths: [rust/**, .github/workflows/rust.yml]
+    paths: [rust/**, examples/rust/**, .github/workflows/rust.yml]
   pull_request:
-    paths: [rust/**, .github/workflows/rust.yml]
+    paths: [rust/**, examples/rust/**, .github/workflows/rust.yml]
 
 permissions:
   contents: read
@@ -32,9 +32,13 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: rust
+          workspaces: |
+            rust
+            examples/rust
       - run: cargo test --all-features --locked
       - run: cargo test --locked
+      - run: cargo check --all-targets --locked
+        working-directory: examples/rust
 
   lint:
     runs-on: ubuntu-latest
@@ -48,10 +52,17 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: rust
+          workspaces: |
+            rust
+            examples/rust
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --all-features --locked
       - run: cargo clippy --all-targets --no-default-features --features native-tls,blocking --locked
       - run: cargo doc --all-features --no-deps --locked
         env:
           RUSTDOCFLAGS: -D warnings
+      - name: Examples
+        working-directory: examples/rust
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked

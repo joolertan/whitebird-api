@@ -72,6 +72,15 @@ impl Client {
         self.block_on(self.inner.login())
     }
 
+    /// Exchanges a one-time code for an operation MFA token, stores it and returns it.
+    ///
+    /// # Errors
+    ///
+    /// See [`crate::Client::confirm_operation`].
+    pub fn confirm_operation(&self, operation: &str, code: Option<&str>) -> Result<String> {
+        self.block_on(self.inner.confirm_operation(operation, code))
+    }
+
     /// Sets the operation MFA token sent as `x-mfa-token` with every request.
     pub fn set_mfa_token(&self, token: impl Into<String>) {
         self.inner.set_mfa_token(token);
@@ -171,6 +180,11 @@ impl RequestBuilder {
     /// Unwraps the given envelope from the response.
     pub fn envelope(self, envelope: Envelope) -> Self {
         self.map(|request| request.envelope(envelope))
+    }
+
+    /// Marks the request as a sensitive operation that needs an operation MFA token.
+    pub fn mfa_operation(self, operation: impl Into<String>) -> Self {
+        self.map(|request| request.mfa_operation(operation))
     }
 
     /// Applies per-request options on top of those of the client.

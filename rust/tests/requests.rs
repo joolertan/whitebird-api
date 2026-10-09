@@ -4,8 +4,10 @@ use std::time::Duration;
 
 use common::*;
 use serde_json::{Value, json};
-use whitebird::models::OtcOrderStatus;
-use whitebird::params::BrokerageOtcOrdersCreateParams;
+use whitebird::models::{KycInvestorStatus, KycQualificationRequest, OtcOrderStatus};
+use whitebird::params::{
+    BrokerageOtcOrdersCreateParams, BrokerageOtcOrdersListParams, KycQualificationSubmitParams,
+};
 use whitebird::{
     Client, Decimal, Envelope, Error, ErrorKind, Method, Multipart, RequestOptions, Service,
 };
@@ -227,6 +229,7 @@ async fn exposes_the_service_error_body() {
     let body = json!({
         "code": 4001,
         "status": "SMS_VERIFICATION_REQUIRED",
+        "subStatus": "SMS_CODE_SENT",
         "message": "Confirm the operation by SMS",
         "fields": [{ "field": "amount", "message": "too small" }],
     });
@@ -237,6 +240,7 @@ async fn exposes_the_service_error_body() {
     let api = error.api().unwrap();
     assert_eq!(api.code(), Some(4001));
     assert_eq!(api.error_code(), Some("SMS_VERIFICATION_REQUIRED"));
+    assert_eq!(api.sub_status(), Some("SMS_CODE_SENT"));
     assert_eq!(api.message(), "Confirm the operation by SMS");
     assert_eq!(
         api.fields(),
@@ -284,10 +288,7 @@ async fn unwraps_the_retcode_envelope() {
         )
         .mount(&server)
         .await;
-    let client = builder(&server)
-        .base_url(Service::Exchange, server.uri())
-        .build()
-        .unwrap();
+    let client = builder(&server).build().unwrap();
     let market = |path: &'static str| {
         client
             .request(Service::Exchange, Method::GET, path)
@@ -375,8 +376,11 @@ async fn escape_hatch_sends_forms_and_multipart() {
         .multipart(
             Multipart::new()
                 .text("documentType", "PASSPORT")
+                .text("meta", json!({ "pages": 2 }))
                 .json("request", json!({ "criteria": ["certifiedExpert"] }))
-                .file("file", b"%PDF".to_vec()),
+                .files("scans", [b"%PDF-1".to_vec(), b"%PDF-2".to_vec()])
+                .file("file", b"%PDF".to_vec())
+                .content_type("file", "application/pdf"),
         )
         .send()
         .await
@@ -397,7 +401,85 @@ async fn escape_hatch_sends_forms_and_multipart() {
     assert!(body.contains(
         "name=\"request\"\r\nContent-Type: application/json\r\n\r\n{\"criteria\":[\"certifiedExpert\"]}"
     ));
-    assert!(body.contains("name=\"file\"; filename=\"file\""));
+    assert!(body.contains("name=\"meta\"\r\nContent-Type: application/json\r\n\r\n{\"pages\":2}"));
+    assert_eq!(
+        body.matches("name=\"scans\"; filename=\"scans\"").count(),
+        2
+    );
+    assert!(body.contains(
+        "name=\"file\"; filename=\"file\"\r\nContent-Type: application/pdf\r\n\r\n%PDF\r\n"
+    ));
+}
+
+#[tokio::test]
+async fn object_bodies_are_sent_even_when_empty() {
+    let server = MockServer::start().await;
+    for (path_, answer) in [
+        ("/api/v1/exchange/rate/stats", json!([])),
+        ("/api/v1/brokerage/otc-order/page", json!({ "content": [] })),
+    ] {
+        Mock::given(method("POST"))
+            .and(path(path_))
+            .and(header("content-type", "application/json"))
+            .and(body_json(json!({})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(answer))
+            .expect(1)
+            .mount(&server)
+            .await;
+    }
+    let client = signed_in(&server, &jwt("me", 3600));
+
+    client.exchange().rates().stats().await.unwrap();
+    client
+        .brokerage()
+        .otc_orders()
+        .list(BrokerageOtcOrdersListParams::default())
+        .first_page()
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn generated_multipart_methods_send_typed_parts() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v2/qualification"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(&server)
+        .await;
+
+    signed_in(&server, &jwt("me", 3600))
+        .kyc()
+        .qualification()
+        .submit(
+            KycQualificationSubmitParams::builder()
+                .request(
+                    KycQualificationRequest::builder()
+                        .requested_investor_status(KycInvestorStatus::QualifiedInvestor)
+                        .certified_expert(true)
+                        .build(),
+                )
+                .files(vec![b"%PDF".to_vec(), b"%PDF-2".to_vec()])
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body = String::from_utf8_lossy(&requests[0].body);
+    let part = body
+        .split("name=\"request\"\r\nContent-Type: application/json\r\n\r\n")
+        .nth(1)
+        .and_then(|rest| rest.split("\r\n").next())
+        .expect("JSON part");
+    assert_eq!(
+        serde_json::from_str::<Value>(part).unwrap(),
+        json!({"requestedInvestorStatus": "QUALIFIED_INVESTOR", "certifiedExpert": true})
+    );
+    assert_eq!(
+        body.matches("name=\"files\"; filename=\"files\"").count(),
+        2
+    );
 }
 
 #[tokio::test]

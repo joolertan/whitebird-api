@@ -1077,10 +1077,6 @@ pub struct ExchangeRateStat {
     pub value24_h: Option<Decimal>,
 }
 
-/// Filter of the statistics; the web app always sends `{}`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, bon::Builder)]
-pub struct ExchangeRateStatsFilter {}
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IcoBuyResult {
@@ -2130,6 +2126,31 @@ pub struct KycPersonalData {
     pub doc_expiration_date: Option<String>,
 }
 
+/// Content of the `request` part of `POST /api/v2/qualification`. The web app sends every
+/// criterion of the requested level, `true` for the ticked ones: `incomeOver80kByn`,
+/// `assetsOver150kByn` for `QUALIFIED_INVESTOR`, `incomeOver300kByn`, `assetsOver600kByn`
+/// for `HIGHLY_QUALIFIED_INVESTOR`, plus `certifiedExpert`, `experienceInOrganization` and
+/// `personalTradingExperience` for both.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, bon::Builder)]
+#[serde(rename_all = "camelCase")]
+pub struct KycQualificationRequest {
+    pub requested_investor_status: KycInvestorStatus,
+    #[serde(rename = "incomeOver80kByn", skip_serializing_if = "Option::is_none")]
+    pub income_over80_k_byn: Option<bool>,
+    #[serde(rename = "assetsOver150kByn", skip_serializing_if = "Option::is_none")]
+    pub assets_over150_k_byn: Option<bool>,
+    #[serde(rename = "incomeOver300kByn", skip_serializing_if = "Option::is_none")]
+    pub income_over300_k_byn: Option<bool>,
+    #[serde(rename = "assetsOver600kByn", skip_serializing_if = "Option::is_none")]
+    pub assets_over600_k_byn: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub certified_expert: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub experience_in_organization: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub personal_trading_experience: Option<bool>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct KycSumsubToken {
     /// SumSub WebSDK access token.
@@ -3008,6 +3029,19 @@ pub struct SubaccountResponse {
     pub balances: Option<HashMap<String, Decimal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<SubaccountStatus>,
+}
+
+/// Content of the `request` part of `POST /api/v1/support`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, bon::Builder)]
+#[builder(on(String, into))]
+pub struct SupportRequest {
+    pub name: String,
+    pub email: String,
+    /// Free text; the web form offers fixed topics in Russian (registration, documents,
+    /// operations, individual exchange terms, withdrawal limit increase, swap limit increase,
+    /// service error, legal entity, other, and settlement account binding).
+    pub topic: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

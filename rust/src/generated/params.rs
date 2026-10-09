@@ -19,12 +19,12 @@ use crate::models::{
     ExchangeOrderStatus, ExchangeQuoteLegRequest, FileType, IcoAccountType,
     IcoBuybackApplicationStatus, IcoBuybackOfferStatus, IcoBuybackPaymentStatus, IcoEmissionStatus,
     IcoObligationStatus, IcoOperationAccount, IcoOperationStatus, IcoPaymentInterval,
-    IcoReportFormat, IcoYieldPeriod, KycProvider, KycSumsubLevelType, MarketCategory,
-    MarketKlineInterval, MerchantReportFileType, MtsCardCountry, Network,
+    IcoReportFormat, IcoYieldPeriod, KycProvider, KycQualificationRequest, KycSumsubLevelType,
+    MarketCategory, MarketKlineInterval, MerchantReportFileType, MtsCardCountry, Network,
     OrderUnifiedOperationType, OtcOrderStatus, PaymentCountryGroup, PaymentOrderType,
     PaymentProviderType, ProviderType, ReportDateFrame, ReportOperationType,
     StatusbankPaymentSystem, SubaccountAddressRequest, SubaccountDocType, SubaccountType,
-    TradingCategory, TradingOrderSide, TradingOrderType, TradingPortfolioPeriod,
+    SupportRequest, TradingCategory, TradingOrderSide, TradingOrderType, TradingPortfolioPeriod,
     TradingReportFormat, TradingSortDirection, TradingTimeInForce, UserGender,
     VtbCortiMilliServiceType,
 };
@@ -1609,12 +1609,11 @@ pub struct KycProfileClosureConfirmParams {
 
 /// Parameters of [`KycQualification::submit`](crate::resources::KycQualification::submit).
 #[derive(Debug, Clone, PartialEq, bon::Builder)]
-#[builder(on(String, into))]
 pub struct KycQualificationSubmitParams {
     /// JSON-encoded `KycQualificationRequest`.
-    pub request: String,
-    /// Supporting document; the server accepts the part repeated once per file.
-    pub files: Vec<u8>,
+    pub request: KycQualificationRequest,
+    /// Supporting documents, sent as one part per file.
+    pub files: Vec<Vec<u8>>,
 }
 
 /// Parameters of [`KycSdk::link`](crate::resources::KycSdk::link).
@@ -2127,9 +2126,9 @@ pub struct SupportSendParams {
     /// Google reCAPTCHA v3 token (public support form).
     pub recaptcha: Option<String>,
     /// JSON-encoded `SupportRequest`.
-    pub request: String,
-    /// Attachment; the server accepts the part repeated once per file.
-    pub files: Option<Vec<u8>>,
+    pub request: SupportRequest,
+    /// Attachments, sent as one part per file.
+    pub files: Option<Vec<Vec<u8>>>,
 }
 
 /// Parameters of [`TradingAccount::fee_rate`](crate::resources::TradingAccount::fee_rate).

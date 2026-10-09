@@ -12,6 +12,8 @@ use wiremock::{Mock, MockBuilder, MockServer, Request, ResponseTemplate};
 pub const TOKEN_PATH: &str = "/oauth/token";
 pub const MFA_PATH: &str = "/api/v1/client/mfa";
 pub const ME_PATH: &str = "/api/v1/brokerage/subaccount/me";
+pub const CAPTCHA_PATH: &str = "/api/v1/captcha/generate";
+pub const MFA_TOKEN_PATH: &str = "/api/v2/auth/mfa/merchant/client/token";
 
 /// A JWT whose `exp` is `seconds` from now.
 pub fn jwt(name: &str, seconds: i64) -> String {
@@ -27,8 +29,10 @@ pub fn jwt(name: &str, seconds: i64) -> String {
 /// A client whose services all point at `server`.
 pub fn builder(server: &MockServer) -> ClientBuilder {
     Client::builder()
+        .base_url(Service::Api, server.uri())
         .base_url(Service::Auth, server.uri())
         .base_url(Service::Brokerage, server.uri())
+        .base_url(Service::Exchange, server.uri())
         .base_url(Service::Notification, server.uri())
         .max_retries(0)
 }

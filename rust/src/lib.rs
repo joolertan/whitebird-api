@@ -48,6 +48,7 @@ mod auth;
 #[cfg(feature = "blocking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
 pub mod blocking;
+mod captcha;
 mod client;
 mod decimal;
 mod enums;
@@ -62,9 +63,10 @@ mod timestamp;
 
 pub use auth::{MemoryTokenStore, TokenStore, Tokens};
 pub use bytes::Bytes;
+pub use captcha::{Captcha, CaptchaSolver};
 pub use client::{Client, ClientBuilder};
 pub use decimal::Decimal;
-pub use error::{ApiError, Error, ErrorKind, Result};
+pub use error::{ApiError, BoxError, Error, ErrorKind, Result};
 pub use generated::{Environment, Service, models, params, resources};
 pub use otp::CodeProvider;
 #[cfg(feature = "otp")]

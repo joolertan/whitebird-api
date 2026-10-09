@@ -10,4 +10,7 @@ pub mod resources;
 mod services;
 
 pub use self::services::{Environment, Service};
-pub(crate) use self::services::{OAUTH_BASIC, OAUTH_SERVICE, OAUTH_TOKEN_PATH};
+pub(crate) use self::services::{
+    OAUTH_BASIC, OAUTH_CAPTCHA_PATH, OAUTH_MFA_STATUS_PATH, OAUTH_SERVICE, OAUTH_TOKEN_PATH,
+    OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH,
+};

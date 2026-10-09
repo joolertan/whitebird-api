@@ -15,24 +15,24 @@ use crate::models::{
     BalanceFiatDeposit, BalanceOperation, BalanceOrderResponse, CarusellBank, ClientFeature,
     ClientModel, CryptoAddressResponse, CurrentAccountSystemAccount, DownloadTokenResponse,
     ExchangeAssets, ExchangeLegacyOrder, ExchangeLimits, ExchangeOrder, ExchangeQuote,
-    ExchangeRateStat, ExchangeRateStatsFilter, IcoBuyResult, IcoBuybackApplication,
-    IcoBuybackOffer, IcoCalculatorResult, IcoCardBuyCalculation, IcoClientInfo, IcoEmission,
-    IcoEmissionSale, IcoInvestedIncome, IcoInvestedTotal, IcoInvestorEmission,
-    IcoInvestorObligations, IcoIssuer, IcoIssuerDebt, IcoIssuerDocument, IcoIssuerDocumentType,
-    IcoIssuerName, IcoIssuerStatistics, IcoOperation, IcoPaymentSchedule, IcoRate, IcoStatistics,
-    IcoYearAmount, IcoYield, KycActualData, KycActualizationClientStatus, KycCryptoTest,
-    KycInvestorData, KycLivenessSession, KycLivenessStatus, KycMsiRedirect, KycPersonalData,
-    KycSumsubToken, KycVerification, MarketInstrument, MarketKline, MarketOrderbook, Merchant,
-    MerchantClientCounts, MerchantPair, MtsCardCountry, MtsQrCommission, MtsQrInfo,
-    NotificationEvent, NotificationStreamMessage, OrderUnifiedResponse, OtcOrderCalculateResponse,
-    OtcOrderResponse, PaymentCard, PaymentCardLimits, PaymentCommission,
-    PaymentDirectionCommission, PaymentMethod, PaymentMethodResponse, PaymentProvider,
-    PaymentProviderType, Referral, ReferralTransaction, RegistrationSdkResult, RegistrationState,
-    StatusbankCardDetails, StatusbankCardSystems, StatusbankOrderConfirmation,
-    StatusbankRegistration, SubaccountDetailsResponse, SubaccountResponse, SupportResponse,
-    TradingExecution, TradingFeeRate, TradingOrder, TradingOrderAck, TradingOrderRecord,
-    TradingPortfolioStatistics, UserEmailChangeConfirmation, UserEmailChangeResult, UserMfaSecret,
-    UserPhoneChangeResult, UserProfile, UserTokenPair, VtbCortiMilliRate,
+    ExchangeRateStat, IcoBuyResult, IcoBuybackApplication, IcoBuybackOffer, IcoCalculatorResult,
+    IcoCardBuyCalculation, IcoClientInfo, IcoEmission, IcoEmissionSale, IcoInvestedIncome,
+    IcoInvestedTotal, IcoInvestorEmission, IcoInvestorObligations, IcoIssuer, IcoIssuerDebt,
+    IcoIssuerDocument, IcoIssuerDocumentType, IcoIssuerName, IcoIssuerStatistics, IcoOperation,
+    IcoPaymentSchedule, IcoRate, IcoStatistics, IcoYearAmount, IcoYield, KycActualData,
+    KycActualizationClientStatus, KycCryptoTest, KycInvestorData, KycLivenessSession,
+    KycLivenessStatus, KycMsiRedirect, KycPersonalData, KycSumsubToken, KycVerification,
+    MarketInstrument, MarketKline, MarketOrderbook, Merchant, MerchantClientCounts, MerchantPair,
+    MtsCardCountry, MtsQrCommission, MtsQrInfo, NotificationEvent, NotificationStreamMessage,
+    OrderUnifiedResponse, OtcOrderCalculateResponse, OtcOrderResponse, PaymentCard,
+    PaymentCardLimits, PaymentCommission, PaymentDirectionCommission, PaymentMethod,
+    PaymentMethodResponse, PaymentProvider, PaymentProviderType, Referral, ReferralTransaction,
+    RegistrationSdkResult, RegistrationState, StatusbankCardDetails, StatusbankCardSystems,
+    StatusbankOrderConfirmation, StatusbankRegistration, SubaccountDetailsResponse,
+    SubaccountResponse, SupportResponse, TradingExecution, TradingFeeRate, TradingOrder,
+    TradingOrderAck, TradingOrderRecord, TradingPortfolioStatistics, UserEmailChangeConfirmation,
+    UserEmailChangeResult, UserMfaSecret, UserPhoneChangeResult, UserProfile, UserTokenPair,
+    VtbCortiMilliRate,
 };
 use crate::params::{
     AccountingAccountsGetEnhancedParams, AccountingAccountsGetParams,
@@ -395,6 +395,7 @@ impl Auth<'_> {
     /// `POST /api/v1/client/mfa`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -707,8 +708,10 @@ impl BalanceWithdrawals<'_> {
     /// `POST /api/v2/exchange/client/balance/crypto/withdrawal`
     ///
     /// **Experimental:** the endpoint may change without notice.
-    /// Requires an operation MFA token for `WITHDRAWAL`; see
-    /// [`Client::set_mfa_token`](crate::Client::set_mfa_token).
+    ///
+    /// Needs an operation MFA token for `WITHDRAWAL`, which the client obtains with
+    /// [`Client::confirm_operation`](crate::Client::confirm_operation) when a one-time code
+    /// provider is configured.
     ///
     /// # Errors
     ///
@@ -733,8 +736,10 @@ impl BalanceWithdrawals<'_> {
     /// `POST /api/v2/exchange/client/balance/fiat/withdrawal`
     ///
     /// **Experimental:** the endpoint may change without notice.
-    /// Requires an operation MFA token for `WITHDRAWAL`; see
-    /// [`Client::set_mfa_token`](crate::Client::set_mfa_token).
+    ///
+    /// Needs an operation MFA token for `WITHDRAWAL`, which the client obtains with
+    /// [`Client::confirm_operation`](crate::Client::confirm_operation) when a one-time code
+    /// provider is configured.
     ///
     /// # Errors
     ///
@@ -1958,9 +1963,9 @@ impl ExchangeRates<'_> {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response cannot be decoded.
-    pub fn stats(&self, body: ExchangeRateStatsFilter) -> Result<Vec<ExchangeRateStat>> {
+    pub fn stats(&self) -> Result<Vec<ExchangeRateStat>> {
         self.client
-            .block_on(self.client.as_async().exchange().rates().stats(body))
+            .block_on(self.client.as_async().exchange().rates().stats())
     }
 }
 
@@ -2102,6 +2107,7 @@ impl IcoEmissions<'_> {
     /// `POST /api/v1/ico/emission`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// Returns a lazy iterator over the items of every page; it yields errors as items.
@@ -2120,6 +2126,7 @@ impl IcoEmissions<'_> {
     /// `POST /api/v1/ico/emission/{emissionId}`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -2137,6 +2144,7 @@ impl IcoEmissions<'_> {
     /// `GET /api/v1/ico/emission/{emissionId}/white-paper`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -2162,6 +2170,7 @@ impl IcoEmissions<'_> {
     /// `POST /api/v1/ico/emission/calculator`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -2408,11 +2417,8 @@ impl<'a> IcoIssuers<'a> {
     /// **Experimental:** the endpoint may change without notice.
     ///
     /// Returns a lazy iterator over the items of every page; it yields errors as items.
-    pub fn names(&self, body: Value) -> Paginator<IcoIssuerName> {
-        Paginator::new(
-            self.client,
-            self.client.as_async().ico().issuers().names(body),
-        )
+    pub fn names(&self) -> Paginator<IcoIssuerName> {
+        Paginator::new(self.client, self.client.as_async().ico().issuers().names())
     }
 }
 
@@ -4724,6 +4730,7 @@ impl Registration<'_> {
     /// `POST /api/v1/registration/initiate`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -4743,6 +4750,7 @@ impl Registration<'_> {
     /// `POST /api/v1/registration/sdk/initiate`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -4761,6 +4769,7 @@ impl Registration<'_> {
     /// `POST /api/v1/registration/email/verify`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -4819,6 +4828,7 @@ impl Registration<'_> {
     /// `POST /api/v1/registration/phone/verify`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -4837,6 +4847,7 @@ impl Registration<'_> {
     /// `POST /api/v1/registration/complete`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -4852,6 +4863,7 @@ impl Registration<'_> {
     /// `POST /api/v1/registration/sdk/complete`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors
@@ -5441,6 +5453,7 @@ impl UserEmail<'_> {
     /// `POST /api/v1/user/code/verify`
     ///
     /// **Experimental:** the endpoint may change without notice.
+    ///
     /// Public: works without signing in.
     ///
     /// # Errors

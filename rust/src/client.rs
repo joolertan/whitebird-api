@@ -6,16 +6,21 @@ use std::time::Duration;
 use reqwest::header::USER_AGENT;
 use reqwest::{Method, StatusCode, Url};
 
+use serde_json::{Value, json};
+
 use crate::auth::{Credentials, Endpoints, MemoryTokenStore, Session, TokenStore, Tokens};
-use crate::error::{ApiError, Error, Result};
-use crate::generated::{Environment, OAUTH_BASIC, OAUTH_SERVICE, OAUTH_TOKEN_PATH, Service};
+use crate::captcha::CaptchaSolver;
+use crate::error::{ApiError, Error, ErrorKind, Result};
+use crate::generated::{
+    Environment, OAUTH_BASIC, OAUTH_CAPTCHA_PATH, OAUTH_MFA_STATUS_PATH, OAUTH_SERVICE,
+    OAUTH_TOKEN_PATH, OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH, Service,
+};
 use crate::otp::CodeProvider;
 use crate::request::{RequestBuilder, RequestOptions};
 use crate::retry::{self, RetryPolicy};
 
 pub(crate) const USER_AGENT_VALUE: &str = concat!("whitebird-api-rust/", env!("CARGO_PKG_VERSION"));
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
-const MFA_CHECK_PATH: &str = "/api/v1/client/mfa";
 const MFA_TOKEN_HEADER: &str = "x-mfa-token";
 
 /// Asynchronous Whitebird client.
@@ -67,11 +72,84 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error for which [`Error::is_mfa_required`] is `true` if the account has
-    /// two-factor authentication on and no code provider is configured, an
+    /// two-factor authentication on and no code provider is configured,
+    /// [`Error::is_captcha_required`] if the account must pass a captcha and no
+    /// [solver](ClientBuilder::captcha) is configured, an
     /// [`ErrorKind::Authentication`](crate::ErrorKind::Authentication) error if the credentials
     /// or the code are rejected and [`Error::Config`] if no credentials are configured.
     pub async fn login(&self) -> Result<Tokens> {
         self.inner.session.login().await
+    }
+
+    /// Exchanges a one-time code for the operation MFA token that sensitive operations such as
+    /// withdrawals need, stores it on the client (see [`set_mfa_token`](Self::set_mfa_token))
+    /// and returns it.
+    ///
+    /// Without `code`, one comes from the [code provider](ClientBuilder::otp). With a provider
+    /// configured the client calls this by itself before such operations, and again once when
+    /// one is refused for lack of a valid token.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Config`] if there is no `code` and no code provider, and an API error if
+    /// the code is rejected (`INVALID_MFA_CODE`).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn run(client: whitebird::Client) -> whitebird::Result<()> {
+    /// client.confirm_operation("WITHDRAWAL", Some("123456")).await?;
+    /// // Withdrawals made with `client` now carry the token.
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn confirm_operation(&self, operation: &str, code: Option<&str>) -> Result<String> {
+        let code = match code {
+            Some(code) => code.to_owned(),
+            None => self
+                .inner
+                .session
+                .otp
+                .as_ref()
+                .map(CodeProvider::code)
+                .ok_or_else(|| {
+                    Error::Config(
+                        "no one-time code: pass one or configure ClientBuilder::otp".into(),
+                    )
+                })?,
+        };
+        let request = self
+            .request(
+                OPERATION_MFA_SERVICE,
+                Method::POST,
+                OPERATION_MFA_TOKEN_PATH,
+            )
+            .json(json!({ "operation": operation, "mfaCode": code }));
+        let token = issued_mfa_token(self.execute(&request).await?).await?;
+        self.set_mfa_token(token.clone());
+        Ok(token)
+    }
+
+    /// Sends a request for an operation that needs an MFA token, obtaining one first if a code
+    /// provider is configured and no token is set, and again once if the token is refused.
+    pub(crate) async fn execute_with_mfa(
+        &self,
+        request: &RequestBuilder,
+        operation: &str,
+    ) -> Result<reqwest::Response> {
+        if self.inner.session.otp.is_none() {
+            return self.execute(request).await;
+        }
+        if self.mfa_token().is_none() {
+            self.confirm_operation(operation, None).await?;
+        }
+        match self.execute(request).await {
+            Err(error) if error.is_mfa_required() => {
+                self.confirm_operation(operation, None).await?;
+                self.execute(request).await
+            }
+            result => result,
+        }
     }
 
     /// Sets the operation MFA token sent as `x-mfa-token` with every request, as required by
@@ -270,6 +348,42 @@ impl Client {
     }
 }
 
+/// Reads the MFA token from the `mfaToken` field, a body that is just the token (as a JSON
+/// string or plain text) or the `x-mfa-token` header.
+async fn issued_mfa_token(response: reqwest::Response) -> Result<String> {
+    let status = response.status();
+    let header = response
+        .headers()
+        .get(MFA_TOKEN_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let body = response.bytes().await?;
+    let from_body = match serde_json::from_slice::<Value>(&body) {
+        Ok(Value::Object(mut fields)) => match fields.remove("mfaToken") {
+            Some(Value::String(token)) => Some(token),
+            _ => None,
+        },
+        Ok(Value::String(token)) => Some(token),
+        Ok(_) => None,
+        Err(_) => std::str::from_utf8(&body)
+            .ok()
+            .map(|text| text.trim().to_owned()),
+    };
+    from_body
+        .into_iter()
+        .chain(header)
+        .find(|token| !token.is_empty())
+        .ok_or_else(|| {
+            ApiError::new(
+                ErrorKind::Other,
+                status,
+                "the response carries no MFA token",
+                &body,
+            )
+            .into()
+        })
+}
+
 async fn api_error(response: reqwest::Response) -> Error {
     let status = response.status();
     let headers = response.headers().clone();
@@ -299,6 +413,7 @@ pub struct ClientBuilder {
     otp: Option<CodeProvider>,
     environment: Environment,
     base_urls: HashMap<Service, String>,
+    captcha: Option<CaptchaSolver>,
     token_store: Option<Arc<dyn TokenStore>>,
     timeout: Option<Duration>,
     max_retries: Option<u32>,
@@ -319,6 +434,14 @@ impl ClientBuilder {
     /// (`&str`), a [`CodeProvider::from_fn`] callback or, with the `otp` feature, a `Totp`.
     pub fn otp(mut self, provider: impl Into<CodeProvider>) -> Self {
         self.otp = Some(provider.into());
+        self
+    }
+
+    /// Sets the solver of the slider captcha that the API asks accounts without two-factor
+    /// authentication to pass on login. Without one, such logins fail with an error for which
+    /// [`Error::is_captcha_required`] is `true`. See [`CaptchaSolver`] for an example.
+    pub fn captcha(mut self, solver: CaptchaSolver) -> Self {
+        self.captcha = Some(solver);
         self
     }
 
@@ -387,11 +510,13 @@ impl ClientBuilder {
             http: http.clone(),
             endpoints: Endpoints {
                 token: format!("{auth_url}{OAUTH_TOKEN_PATH}"),
-                mfa_check: format!("{auth_url}{MFA_CHECK_PATH}"),
+                mfa_status: format!("{auth_url}{OAUTH_MFA_STATUS_PATH}"),
+                captcha: format!("{auth_url}{OAUTH_CAPTCHA_PATH}"),
                 basic: OAUTH_BASIC.to_owned(),
             },
             credentials: self.credentials,
             otp: self.otp,
+            captcha: self.captcha,
             store: self
                 .token_store
                 .unwrap_or_else(|| Arc::new(MemoryTokenStore::new())),
@@ -432,6 +557,7 @@ impl fmt::Debug for ClientBuilder {
         f.debug_struct("ClientBuilder")
             .field("credentials", &self.credentials)
             .field("otp", &self.otp)
+            .field("captcha", &self.captcha)
             .field("environment", &self.environment)
             .field("base_urls", &self.base_urls)
             .field("timeout", &self.timeout)

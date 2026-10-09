@@ -95,16 +95,33 @@ impl RequestOptions {
 }
 
 /// Multipart form body.
+///
+/// # Examples
+///
+/// ```
+/// use whitebird::Multipart;
+///
+/// let form = Multipart::new()
+///     .json("request", serde_json::json!({ "criteria": ["certifiedExpert"] }))
+///     .files("files", [b"%PDF-1.7".to_vec(), b"%PDF-1.4".to_vec()])
+///     .text("comment", "two diplomas");
+/// ```
 #[derive(Debug, Clone, Default)]
 #[must_use]
 pub struct Multipart {
-    parts: Vec<(String, Part)>,
+    parts: Vec<Part>,
 }
 
 #[derive(Debug, Clone)]
-enum Part {
+struct Part {
+    name: String,
+    content: Content,
+    content_type: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+enum Content {
     Text(String),
-    Json(String),
     File(Vec<u8>),
 }
 
@@ -114,52 +131,109 @@ impl Multipart {
         Self::default()
     }
 
-    /// Adds a text part; `None` is skipped and sequences add one part per item.
+    /// Adds text parts: `None` is skipped, a sequence adds one part per item and objects are
+    /// added as JSON parts.
     pub fn text(mut self, name: &str, value: impl Serialize) -> Self {
-        let values = serde_json::to_value(value).map(scalars).unwrap_or_default();
-        self.parts.extend(
-            values
-                .into_iter()
-                .map(|value| (name.to_owned(), Part::Text(value))),
-        );
-        self
-    }
-
-    /// Adds a part holding `value` as JSON, with content type `application/json`.
-    pub fn json(mut self, name: &str, value: impl Serialize) -> Self {
-        if let Ok(json) = serde_json::to_string(&value) {
-            self.parts.push((name.to_owned(), Part::Json(json)));
+        let mut pending = match serde_json::to_value(value) {
+            Ok(Value::Array(items)) => items,
+            Ok(value) => vec![value],
+            Err(_) => Vec::new(),
+        };
+        pending.reverse();
+        while let Some(value) = pending.pop() {
+            match value {
+                Value::Null => {}
+                Value::Array(items) => pending.extend(items.into_iter().rev()),
+                Value::String(text) => self.push(name, Content::Text(text), None),
+                object @ Value::Object(_) => self.push_json(name, &object),
+                scalar => self.push(name, Content::Text(scalar.to_string()), None),
+            }
         }
         self
     }
 
-    /// Adds a file part named after the field; `None` is skipped.
+    /// Adds `value` as one JSON part with content type `application/json`; `None` is skipped.
+    pub fn json(mut self, name: &str, value: impl Serialize) -> Self {
+        match serde_json::to_value(value) {
+            Ok(Value::Null) | Err(_) => {}
+            Ok(value) => self.push_json(name, &value),
+        }
+        self
+    }
+
+    /// Adds a file part; `None` is skipped.
     pub fn file(mut self, name: &str, data: impl Into<Option<Vec<u8>>>) -> Self {
         if let Some(data) = data.into() {
-            self.parts.push((name.to_owned(), Part::File(data)));
+            self.push(name, Content::File(data), None);
         }
         self
+    }
+
+    /// Adds one file part per item, all under `name`.
+    pub fn files(mut self, name: &str, files: impl IntoIterator<Item = Vec<u8>>) -> Self {
+        for data in files {
+            self.push(name, Content::File(data), None);
+        }
+        self
+    }
+
+    /// Sets the media type of the parts named `name` added so far.
+    pub fn content_type(mut self, name: &str, media_type: &str) -> Self {
+        for part in self.parts.iter_mut().filter(|part| part.name == name) {
+            part.content_type = Some(media_type.to_owned());
+        }
+        self
+    }
+
+    fn push(&mut self, name: &str, content: Content, content_type: Option<&str>) {
+        self.parts.push(Part {
+            name: name.to_owned(),
+            content,
+            content_type: content_type.map(str::to_owned),
+        });
+    }
+
+    fn push_json(&mut self, name: &str, value: &Value) {
+        self.push(
+            name,
+            Content::Text(value.to_string()),
+            Some("application/json"),
+        );
+    }
+
+    /// Returns the first media type that is not valid.
+    fn invalid_media_type(&self) -> Option<&str> {
+        self.parts
+            .iter()
+            .filter_map(|part| part.content_type.as_deref())
+            .find(|media_type| {
+                reqwest::multipart::Part::text("")
+                    .mime_str(media_type)
+                    .is_err()
+            })
     }
 
     fn to_form(&self) -> reqwest::multipart::Form {
-        self.parts.iter().fold(
-            reqwest::multipart::Form::new(),
-            |form, (name, part)| match part {
-                Part::Text(value) => form.text(name.clone(), value.clone()),
-                Part::Json(value) => {
-                    let part = reqwest::multipart::Part::text(value.clone());
-                    match part.mime_str("application/json") {
-                        Ok(part) => form.part(name.clone(), part),
-                        Err(_) => form.text(name.clone(), value.clone()),
-                    }
-                }
-                Part::File(data) => {
-                    let file =
-                        reqwest::multipart::Part::bytes(data.clone()).file_name(name.clone());
-                    form.part(name.clone(), file)
-                }
-            },
-        )
+        self.parts
+            .iter()
+            .fold(reqwest::multipart::Form::new(), |form, part| {
+                form.part(part.name.clone(), part.to_part())
+            })
+    }
+}
+
+impl Part {
+    fn to_part(&self) -> reqwest::multipart::Part {
+        let part = || match &self.content {
+            Content::Text(text) => reqwest::multipart::Part::text(text.clone()),
+            Content::File(data) => {
+                reqwest::multipart::Part::bytes(data.clone()).file_name(self.name.clone())
+            }
+        };
+        self.content_type
+            .as_deref()
+            .and_then(|media_type| part().mime_str(media_type).ok())
+            .unwrap_or_else(part)
     }
 }
 
@@ -213,6 +287,7 @@ pub struct RequestBuilder {
     pub(crate) public: bool,
     pub(crate) streaming: bool,
     pub(crate) envelope: Option<Envelope>,
+    pub(crate) mfa_operation: Option<String>,
     pub(crate) options: RequestOptions,
     pub(crate) invalid: Option<String>,
 }
@@ -231,6 +306,7 @@ impl RequestBuilder {
             public: false,
             streaming: false,
             envelope: None,
+            mfa_operation: None,
             options,
             invalid: None,
         }
@@ -285,6 +361,9 @@ impl RequestBuilder {
 
     /// Sets a multipart body.
     pub fn multipart(mut self, form: Multipart) -> Self {
+        if let Some(media_type) = form.invalid_media_type() {
+            self.invalid = Some(format!("invalid multipart media type {media_type:?}"));
+        }
         self.body = Body::Multipart(form);
         self
     }
@@ -298,6 +377,13 @@ impl RequestBuilder {
     /// Unwraps the given envelope from the response.
     pub fn envelope(mut self, envelope: Envelope) -> Self {
         self.envelope = Some(envelope);
+        self
+    }
+
+    /// Marks the request as a sensitive operation, such as `WITHDRAWAL`, that needs an operation
+    /// MFA token; see [`Client::confirm_operation`].
+    pub fn mfa_operation(mut self, operation: impl Into<String>) -> Self {
+        self.mfa_operation = Some(operation.into());
         self
     }
 
@@ -315,7 +401,10 @@ impl RequestBuilder {
     /// [`Error::Transport`] when the API cannot be reached and [`Error::Config`] for an invalid
     /// request.
     pub async fn send(self) -> Result<Response> {
-        let response = self.client.execute(&self).await?;
+        let response = match &self.mfa_operation {
+            Some(operation) => self.client.execute_with_mfa(&self, operation).await?,
+            None => self.client.execute(&self).await?,
+        };
         Ok(Response {
             inner: response,
             envelope: self.envelope,

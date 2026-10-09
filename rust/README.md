@@ -4,8 +4,9 @@ Unofficial Rust client for the [Whitebird](https://whitebird.io) crypto exchange
 
 - Typed methods for every documented endpoint, grouped by resource:
   `client.brokerage().otc_orders().list(params)`.
-- Handles the whole login flow, including the TOTP code when two-factor authentication is on.
-  Sessions are refreshed before they expire and after a 401.
+- Handles the whole login flow: the TOTP code when two-factor authentication is on, a captcha
+  through your solver otherwise, and the MFA token of withdrawals. Sessions are refreshed
+  before they expire and after a 401.
 - Retries idempotent requests on network errors, 429 and 5xx, honouring `Retry-After`.
 - Paginated endpoints are lazy `Stream`s, and notifications are a `Stream` of server-sent events
   that reconnects by itself.
@@ -90,26 +91,21 @@ match client.brokerage().otc_orders().create(params).await {
 # }
 ```
 
-### Operation MFA
+### Two-factor codes, operation MFA and captchas
 
-Withdrawals need an operation MFA token. Exchange a TOTP code for one, then the client sends it
-as `x-mfa-token` with every request until it is cleared:
+Withdrawals need an operation MFA token. With a code provider (`.otp(..)`) the client obtains
+one before the first withdrawal and renews it when it is refused. Without a provider, pass a
+code yourself; the token is then sent as `x-mfa-token` with every request:
 
 ```rust,no_run
 # async fn run(client: whitebird::Client) -> whitebird::Result<()> {
-use whitebird::models::AuthMfaOperation;
-use whitebird::params::AuthCreateMfaTokenParams;
-
-let params = AuthCreateMfaTokenParams::builder()
-    .operation(AuthMfaOperation::Withdrawal)
-    .mfa_code("123456")
-    .build();
-if let Some(token) = client.auth().create_mfa_token(params).await?.mfa_token {
-    client.set_mfa_token(token);
-}
+client.confirm_operation("WITHDRAWAL", Some("123456")).await?;
 # Ok(())
 # }
 ```
+
+Accounts without two-factor authentication must pass a slider captcha to sign in. The SDK does
+not solve it: set a `CaptchaSolver` that shows the images to a person or calls a solving service.
 
 ### Sessions
 
@@ -131,6 +127,8 @@ let body: serde_json::Value = client
 # Ok(())
 # }
 ```
+
+More programs are in [`examples/rust`](https://github.com/joolertan/whitebird-api/tree/main/examples/rust).
 
 ## License
 

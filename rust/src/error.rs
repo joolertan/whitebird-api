@@ -33,7 +33,13 @@ pub enum Error {
     /// password or a body that cannot be serialized.
     #[error("{0}")]
     Config(String),
+    /// The [captcha solver](crate::CaptchaSolver) failed.
+    #[error("the captcha solver failed: {0}")]
+    Captcha(#[source] BoxError),
 }
+
+/// Error type returned by user callbacks such as the [captcha solver](crate::CaptchaSolver).
+pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 impl Error {
     /// Returns the API error, if the API answered with one.
@@ -57,6 +63,12 @@ impl Error {
     /// Returns `true` if a TOTP code (on login) or an operation MFA token is required.
     pub fn is_mfa_required(&self) -> bool {
         self.kind() == Some(ErrorKind::MfaRequired)
+    }
+
+    /// Returns `true` if login needs a solved captcha; see
+    /// [`ClientBuilder::captcha`](crate::ClientBuilder::captcha).
+    pub fn is_captcha_required(&self) -> bool {
+        self.kind() == Some(ErrorKind::CaptchaRequired)
     }
 
     /// Returns `true` if the account must pass SMS or liveness verification first.
@@ -99,6 +111,8 @@ pub enum ErrorKind {
     Authentication,
     /// Login needs a TOTP code, or the operation needs an MFA token.
     MfaRequired,
+    /// Login needs a solved captcha: no solver is configured, or it kept failing.
+    CaptchaRequired,
     /// HTTP 403.
     PermissionDenied,
     /// HTTP 404.
@@ -120,10 +134,13 @@ impl ErrorKind {
         matches!(self, Self::BadRequest | Self::VerificationRequired)
     }
 
-    /// Returns `true` for [`Authentication`](Self::Authentication) and its refinement
-    /// [`MfaRequired`](Self::MfaRequired).
+    /// Returns `true` for [`Authentication`](Self::Authentication) and its refinements
+    /// [`MfaRequired`](Self::MfaRequired) and [`CaptchaRequired`](Self::CaptchaRequired).
     pub fn is_authentication(self) -> bool {
-        matches!(self, Self::Authentication | Self::MfaRequired)
+        matches!(
+            self,
+            Self::Authentication | Self::MfaRequired | Self::CaptchaRequired
+        )
     }
 
     fn classify(status: StatusCode, error_code: Option<&str>, message: &str) -> Self {
@@ -137,6 +154,9 @@ impl ErrorKind {
                 .contains("requires mfa checking")
         {
             return Self::MfaRequired;
+        }
+        if error_code.is_some_and(|code| code.to_ascii_uppercase().contains("CAPTCHA")) {
+            return Self::CaptchaRequired;
         }
         if status == StatusCode::BAD_REQUEST
             && error_code.is_some_and(|code| VERIFICATION.contains(&code))
@@ -161,7 +181,7 @@ impl ErrorKind {
 
 /// Error answered by the API.
 ///
-/// Whitebird services answer `{"code", "status", "message", "fields"}`, the OAuth server
+/// Whitebird services answer `{"code", "status", "subStatus", "message", "fields"}`, the OAuth server
 /// answers `{"error", "error_description"}` and market data answers `{"retCode", "retMsg"}`;
 /// all of them are normalized here.
 #[derive(Clone)]
@@ -173,6 +193,7 @@ struct Details {
     status: StatusCode,
     code: Option<i64>,
     error_code: Option<String>,
+    sub_status: Option<String>,
     message: String,
     fields: Vec<Value>,
     body: String,
@@ -208,6 +229,7 @@ impl ApiError {
             status,
             code,
             error_code,
+            sub_status: text("subStatus").map(str::to_owned),
             message,
             fields,
             body: String::from_utf8_lossy(body).into_owned(),
@@ -226,6 +248,7 @@ impl ApiError {
             status,
             code: None,
             error_code: None,
+            sub_status: None,
             message: message.into(),
             fields: Vec::new(),
             body: String::from_utf8_lossy(body).into_owned(),
@@ -257,6 +280,11 @@ impl ApiError {
     /// or `error` of an OAuth error (`invalid_grant`).
     pub fn error_code(&self) -> Option<&str> {
         self.0.error_code.as_deref()
+    }
+
+    /// Refinement of [`error_code`](Self::error_code): `subStatus` of a service error.
+    pub fn sub_status(&self) -> Option<&str> {
+        self.0.sub_status.as_deref()
     }
 
     /// Human-readable message.
@@ -314,11 +342,12 @@ mod tests {
     fn service_error() {
         let error = parse(
             400,
-            r#"{"code": 1001, "status": "VALIDATION_ERROR", "message": "Invalid amount", "fields": [{"field": "amount"}]}"#,
+            r#"{"code": 1001, "status": "VALIDATION_ERROR", "subStatus": "AMOUNT_TOO_LOW", "message": "Invalid amount", "fields": [{"field": "amount"}]}"#,
         );
         assert_eq!(error.kind(), ErrorKind::BadRequest);
         assert_eq!(error.code(), Some(1001));
         assert_eq!(error.error_code(), Some("VALIDATION_ERROR"));
+        assert_eq!(error.sub_status(), Some("AMOUNT_TOO_LOW"));
         assert_eq!(error.message(), "Invalid amount");
         assert_eq!(error.fields().len(), 1);
         assert_eq!(

@@ -150,3 +150,11 @@ pub(crate) const OAUTH_SERVICE: Service = Service::Auth;
 pub(crate) const OAUTH_TOKEN_PATH: &str = "/oauth/token";
 /// Public OAuth client credentials of the web application.
 pub(crate) const OAUTH_BASIC: &str = "YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA=";
+/// Tells whether an account has two-factor authentication on (`POST {"username"}`).
+pub(crate) const OAUTH_MFA_STATUS_PATH: &str = "/api/v1/client/mfa";
+/// Slider captcha that accounts without two-factor authentication solve to sign in.
+pub(crate) const OAUTH_CAPTCHA_PATH: &str = "/api/v1/captcha/generate";
+
+/// Exchanges a TOTP code for the `x-mfa-token` of sensitive operations.
+pub(crate) const OPERATION_MFA_SERVICE: Service = Service::Api;
+pub(crate) const OPERATION_MFA_TOKEN_PATH: &str = "/api/v2/auth/mfa/merchant/client/token";
