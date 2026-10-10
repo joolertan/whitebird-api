@@ -6,6 +6,10 @@ repo_name: joolertan/whitebird-api
 edit_uri: edit/main/docs/
 copyright: MIT License · Not affiliated with Whitebird
 
+# Rendered by scripts/docs-reference.sh and included into the reference pages.
+exclude_docs: |
+  reference/generated/
+
 theme:
   name: material
   language: en

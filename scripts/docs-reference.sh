@@ -16,9 +16,12 @@ npm ci --prefix "$root/scripts/docs" --no-audit --no-fund
   --out "$tmp/node" --readme none --outputFileStrategy modules \
   --excludePrivate --excludeInternal --hidePageHeader --hideBreadcrumbs \
   --disableSources --skipErrorChecking
-# Drop each page's own "# <module>" title; the including page has one.
-tail -n +2 "$tmp/node/index.md" > "$out/node.md"
-tail -n +2 "$tmp/node/otp.md" > "$out/node-otp.md"
+# Drop each page's own "# <module>" title, the including page has one, and escape nested array
+# types (`string`[][]), which Markdown would read as a reference link.
+for name in index otp; do
+  tail -n +2 "$tmp/node/$name.md" | sed 's/\[\]\[\]/\\[\\]\\[\\]/g' > "$out/node-$name.md"
+done
+mv "$out/node-index.md" "$out/node.md"
 
 gomarkdoc=github.com/princjef/gomarkdoc/cmd/gomarkdoc@v1.1.0
 (cd "$root/go" && go run "$gomarkdoc" --output "$tmp/go.md" . && go run "$gomarkdoc" --output "$tmp/go-otp.md" ./otp)

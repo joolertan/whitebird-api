@@ -92,7 +92,8 @@ has three operations: load, save and clear.
 
     Implement `whitebird::TokenStore` and pass it with `ClientBuilder::token_store`.
 
-`logout` signs out and clears the store.
+`user.logout()` ends the session on the server; clear the store as well so the next run signs in
+again. In Node.js, `client.logout()` forgets the client's tokens and clears the store.
 
 ## Captcha
 
