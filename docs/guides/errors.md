@@ -40,7 +40,7 @@ WhitebirdError
     try:
         order = client.exchange.orders.get(order_id)
     except NotFoundError:
-        order = None
+        print("No such order")
     except APIError as error:
         print(error.status_code, error.error_code, error.message, error.fields)
         raise

@@ -120,24 +120,24 @@ A paginated method returns an object that is directly iterable over items and fe
 page lazily:
 
 ```python
-for order in client.orders.history(size=50):
+for order in client.exchange.orders.history(size=50):
     ...
-async for order in async_client.orders.history(size=50):
+async for order in async_client.exchange.orders.history(size=50):
     ...
 ```
 
 ```ts
-for await (const order of client.orders.history({ size: 50 })) { ... }
-const firstPage = await client.orders.history({ size: 50 }); // Page<Order>
+for await (const order of client.exchange.orders.history({ size: 50 })) { ... }
+const firstPage = await client.exchange.orders.history({ size: 50 }); // Page<ExchangeOrder>
 ```
 
 ```go
-for order, err := range client.Orders.History(ctx, whitebird.OrdersHistoryParams{Size: 50}) { ... }
-page, err := client.Orders.HistoryPage(ctx, params)
+for order, err := range client.Exchange.Orders.History(ctx, whitebird.ExchangeOrdersHistoryParams{Size: 50}) { ... }
+page, err := client.Exchange.Orders.HistoryPage(ctx, params)
 ```
 
 ```rust
-let mut orders = client.orders().history(params);   // impl Stream<Item = Result<Order>>
+let mut orders = client.exchange().orders().history(params);   // impl Stream<Item = Result<Order>>
 while let Some(order) = orders.try_next().await? { ... }
 ```
 
