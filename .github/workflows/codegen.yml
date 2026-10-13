@@ -1,0 +1,51 @@
+name: Codegen
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Generated code is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/codegen/uv.lock
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: node/package-lock.json
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache-dependency-path: go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: npm ci
+        working-directory: node
+      - name: Lint
+        working-directory: tools/codegen
+        run: |
+          uv sync --locked
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy
+      - name: Test emitters
+        working-directory: tools/codegen
+        run: uv run pytest
+      - name: Check generated code
+        working-directory: tools/codegen
+        # ruff from the codegen environment formats the generated Python.
+        run: uv run python -m whitebird_codegen generate --check

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "separate-pull-requests": true,
+  "include-component-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    "python": {
+      "release-type": "python",
+      "component": "python",
+      "package-name": "whitebird-api",
+      "extra-files": ["src/whitebird/_version.py"]
+    },
+    "node": {
+      "release-type": "node",
+      "component": "node",
+      "extra-files": ["src/version.ts"]
+    },
+    "go": {
+      "release-type": "go",
+      "component": "go",
+      "tag-separator": "/",
+      "extra-files": ["version.go"]
+    },
+    "rust": {
+      "release-type": "rust",
+      "component": "rust"
+    }
+  }
+}

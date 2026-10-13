@@ -1,0 +1,32 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths: [docs/**, mkdocs.yml, scripts/docs/**, scripts/docs-reference.sh, python/src/**, node/src/**, go/**, .github/workflows/docs.yml]
+  pull_request:
+    paths: [docs/**, mkdocs.yml, scripts/docs/**, scripts/docs-reference.sh, python/src/**, node/src/**, go/**, .github/workflows/docs.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache-dependency-path: go/go.mod
+      - run: pip install -r docs/requirements.txt
+      - run: bash scripts/docs-reference.sh
+      - run: mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: "1"
