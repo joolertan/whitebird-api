@@ -1,5 +1,8 @@
 # whitebird-api
 
+[![crates.io](https://img.shields.io/crates/v/whitebird-api?label=crates.io)](https://crates.io/crates/whitebird-api)
+[![docs.rs](https://img.shields.io/docsrs/whitebird-api)](https://docs.rs/whitebird-api)
+
 Unofficial Rust client for the [Whitebird](https://whitebird.io) crypto exchange API.
 
 - Typed methods for every documented endpoint, grouped by resource:

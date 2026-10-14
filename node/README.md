@@ -1,5 +1,8 @@
 # whitebird-api
 
+[![npm](https://img.shields.io/npm/v/whitebird-api?label=npm)](https://www.npmjs.com/package/whitebird-api)
+[![Docs](https://img.shields.io/readthedocs/whitebird-api)](https://whitebird-api.readthedocs.io)
+
 Unofficial TypeScript client for the [Whitebird](https://whitebird.io) crypto exchange API, for
 Node.js 22+ and browsers. No runtime dependencies; ESM and CommonJS.
 

@@ -2,6 +2,7 @@
 name = "whitebird-api"
 dynamic = ["version"]
 description = "Unofficial Whitebird API client"
+readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
