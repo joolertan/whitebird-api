@@ -6,6 +6,9 @@
 Unofficial Go client for the [Whitebird](https://whitebird.io) crypto exchange API. Standard
 library only.
 
+Covers market data, exchange and spot trading, deposits and withdrawals, payment cards,
+brokerage, ICO tokens, KYC, notifications and account settings.
+
 ```sh
 go get github.com/joolertan/whitebird-api/go
 ```

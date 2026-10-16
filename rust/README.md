@@ -5,7 +5,8 @@
 
 Unofficial Rust client for the [Whitebird](https://whitebird.io) crypto exchange API.
 
-- Typed methods for every documented endpoint, grouped by resource:
+- Typed methods for market data, exchange and spot trading, deposits and withdrawals, payment
+  cards, brokerage, ICO tokens, KYC, notifications and account settings, grouped by resource:
   `client.brokerage().otc_orders().list(params)`.
 - Handles the whole login flow: the TOTP code when two-factor authentication is on, a captcha
   through your solver otherwise, and the MFA token of withdrawals. Sessions are refreshed

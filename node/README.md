@@ -6,6 +6,9 @@
 Unofficial TypeScript client for the [Whitebird](https://whitebird.io) crypto exchange API, for
 Node.js 22+ and browsers. No runtime dependencies; ESM and CommonJS.
 
+Covers market data, exchange and spot trading, deposits and withdrawals, payment cards,
+brokerage, ICO tokens, KYC, notifications and account settings.
+
 ```sh
 npm install whitebird-api
 ```

@@ -7,6 +7,9 @@
 Unofficial Python client for the [Whitebird](https://whitebird.io) crypto exchange API, sync and
 async, fully typed.
 
+Covers market data, exchange and spot trading, deposits and withdrawals, payment cards,
+brokerage, ICO tokens, KYC, notifications and account settings.
+
 ```sh
 pip install whitebird-api
 pip install "whitebird-api[otp]"   # TOTP codes for accounts with two-factor authentication

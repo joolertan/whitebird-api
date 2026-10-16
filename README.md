@@ -10,17 +10,6 @@
 Unofficial clients for the [Whitebird](https://whitebird.io) crypto exchange API in Python,
 Node.js, Go and Rust.
 
-Whitebird publishes no API reference, so the API is reconstructed from its web application into
-an OpenAPI description, the four SDKs are generated from it, and a daily job compares it with the
-live application to catch new and changed endpoints.
-
-- Every endpoint the web application uses: brokerage, exchange, balances, spot trading, market
-  data, KYC, notifications, ICO tokens and payment providers.
-- Sign-in with password and TOTP, automatic token refresh, captcha solver hook and the MFA flow
-  for withdrawals.
-- Typed models, lossless decimal amounts, natively iterable pagination, Server-Sent Events as
-  native streams, retries with backoff.
-
 | Language | Package | Install |
 |---|---|---|
 | Python 3.11+ | [`python/`](python) | `pip install "whitebird-api[otp]"` |
@@ -39,18 +28,39 @@ with Whitebird("me@example.com", "password", otp=TOTP("BASE32SECRET")) as client
         print(order.number, order.status)
 ```
 
-The same in the other languages, guides and the full endpoint list are in the
+## What you can do
+
+| Resource | |
+|---|---|
+| `market` | Spot instruments, order books and candles, without an account |
+| `exchange` | Quotes, exchange orders and their history, limits and rates |
+| `trading` | Spot orders: place, amend, cancel; open orders, executions, fees, portfolio history |
+| `balance`, `accounting` | Balances, fiat and crypto deposits and withdrawals with fee calculation, ledger transactions and receipts |
+| `payments`, `providers` | Payment methods and commissions, bank cards (Alfa-Bank, Assist, bePaid, MTS Bank), SBP QR codes, crypto cards |
+| `brokerage` | OTC orders, subaccounts, crypto addresses and balance orders of a broker |
+| `ico` | Token emissions, purchases and buybacks, investor portfolio, issuer reports |
+| `kyc` | Verification questionnaire, liveness check, SumSub and MSI identification, investor qualification |
+| `user`, `client`, `registration` | Registration, profile, password, email and phone, turning 2FA on and off |
+| `notifications` | Live account events as a stream, notification history |
+| `merchant`, `referral`, `reports`, `current_account`, `support` | Merchant API keys and webhooks, referral programme, statements, invoices, support messages |
+
+Every SDK also takes care of:
+
+- **Sign-in:** password with a TOTP code, the slider captcha through your own solver, token
+  refresh before expiry and pluggable session storage.
+- **Withdrawals:** the operation MFA token is obtained automatically when a TOTP secret is set.
+- **Models:** typed responses and decimal amounts without floating point; unknown fields and enum
+  values do not break parsing.
+- **Pagination:** listings are iterated with the language's own loop: `for`, `for await`,
+  `range`, `Stream`.
+- **Errors and retries:** typed errors with the API's code and invalid fields, retries with
+  backoff for idempotent requests.
+- **Raw requests:** `client.request(...)` reaches endpoints that have no method yet, with the same
+  authentication and retries.
+
+The same in the other languages, guides and the full method list are in the
 [documentation](https://whitebird-api.readthedocs.io); runnable programs are in
 [`examples/`](examples).
-
-## Repository
-
-| Path | |
-|---|---|
-| [`spec/`](spec) | OpenAPI description of every Whitebird service, the source of truth |
-| [`tools/wbscan/`](tools/wbscan) | extracts endpoints from the whitebird.io bundles and reports drift |
-| [`tools/codegen/`](tools/codegen) | generates models and resources for the four SDKs |
-| [`docs/`](docs) | documentation site ([architecture](docs/development/architecture.md)) |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to work on the project and [SECURITY.md](SECURITY.md) to
 report a vulnerability.
