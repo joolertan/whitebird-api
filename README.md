@@ -28,6 +28,9 @@ with Whitebird("me@example.com", "password", otp=TOTP("BASE32SECRET")) as client
         print(order.number, order.status)
 ```
 
+`AsyncWhitebird` has the same methods as coroutines, with `async for` over listings and
+notifications.
+
 ## What you can do
 
 | Resource | |
@@ -51,8 +54,8 @@ Every SDK also takes care of:
 - **Withdrawals:** the operation MFA token is obtained automatically when a TOTP secret is set.
 - **Models:** typed responses and decimal amounts without floating point; unknown fields and enum
   values do not break parsing.
-- **Pagination:** listings are iterated with the language's own loop: `for`, `for await`,
-  `range`, `Stream`.
+- **Pagination:** listings are iterated with the language's own loop: `for` and `async for`,
+  `for await`, `range`, `Stream`.
 - **Errors and retries:** typed errors with the API's code and invalid fields, retries with
   backoff for idempotent requests.
 - **Raw requests:** `client.request(...)` reaches endpoints that have no method yet, with the same
