@@ -17,6 +17,10 @@ Node.js, Go and Rust.
 | Go 1.25+ | [`go/`](go) | `go get github.com/joolertan/whitebird-api/go` |
 | Rust 1.85+ | [`rust/`](rust) | `cargo add whitebird-api --features otp` |
 
+## Usage
+
+**Python**
+
 ```python
 from whitebird import Whitebird
 from whitebird.otp import TOTP
@@ -28,8 +32,87 @@ with Whitebird("me@example.com", "password", otp=TOTP("BASE32SECRET")) as client
         print(order.number, order.status)
 ```
 
-`AsyncWhitebird` has the same methods as coroutines, with `async for` over listings and
-notifications.
+**Python, asyncio**
+
+```python
+import asyncio
+
+from whitebird import AsyncWhitebird
+from whitebird.otp import TOTP
+
+
+async def main() -> None:
+    async with AsyncWhitebird("me@example.com", "password", otp=TOTP("BASE32SECRET")) as client:
+        me = await client.user.me()
+        print(me.email)
+
+        async for order in client.exchange.orders.history(size=50):
+            print(order.number, order.status)
+
+
+asyncio.run(main())
+```
+
+**Node.js**
+
+```ts
+import { Whitebird } from 'whitebird-api';
+import { totp } from 'whitebird-api/otp';
+
+const client = new Whitebird({
+  username: 'me@example.com',
+  password: 'password',
+  otp: totp('BASE32SECRET'),
+});
+
+const book = await client.market.orderbook({ symbol: 'BTCUSDT', limit: 5 });
+console.log(book.bids[0]);
+
+for await (const order of client.exchange.orders.history({ size: 50 })) {
+  console.log(order.number, order.status);
+}
+```
+
+**Go**
+
+```go
+totp, err := otp.New("BASE32SECRET")
+if err != nil {
+	log.Fatal(err)
+}
+client, err := whitebird.NewClient(
+	whitebird.WithCredentials("me@example.com", "password"),
+	whitebird.WithCodeProvider(totp),
+)
+if err != nil {
+	log.Fatal(err)
+}
+
+for order, err := range client.Exchange.Orders.History(ctx, whitebird.ExchangeOrdersHistoryParams{Size: 50}) {
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(order.Number, order.Status)
+}
+```
+
+**Rust**
+
+```rust
+let client = Client::builder()
+    .credentials("me@example.com", "password")
+    .otp(Totp::new("BASE32SECRET")?)
+    .build()?;
+
+let me = client.user().me().await?;
+println!("{:?}", me.email);
+
+let params = ExchangeOrdersHistoryParams::builder().size(50).build();
+let mut orders = client.exchange().orders().history(params);
+while let Some(order) = orders.try_next().await? {
+    println!("{:?} {:?}", order.number, order.status);
+}
+```
 
 ## What you can do
 
@@ -54,14 +137,14 @@ Every SDK also takes care of:
 - **Withdrawals:** the operation MFA token is obtained automatically when a TOTP secret is set.
 - **Models:** typed responses and decimal amounts without floating point; unknown fields and enum
   values do not break parsing.
-- **Pagination:** listings are iterated with the language's own loop: `for` and `async for`,
-  `for await`, `range`, `Stream`.
+- **Pagination:** listings are iterated with the language's own loop: `for`, `for await`,
+  `range`, `Stream`.
 - **Errors and retries:** typed errors with the API's code and invalid fields, retries with
   backoff for idempotent requests.
 - **Raw requests:** `client.request(...)` reaches endpoints that have no method yet, with the same
   authentication and retries.
 
-The same in the other languages, guides and the full method list are in the
+Guides and the full method list are in the
 [documentation](https://whitebird-api.readthedocs.io); runnable programs are in
 [`examples/`](examples).
 
