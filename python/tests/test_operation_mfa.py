@@ -128,3 +128,17 @@ async def test_async_operation_mfa(
     assert [call.request.headers["x-mfa-token"] for call in route.calls] == ["mfa-1", "mfa-2"]
     assert await client.confirm_operation("WITHDRAWAL", code="111111") == "mfa-3"
     assert json.loads(confirm.calls.last.request.content)["mfaCode"] == "111111"
+
+
+async def test_async_confirm_operation_awaits_the_code_provider(
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    confirm = respx_mock.post(CONFIRM_URL).respond(json={"mfaToken": "mfa-1"})
+
+    async def ask() -> str:
+        return "135790"
+
+    client: AsyncWhitebird = make_async_client(token_store=MemoryTokenStore(session()), otp=ask)
+
+    assert await client.confirm_operation("WITHDRAWAL") == "mfa-1"
+    assert json.loads(confirm.calls.last.request.content)["mfaCode"] == "135790"

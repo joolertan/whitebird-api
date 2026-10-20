@@ -316,3 +316,34 @@ async def test_async_mfa_required(
 
     with pytest.raises(MFARequiredError):
         await client.login()
+
+
+async def test_async_login_awaits_the_code_provider(
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
+
+    async def ask() -> str:
+        await asyncio.sleep(0)
+        return "246810"
+
+    client = make_async_client("me@example.com", "secret", otp=ask)
+
+    await client.login()
+
+    assert form(token.calls.last.request)["code"] == "246810"
+
+
+def test_sync_client_rejects_a_coroutine_code_provider(
+    make_client: ClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    token = respx_mock.post(TOKEN_URL)
+
+    async def ask() -> str:
+        return "246810"
+
+    client = make_client("me@example.com", "secret", otp=ask)
+
+    with pytest.raises(TypeError, match="AsyncWhitebird"):
+        client.login()
+    assert not token.called

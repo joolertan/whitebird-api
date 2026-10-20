@@ -10,6 +10,7 @@ import logging
 import threading
 import time
 import uuid
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,7 +34,7 @@ from ._generated.services import (
     OAUTH_TOKEN_PATH,
 )
 from .tokens import Tokens, TokenStore
-from .types import AsyncCaptchaSolver, Captcha, CaptchaSolver, CodeProvider
+from .types import AsyncCaptchaSolver, AsyncCodeProvider, Captcha, CaptchaSolver
 
 REFRESH_MARGIN = 30.0
 CAPTCHA_ATTEMPTS = 3
@@ -53,7 +54,7 @@ class Credentials:
 
     username: str | None = None
     password: str | None = None
-    otp: CodeProvider | None = None
+    otp: AsyncCodeProvider | None = None
 
     @property
     def can_login(self) -> bool:
@@ -61,6 +62,19 @@ class Credentials:
 
     def code(self) -> str | None:
         """Returns a one-time code from the configured provider, if any."""
+        code = self._provide()
+        if inspect.isawaitable(code):
+            if inspect.iscoroutine(code):
+                code.close()
+            raise TypeError("otp returned an awaitable: coroutine functions need AsyncWhitebird")
+        return code
+
+    async def acode(self) -> str | None:
+        """Returns a one-time code, awaiting it if the provider is a coroutine function."""
+        code = self._provide()
+        return await code if inspect.isawaitable(code) else code
+
+    def _provide(self) -> str | Awaitable[str] | None:
         if self.otp is None or isinstance(self.otp, str):
             return self.otp
         return self.otp()
@@ -295,7 +309,7 @@ class AsyncAuthenticator(_Authenticator):
 
     async def _login(self, code: str | None) -> Tokens:
         if code is None and self._needs_code(await self._mfa_status()):
-            code = self.credentials.code()
+            code = await self.credentials.acode()
             if code is None:
                 raise MFARequiredError(_MFA_REQUIRED)
         solver = self._captcha if code is None else None

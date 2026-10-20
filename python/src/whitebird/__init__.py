@@ -32,6 +32,7 @@ from .streaming import AsyncEventStream, EventStream, ServerSentEvent
 from .tokens import FileTokenStore, MemoryTokenStore, Tokens, TokenStore
 from .types import (
     AsyncCaptchaSolver,
+    AsyncCodeProvider,
     Captcha,
     CaptchaSolver,
     CodeProvider,
@@ -42,6 +43,7 @@ from .types import (
 __all__ = [
     "APIError",
     "AsyncCaptchaSolver",
+    "AsyncCodeProvider",
     "AsyncEventStream",
     "AsyncPager",
     "AsyncWhitebird",

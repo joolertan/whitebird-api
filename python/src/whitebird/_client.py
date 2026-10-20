@@ -16,7 +16,13 @@ from ._generated.resources import AsyncResources, Resources
 from ._generated.services import Environment
 from ._http import Envelope
 from .tokens import MemoryTokenStore, TokenStore
-from .types import AsyncCaptchaSolver, CaptchaSolver, CodeProvider, RequestOptions
+from .types import (
+    AsyncCaptchaSolver,
+    AsyncCodeProvider,
+    CaptchaSolver,
+    CodeProvider,
+    RequestOptions,
+)
 
 T = TypeVar("T")
 
@@ -52,8 +58,9 @@ class Whitebird(_Client, Resources):
         username: E-mail of the account, needed to log in with a password.
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
-            callable returning a fresh code, or `whitebird.otp.TOTP`. Also used to confirm
-            sensitive operations, see `confirm_operation`.
+            function returning a fresh code (one that asks the user keeps the secret out of
+            the program), or `whitebird.otp.TOTP`. Also used to confirm sensitive
+            operations, see `confirm_operation`.
         captcha: Solves the slider captcha that Whitebird asks of accounts without two-factor
             authentication when they log in: called with a `Captcha`, returns the slider
             position. The SDK does not solve captchas itself; without a solver such a login
@@ -303,8 +310,9 @@ class AsyncWhitebird(_Client, AsyncResources):
         username: E-mail of the account, needed to log in with a password.
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
-            callable returning a fresh code, or `whitebird.otp.TOTP`. Also used to confirm
-            sensitive operations, see `confirm_operation`.
+            function or coroutine function returning a fresh code, or
+            `whitebird.otp.TOTP`. Also used to confirm sensitive operations, see
+            `confirm_operation`.
         captcha: Solves the login captcha of accounts without two-factor authentication, see
             `Whitebird`: a function or a coroutine function.
         environment: `"production"`, or `"demo"` for the sandbox trading contour.
@@ -334,7 +342,7 @@ class AsyncWhitebird(_Client, AsyncResources):
         username: str | None = None,
         password: str | None = None,
         *,
-        otp: CodeProvider | None = None,
+        otp: AsyncCodeProvider | None = None,
         captcha: AsyncCaptchaSolver | None = None,
         environment: Environment = "production",
         base_urls: Mapping[str, str] | None = None,

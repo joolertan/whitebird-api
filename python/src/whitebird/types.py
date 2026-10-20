@@ -10,6 +10,7 @@ import httpx
 
 __all__ = [
     "AsyncCaptchaSolver",
+    "AsyncCodeProvider",
     "Captcha",
     "CaptchaSolver",
     "CodeProvider",
@@ -27,6 +28,9 @@ FileContent: TypeAlias = (
 
 CodeProvider: TypeAlias = str | Callable[[], str]
 """Source of one-time codes: a static code, or a callable such as `whitebird.otp.TOTP`."""
+
+AsyncCodeProvider: TypeAlias = str | Callable[[], str | Awaitable[str]]
+"""Code provider of `AsyncWhitebird`: a static code, a function or a coroutine function."""
 
 
 @dataclass(frozen=True)

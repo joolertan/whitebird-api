@@ -44,6 +44,9 @@ streams.
 
 - **Sessions:** the client signs in on the first call that needs it, refreshes the token before it
   expires and keeps it in a token store (`FileTokenStore` survives restarts).
+- **Two-factor codes:** `otp=` takes `TOTP(secret)`, a function returning the current code (one
+  that asks the user keeps the secret out of the program; coroutine functions with
+  `AsyncWhitebird`) or a fixed code.
 - **Captcha:** accounts without two-factor authentication may get a slider captcha; pass
   `captcha=` a function that returns the slider position.
 - **Withdrawals:** with `otp` configured the client obtains the operation MFA token on its own;

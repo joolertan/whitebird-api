@@ -67,7 +67,6 @@ class _Engine:
         )
 
     def _confirmation(self, operation: str, code: str | None) -> dict[str, Any]:
-        code = code or self._credentials.code()
         if code is None:
             raise MFARequiredError(
                 f"Confirming the {operation} operation needs a one-time code: pass code= or "
@@ -320,6 +319,7 @@ class SyncEngine(_Engine):
 
     def confirm_operation(self, operation: str, code: str | None = None) -> str:
         """Obtains an operation MFA token, sets it as `mfa_token` and returns it."""
+        code = code or self._credentials.code()
         request = self._http.build_request(**self._confirmation(operation, code))
         response = self.send(request, authenticated=True, options={})
         self.mfa_token = _http.operation_mfa_token(response)
@@ -581,6 +581,7 @@ class AsyncEngine(_Engine):
 
     async def confirm_operation(self, operation: str, code: str | None = None) -> str:
         """Obtains an operation MFA token, sets it as `mfa_token` and returns it."""
+        code = code or await self._credentials.acode()
         request = self._http.build_request(**self._confirmation(operation, code))
         response = await self.send(request, authenticated=True, options={})
         self.mfa_token = _http.operation_mfa_token(response)
