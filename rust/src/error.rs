@@ -36,9 +36,13 @@ pub enum Error {
     /// The [captcha solver](crate::CaptchaSolver) failed.
     #[error("the captcha solver failed: {0}")]
     Captcha(#[source] BoxError),
+    /// The [code provider](crate::CodeProvider) failed.
+    #[error("the code provider failed: {0}")]
+    CodeProvider(#[source] BoxError),
 }
 
-/// Error type returned by user callbacks such as the [captcha solver](crate::CaptchaSolver).
+/// Error type returned by user callbacks such as the [captcha solver](crate::CaptchaSolver)
+/// and the [code provider](crate::CodeProvider).
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 impl Error {

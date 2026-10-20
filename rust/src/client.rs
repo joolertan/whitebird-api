@@ -106,17 +106,14 @@ impl Client {
     pub async fn confirm_operation(&self, operation: &str, code: Option<&str>) -> Result<String> {
         let code = match code {
             Some(code) => code.to_owned(),
-            None => self
-                .inner
-                .session
-                .otp
-                .as_ref()
-                .map(CodeProvider::code)
-                .ok_or_else(|| {
-                    Error::Config(
+            None => match &self.inner.session.otp {
+                Some(otp) => otp.code().await?,
+                None => {
+                    return Err(Error::Config(
                         "no one-time code: pass one or configure ClientBuilder::otp".into(),
-                    )
-                })?,
+                    ));
+                }
+            },
         };
         let request = self
             .request(

@@ -98,7 +98,7 @@ async fn asks_the_code_provider_on_every_login() {
         .credentials("me@example.com", "secret")
         .otp(CodeProvider::from_fn(move || {
             *counter.lock().unwrap() += 1;
-            "654321".into()
+            Ok("654321".into())
         }))
         .build()
         .unwrap();
@@ -107,6 +107,46 @@ async fn asks_the_code_provider_on_every_login() {
     client.login().await.unwrap();
 
     assert_eq!(*calls.lock().unwrap(), 2);
+}
+
+#[tokio::test]
+async fn awaits_an_async_code_provider() {
+    let server = MockServer::start().await;
+    password_grant()
+        .and(body_string_contains("code=246810"))
+        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = builder(&server)
+        .credentials("me@example.com", "secret")
+        .otp(CodeProvider::new(|| async {
+            tokio::task::yield_now().await;
+            Ok("246810".to_owned())
+        }))
+        .build()
+        .unwrap();
+
+    client.login().await.unwrap();
+}
+
+#[tokio::test]
+async fn reports_a_failing_code_provider() {
+    let server = MockServer::start().await;
+    password_grant()
+        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let client = builder(&server)
+        .credentials("me@example.com", "secret")
+        .otp(CodeProvider::from_fn(|| Err("no code entered".into())))
+        .build()
+        .unwrap();
+
+    let error = client.login().await.unwrap_err();
+
+    assert!(matches!(error, Error::CodeProvider(_)), "{error:?}");
 }
 
 #[cfg(feature = "otp")]

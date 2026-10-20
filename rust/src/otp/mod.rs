@@ -1,32 +1,45 @@
-//! One-time codes for two-factor login.
+//! One-time codes for two-factor login and operation confirmation.
 
 #[cfg(feature = "otp")]
 mod totp;
 
 use std::fmt;
+use std::future::Future;
 use std::sync::Arc;
+
+use futures_util::FutureExt;
+use futures_util::future::BoxFuture;
+
+use crate::error::{BoxError, Error, Result};
 
 #[cfg(feature = "otp")]
 pub use self::totp::Totp;
 
-/// Source of the TOTP code sent with the password when two-factor authentication is on.
+type Provide = dyn Fn() -> BoxFuture<'static, Result<String, BoxError>> + Send + Sync;
+
+/// Source of the TOTP codes sent with the password when two-factor authentication is on, and
+/// with [operation confirmations](crate::Client::confirm_operation).
 ///
-/// A provider is asked for a code on every password login, so a callback or [`Totp`] keeps
+/// A provider is asked for a code every time one is needed, so a callback or [`Totp`] keeps
 /// working when the client has to log in again hours later; a fixed code only suits a single
-/// login.
+/// login. A callback means the TOTP secret never has to be given to the client.
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use whitebird::{Client, CodeProvider};
 ///
-/// # fn main() -> whitebird::Result<()> {
+/// let otp = CodeProvider::from_fn(|| {
+///     println!("Code from the authenticator app:");
+///     let mut code = String::new();
+///     std::io::stdin().read_line(&mut code)?;
+///     Ok(code.trim().to_owned())
+/// });
 /// let client = Client::builder()
 ///     .credentials("me@example.com", "password")
-///     .otp(CodeProvider::from_fn(|| std::env::var("WHITEBIRD_CODE").unwrap_or_default()))
+///     .otp(otp)
 ///     .build()?;
-/// # Ok(())
-/// # }
+/// # Ok::<(), whitebird::Error>(())
 /// ```
 #[derive(Clone)]
 pub struct CodeProvider(Source);
@@ -34,7 +47,7 @@ pub struct CodeProvider(Source);
 #[derive(Clone)]
 enum Source {
     Fixed(String),
-    Callback(Arc<dyn Fn() -> String + Send + Sync>),
+    Callback(Arc<Provide>),
     #[cfg(feature = "otp")]
     Totp(Totp),
 }
@@ -45,17 +58,39 @@ impl CodeProvider {
         Self(Source::Fixed(code.into()))
     }
 
-    /// Calls `callback` for every login, for example to prompt the user.
-    pub fn from_fn(callback: impl Fn() -> String + Send + Sync + 'static) -> Self {
-        Self(Source::Callback(Arc::new(callback)))
+    /// Creates a provider from an async function, such as one that waits for the code in a
+    /// chat.
+    pub fn new<F, Fut>(provide: F) -> Self
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<String, BoxError>> + Send + 'static,
+    {
+        Self(Source::Callback(Arc::new(move || provide().boxed())))
     }
 
-    pub(crate) fn code(&self) -> String {
+    /// Creates a provider from a blocking function, which runs on a thread where blocking is
+    /// fine, such as one prompting in the terminal.
+    pub fn from_fn<F>(provide: F) -> Self
+    where
+        F: Fn() -> Result<String, BoxError> + Send + Sync + 'static,
+    {
+        let provide = Arc::new(provide);
+        Self::new(move || {
+            let provide = Arc::clone(&provide);
+            async move {
+                tokio::task::spawn_blocking(move || provide())
+                    .await
+                    .map_err(BoxError::from)?
+            }
+        })
+    }
+
+    pub(crate) async fn code(&self) -> Result<String> {
         match &self.0 {
-            Source::Fixed(code) => code.clone(),
-            Source::Callback(callback) => callback(),
+            Source::Fixed(code) => Ok(code.clone()),
+            Source::Callback(provide) => provide().await.map_err(Error::CodeProvider),
             #[cfg(feature = "otp")]
-            Source::Totp(totp) => totp.code(),
+            Source::Totp(totp) => Ok(totp.code()),
         }
     }
 }

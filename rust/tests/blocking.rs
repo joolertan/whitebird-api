@@ -5,8 +5,8 @@ mod common;
 use common::*;
 use serde_json::{Value, json};
 use whitebird::params::BrokerageSubaccountsListParams;
-use whitebird::{ErrorKind, Method, Service};
-use wiremock::matchers::{header, path, query_param};
+use whitebird::{CodeProvider, ErrorKind, Method, Service};
+use wiremock::matchers::{body_string_contains, header, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// The blocking client runs its own runtime, so the mock server lives on another one.
@@ -127,4 +127,22 @@ fn confirms_operations() {
 
     assert_eq!(token, "mfa-1");
     assert_eq!(client.mfa_token().as_deref(), Some("mfa-1"));
+}
+
+#[test]
+fn calls_a_blocking_code_provider() {
+    let server = Server::start();
+    server.mount(
+        password_grant()
+            .and(body_string_contains("code=112233"))
+            .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+            .expect(1),
+    );
+    let client = builder(&server.mock)
+        .credentials("me@example.com", "secret")
+        .otp(CodeProvider::from_fn(|| Ok("112233".into())))
+        .build_blocking()
+        .unwrap();
+
+    client.login().unwrap();
 }

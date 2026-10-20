@@ -48,7 +48,7 @@ use whitebird::{Client, Environment, Totp};
 async fn main() -> whitebird::Result<()> {
     let client = Client::builder()
         .credentials("me@example.com", "password")
-        .otp(Totp::new("JBSWY3DPEHPK3PXP")?) // or a fixed code: .otp("123456")
+        .otp(Totp::new("JBSWY3DPEHPK3PXP")?) // or CodeProvider::from_fn(ask) / ::new(async_ask)
         .environment(Environment::Demo)
         .build()?;
 

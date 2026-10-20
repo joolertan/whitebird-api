@@ -4,7 +4,7 @@ use common::*;
 use serde_json::json;
 use whitebird::models::BalanceAccountType;
 use whitebird::params::BalanceWithdrawalsCreateCryptoParams;
-use whitebird::{Client, Error, MemoryTokenStore, Tokens};
+use whitebird::{Client, CodeProvider, Error, MemoryTokenStore, Tokens};
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -66,6 +66,29 @@ async fn confirm_operation_stores_the_issued_token() {
 
     assert_eq!(token, "mfa-1");
     assert_eq!(client.mfa_token().as_deref(), Some("mfa-1"));
+}
+
+#[tokio::test]
+async fn confirm_operation_asks_the_code_provider() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(MFA_TOKEN_PATH))
+        .and(body_json(
+            json!({ "operation": "WITHDRAWAL", "mfaCode": "135790" }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaToken": "mfa-1" })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = builder(&server)
+        .token_store(MemoryTokenStore::from(Tokens::new(jwt("me", 3600), None)))
+        .otp(CodeProvider::new(|| async { Ok("135790".to_owned()) }))
+        .build()
+        .unwrap();
+
+    let token = client.confirm_operation("WITHDRAWAL", None).await.unwrap();
+
+    assert_eq!(token, "mfa-1");
 }
 
 #[tokio::test]

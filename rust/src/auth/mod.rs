@@ -61,7 +61,7 @@ pub(crate) struct Session {
 struct Login<'a> {
     username: &'a str,
     password: &'a str,
-    code: Option<String>,
+    code: Option<&'a str>,
     /// Value of the `captcha` header.
     captcha: Option<String>,
     mfa_enabled: Option<bool>,
@@ -155,8 +155,8 @@ impl Session {
             None
         };
         let two_factor = mfa_enabled.unwrap_or(self.otp.is_some());
-        let otp = match &self.otp {
-            Some(otp) if two_factor => Some(otp),
+        let code = match &self.otp {
+            Some(otp) if two_factor => Some(otp.code().await?),
             None if two_factor => return Err(mfa_required(StatusCode::OK, &[])),
             _ => None,
         };
@@ -171,7 +171,7 @@ impl Session {
             let login = Login {
                 username: &username,
                 password: &credentials.password,
-                code: otp.map(CodeProvider::code),
+                code: code.as_deref(),
                 captcha,
                 mfa_enabled,
             };
@@ -194,7 +194,7 @@ impl Session {
             ("username", login.username),
             ("password", login.password),
         ];
-        if let Some(code) = &login.code {
+        if let Some(code) = login.code {
             form.push(("code", code));
         }
         let grant = match self.token_request(&form, login.captcha.as_deref()).await {
