@@ -52,6 +52,8 @@ func main() {
 
 - **Sessions:** the client signs in on the first call that needs it, refreshes the token before it
   expires and keeps it in a `TokenStore`.
+- **Two-factor codes:** `WithCodeProvider` takes an `*otp.TOTP`, a `CodeFunc` that asks for the
+  code, so the secret stays out of the program, or a `StaticCode`.
 - **Captcha:** `WithCaptchaSolver` answers the slider captcha of accounts without 2FA.
 - **Withdrawals:** with a code provider the client obtains the operation MFA token on its own;
   `client.ConfirmOperation` does it explicitly.

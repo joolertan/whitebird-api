@@ -12,18 +12,35 @@ Public endpoints (market data, ICO showcase, payment provider lists) work withou
 
 ## Two-factor authentication
 
-Accounts with 2FA send a TOTP code with the password. Configure a code provider: a fixed code, a
-function that returns one, or a TOTP generator built from the authenticator secret (the base32
-string behind the QR code).
+Accounts with 2FA send a TOTP code with the password, and the same kind of code confirms
+withdrawals. Configure a code provider:
+
+- a function that returns the current code: it can ask the user, wait for a chat bot or read a
+  password manager, so the authenticator secret never reaches the program;
+- a TOTP generator built from the authenticator secret (the base32 string behind the QR code), for
+  programs that run unattended;
+- a fixed code, which only suits a single sign-in.
+
+The provider is called on every sign-in and before operations that need confirmation, so a
+function keeps working when the client signs in again hours later.
 
 === "Python"
 
     ```python
-    from whitebird import Whitebird
+    import asyncio
+
+    from whitebird import AsyncWhitebird, Whitebird
     from whitebird.otp import TOTP  # pip install "whitebird-api[otp]"
 
-    client = Whitebird(username, password, otp=TOTP(secret))
     client = Whitebird(username, password, otp=lambda: input("2FA code: "))
+    client = Whitebird(username, password, otp=TOTP(secret))
+
+
+    async def ask() -> str:
+        return await asyncio.to_thread(input, "2FA code: ")
+
+
+    async_client = AsyncWhitebird(username, password, otp=ask)  # functions or coroutines
     ```
 
 === "Node.js"
@@ -31,25 +48,40 @@ string behind the QR code).
     ```ts
     import { totp } from 'whitebird-api/otp';
 
-    const client = new Whitebird({ username, password, otp: totp(secret) });
+    // The function may return the code or a promise of it.
+    const client = new Whitebird({ username, password, otp: () => rl.question('2FA code: ') });
+    const unattended = new Whitebird({ username, password, otp: totp(secret) });
     ```
 
 === "Go"
 
     ```go
-    totp, err := otp.New(secret)
+    ask := whitebird.CodeFunc(func(ctx context.Context) (string, error) {
+        fmt.Print("2FA code: ")
+        var code string
+        _, err := fmt.Scanln(&code)
+        return code, err
+    })
     client, err := whitebird.NewClient(
         whitebird.WithCredentials(username, password),
-        whitebird.WithCodeProvider(totp),
+        whitebird.WithCodeProvider(ask), // or an *otp.TOTP from otp.New(secret)
     )
     ```
 
 === "Rust"
 
     ```rust
+    use whitebird::{Client, CodeProvider};
+
+    // Runs on a blocking thread; CodeProvider::new takes an async function instead.
+    let ask = CodeProvider::from_fn(|| {
+        let mut code = String::new();
+        std::io::stdin().read_line(&mut code)?;
+        Ok(code.trim().to_owned())
+    });
     let client = Client::builder()
         .credentials(username, password)
-        .otp(Totp::new(&secret)?) // feature "otp"
+        .otp(ask) // or Totp::new(&secret)? with the "otp" feature
         .build()?;
     ```
 
