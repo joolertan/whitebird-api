@@ -1,4 +1,5 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
+import { createInterface } from 'node:readline/promises';
 import { type TokenStore, Whitebird } from 'whitebird-api';
 import { totp } from 'whitebird-api/otp';
 
@@ -11,16 +12,27 @@ export function fileTokenStore(path: URL): TokenStore {
   };
 }
 
+/** Asks for a two-factor code in the terminal. */
+async function askCode(): Promise<string> {
+  const terminal = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await terminal.question('Two-factor code: ')).trim();
+  } finally {
+    terminal.close();
+  }
+}
+
 /**
- * Client of the account in WHITEBIRD_USERNAME and WHITEBIRD_PASSWORD. Two-factor codes are
- * computed from WHITEBIRD_TOTP_SECRET, the base32 secret behind the authenticator app QR code.
+ * Client of the account in WHITEBIRD_USERNAME and WHITEBIRD_PASSWORD. Two-factor codes are asked
+ * for in the terminal, or computed from WHITEBIRD_TOTP_SECRET (the base32 secret behind the
+ * authenticator app QR code) when it is set.
  */
 export function createClient(): Whitebird {
   const { WHITEBIRD_USERNAME, WHITEBIRD_PASSWORD, WHITEBIRD_TOTP_SECRET } = process.env;
   return new Whitebird({
     username: WHITEBIRD_USERNAME,
     password: WHITEBIRD_PASSWORD,
-    otp: WHITEBIRD_TOTP_SECRET ? totp(WHITEBIRD_TOTP_SECRET) : undefined,
+    otp: WHITEBIRD_TOTP_SECRET ? totp(WHITEBIRD_TOTP_SECRET) : askCode,
     tokenStore: fileTokenStore(new URL('.session.json', import.meta.url)),
   });
 }

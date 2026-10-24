@@ -1,22 +1,11 @@
 """Print the balances of the Whitebird wallet with their USD value."""
 
-import os
-from pathlib import Path
-
-from whitebird import FileTokenStore, Whitebird
+from account import connect
 from whitebird.models import AccountingAccountType
-from whitebird.otp import TOTP
-
-SESSION = Path.home() / ".config" / "whitebird" / "session.json"
 
 
 def main() -> None:
-    with Whitebird(
-        os.environ["WHITEBIRD_USERNAME"],
-        os.environ["WHITEBIRD_PASSWORD"],
-        otp=TOTP(os.environ["WHITEBIRD_TOTP_SECRET"]),
-        token_store=FileTokenStore(SESSION),
-    ) as client:
+    with connect() as client:
         wallet = client.accounting.accounts.get_enhanced(type=AccountingAccountType.USER_BALANCE)
         for balance in wallet.balances or []:
             if balance.amount:

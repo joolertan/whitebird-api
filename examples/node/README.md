@@ -8,19 +8,20 @@ them as they are, TypeScript included. Build the SDK first, then install the exa
 npm install
 ```
 
-The examples that need an account read the credentials from the environment and keep the
-session in `.session.json` (see [`client.ts`](client.ts)):
+The examples that need an account read the credentials from the environment, ask for the
+two-factor code in the terminal and keep the session in `.session.json` (see
+[`client.ts`](client.ts)):
 
 ```sh
 export WHITEBIRD_USERNAME=trader@example.com
 export WHITEBIRD_PASSWORD=...
-export WHITEBIRD_TOTP_SECRET=...   # base32 2FA secret, for accounts with two-factor authentication
+export WHITEBIRD_TOTP_SECRET=...   # optional: base32 2FA secret, computes the codes instead of asking
 ```
 
 | Command | What it does |
 | --- | --- |
 | `node market-data.ts [demo]` | Instruments, order book and candles; no account needed |
-| `node login-totp.ts` | Signs in with a TOTP code, saves the session, prints the profile |
+| `node login.ts` | Signs in, saves the session, prints the profile |
 | `node balances.ts` | Prints the wallet balances |
 | `node order-history.ts [count]` | Iterates the exchange order history, stopping after `count` orders |
 | `node exchange.ts [--confirm]` | Quotes 10 USDT to BTC; places the order only with `--confirm` |

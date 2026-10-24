@@ -1,28 +1,17 @@
-// Command login_totp signs in with a TOTP code computed from the 2FA secret, keeps the session
-// in a file and prints the profile of the account. Run it twice: the second run reuses the
-// saved session instead of signing in again.
+// Command login signs in, keeps the session in whitebird-session.json and prints the profile of
+// the account. Run it twice: the second run reuses the saved session instead of signing in again.
 package main
 
 import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 
-	whitebird "github.com/joolertan/whitebird-api/go"
-	"github.com/joolertan/whitebird-api/go/otp"
+	"github.com/joolertan/whitebird-api/examples/go/internal/envclient"
 )
 
 func main() {
-	totp, err := otp.New(os.Getenv("WHITEBIRD_TOTP_SECRET"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	client, err := whitebird.NewClient(
-		whitebird.WithCredentials(os.Getenv("WHITEBIRD_USERNAME"), os.Getenv("WHITEBIRD_PASSWORD")),
-		whitebird.WithCodeProvider(totp),
-		whitebird.WithTokenStore(whitebird.FileTokenStore{Path: "whitebird-session.json"}),
-	)
+	client, err := envclient.New()
 	if err != nil {
 		log.Fatal(err)
 	}

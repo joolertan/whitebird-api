@@ -1,25 +1,14 @@
-"""Sign in with a TOTP secret and keep the session in a file, so later runs skip the login.
+"""Sign in, keep the session in a file and print the account; later runs skip the login.
 
-Needs WHITEBIRD_USERNAME, WHITEBIRD_PASSWORD and WHITEBIRD_TOTP_SECRET (the base32 secret shown
-when two-factor authentication was enabled) and the otp extra: pip install "whitebird-api[otp]".
+Needs WHITEBIRD_USERNAME and WHITEBIRD_PASSWORD. The two-factor code is asked for in the terminal,
+or computed from WHITEBIRD_TOTP_SECRET when that is set (with the otp extra installed).
 """
 
-import os
-from pathlib import Path
-
-from whitebird import FileTokenStore, Whitebird
-from whitebird.otp import TOTP
-
-SESSION = Path.home() / ".config" / "whitebird" / "session.json"
+from account import SESSION, connect
 
 
 def main() -> None:
-    with Whitebird(
-        os.environ["WHITEBIRD_USERNAME"],
-        os.environ["WHITEBIRD_PASSWORD"],
-        otp=TOTP(os.environ["WHITEBIRD_TOTP_SECRET"]),
-        token_store=FileTokenStore(SESSION),
-    ) as client:
+    with connect() as client:
         # The first call logs in, unless the stored session is still valid.
         profile = client.user.me()
         print(f"Signed in as {profile.email} (two-factor: {profile.mfa_enabled})")

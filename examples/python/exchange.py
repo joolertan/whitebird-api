@@ -4,20 +4,15 @@ Without --confirm only the quote is printed: placing the order spends real funds
 """
 
 import argparse
-import os
 from decimal import Decimal
-from pathlib import Path
 
-from whitebird import FileTokenStore, Whitebird
+from account import connect
 from whitebird.models import (
     ExchangeDestination,
     ExchangeLeg,
     ExchangeLegType,
     ExchangeQuoteLegRequest,
 )
-from whitebird.otp import TOTP
-
-SESSION = Path.home() / ".config" / "whitebird" / "session.json"
 
 
 def describe(leg: ExchangeLeg | None) -> str:
@@ -32,12 +27,7 @@ def main() -> None:
     parser.add_argument("--confirm", action="store_true", help="place the order")
     args = parser.parse_args()
 
-    with Whitebird(
-        os.environ["WHITEBIRD_USERNAME"],
-        os.environ["WHITEBIRD_PASSWORD"],
-        otp=TOTP(os.environ["WHITEBIRD_TOTP_SECRET"]),
-        token_store=FileTokenStore(SESSION),
-    ) as client:
+    with connect() as client:
         wallet = ExchangeLegType.INTERNAL_BALANCE
         quote = client.exchange.quotes.create(
             input=ExchangeQuoteLegRequest(asset=args.sell, type=wallet, amount=args.amount),

@@ -2,9 +2,10 @@
 
 use std::env;
 use std::fs;
+use std::io::{self, Write};
 use std::path::PathBuf;
 
-use whitebird::{Client, TokenStore, Tokens, Totp};
+use whitebird::{BoxError, Client, CodeProvider, TokenStore, Tokens, Totp};
 
 /// Error type of the examples' `main` functions.
 pub type Error = Box<dyn std::error::Error>;
@@ -48,18 +49,30 @@ pub fn var(name: &str) -> Result<String, Error> {
     env::var(name).map_err(|_| format!("set the {name} environment variable").into())
 }
 
-/// A client signed in as `WHITEBIRD_USERNAME` / `WHITEBIRD_PASSWORD`, with TOTP codes computed
-/// from `WHITEBIRD_TOTP_SECRET` when it is set, sharing the session file of `login_totp`.
+/// A client signed in as `WHITEBIRD_USERNAME` / `WHITEBIRD_PASSWORD` that keeps its session in
+/// `whitebird-session.json`. Two-factor codes are asked for in the terminal, or computed from
+/// `WHITEBIRD_TOTP_SECRET` when it is set.
 ///
 /// # Errors
 ///
 /// Returns an error if a variable is missing or the TOTP secret is not valid base32.
 pub fn client() -> Result<Client, Error> {
-    let mut builder = Client::builder()
+    let codes = match env::var("WHITEBIRD_TOTP_SECRET") {
+        Ok(secret) => Totp::new(&secret)?.into(),
+        Err(_) => CodeProvider::from_fn(ask_code),
+    };
+    Ok(Client::builder()
         .credentials(var("WHITEBIRD_USERNAME")?, var("WHITEBIRD_PASSWORD")?)
-        .token_store(FileTokenStore::new("whitebird-session.json"));
-    if let Ok(secret) = env::var("WHITEBIRD_TOTP_SECRET") {
-        builder = builder.otp(Totp::new(&secret)?);
-    }
-    Ok(builder.build()?)
+        .otp(codes)
+        .token_store(FileTokenStore::new("whitebird-session.json"))
+        .build()?)
+}
+
+/// Reads a two-factor code from the terminal.
+fn ask_code() -> Result<String, BoxError> {
+    print!("Two-factor code: ");
+    io::stdout().flush()?;
+    let mut code = String::new();
+    io::stdin().read_line(&mut code)?;
+    Ok(code.trim().to_owned())
 }
