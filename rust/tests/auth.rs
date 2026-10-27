@@ -25,7 +25,7 @@ async fn logs_in_lazily_with_lowercased_username() {
     Mock::given(method("POST"))
         .and(path(MFA_PATH))
         .and(body_json(json!({ "username": "trader@example.com" })))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaEnabled": false })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaEnabled": true })))
         .expect(1)
         .mount(&server)
         .await;
@@ -42,6 +42,7 @@ async fn logs_in_lazily_with_lowercased_username() {
 
     let client = builder(&server)
         .credentials("Trader@Example.com", "secret")
+        .otp("123456")
         .build()
         .unwrap();
     let me = client.brokerage().subaccounts().me().await.unwrap();
@@ -59,14 +60,15 @@ async fn logs_in_lazily_with_lowercased_username() {
             ("grant_type".into(), "password".into()),
             ("username".into(), "trader@example.com".into()),
             ("password".into(), "secret".into()),
+            ("code".into(), "123456".into()),
         ]
     );
 }
 
 #[tokio::test]
-async fn sends_the_one_time_code_without_asking_whether_mfa_is_on() {
+async fn sends_the_one_time_code_when_mfa_is_on() {
     let server = MockServer::start().await;
-    mfa_check(true).expect(0).mount(&server).await;
+    mfa_check(true).expect(1).mount(&server).await;
     password_grant()
         .and(body_string_contains("code=123456"))
         .respond_with(grant(&jwt("me", 3600), "refresh-1"))
@@ -131,6 +133,62 @@ async fn awaits_an_async_code_provider() {
 }
 
 #[tokio::test]
+async fn asks_for_a_captcha_instead_of_a_code_without_two_factor() {
+    let server = MockServer::start().await;
+    mfa_check(false).expect(1).mount(&server).await;
+    password_grant()
+        .respond_with(grant("unused", "unused"))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let calls = Arc::new(Mutex::new(0));
+    let counter = Arc::clone(&calls);
+    let client = builder(&server)
+        .credentials("me@example.com", "secret")
+        .otp(CodeProvider::from_fn(move || {
+            *counter.lock().unwrap() += 1;
+            Ok("123456".into())
+        }))
+        .build()
+        .unwrap();
+
+    let error = client.login().await.unwrap_err();
+
+    assert!(error.is_captcha_required(), "{error:?}");
+    assert!(
+        error
+            .api()
+            .unwrap()
+            .message()
+            .contains("ClientBuilder::captcha")
+    );
+    assert_eq!(*calls.lock().unwrap(), 0);
+}
+
+#[tokio::test]
+async fn sends_the_code_when_the_status_check_fails() {
+    let server = MockServer::start().await;
+    Mock::given(path(MFA_PATH))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(1)
+        .mount(&server)
+        .await;
+    password_grant()
+        .and(body_string_contains("code=123456"))
+        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = builder(&server)
+        .credentials("me@example.com", "secret")
+        .otp("123456")
+        .build()
+        .unwrap();
+
+    client.login().await.unwrap();
+}
+
+#[tokio::test]
 async fn reports_a_failing_code_provider() {
     let server = MockServer::start().await;
     password_grant()
@@ -169,7 +227,11 @@ async fn computes_totp_codes_from_the_secret() {
     let after = totp.code();
 
     let requests = server.received_requests().await.unwrap();
-    let fields = form(&requests[0]);
+    let login = requests
+        .iter()
+        .find(|r| r.url.path() == TOKEN_PATH)
+        .unwrap();
+    let fields = form(login);
     let (_, code) = fields.iter().find(|(name, _)| name == "code").unwrap();
     assert!(*code == before || *code == after);
 }
@@ -251,9 +313,9 @@ async fn rejected_code_is_an_authentication_error() {
 }
 
 #[tokio::test]
-async fn wrong_password_without_two_factor_is_an_authentication_error() {
+async fn wrong_password_is_an_authentication_error() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    mfa_check(true).mount(&server).await;
     password_grant()
         .respond_with(ResponseTemplate::new(400).set_body_json(
             json!({ "error": "invalid_grant", "error_description": "Bad credentials" }),
@@ -263,6 +325,7 @@ async fn wrong_password_without_two_factor_is_an_authentication_error() {
 
     let client = builder(&server)
         .credentials("me@example.com", "wrong")
+        .otp("123456")
         .build()
         .unwrap();
     let error = client.login().await.unwrap_err();
@@ -343,7 +406,7 @@ async fn logs_in_again_when_the_refresh_token_is_rejected() {
         .expect(1)
         .mount(&server)
         .await;
-    mfa_check(false).mount(&server).await;
+    mfa_check(true).mount(&server).await;
     password_grant()
         .respond_with(grant(&fresh, "refresh-2"))
         .expect(1)
@@ -353,6 +416,7 @@ async fn logs_in_again_when_the_refresh_token_is_rejected() {
 
     let client = builder(&server)
         .credentials("me@example.com", "secret")
+        .otp("123456")
         .token_store(whitebird::MemoryTokenStore::from(Tokens::new(
             jwt("expired", -60),
             Some("revoked".into()),
@@ -402,7 +466,7 @@ impl TokenStore for RecordingStore {
 async fn token_store_keeps_the_session_across_clients() {
     let server = MockServer::start().await;
     let access = jwt("me", 3600);
-    mfa_check(false).mount(&server).await;
+    mfa_check(true).mount(&server).await;
     password_grant()
         .respond_with(grant(&access, "refresh-1"))
         .expect(1)
@@ -413,12 +477,14 @@ async fn token_store_keeps_the_session_across_clients() {
 
     let first = builder(&server)
         .credentials("me@example.com", "secret")
+        .otp("123456")
         .token_store(Arc::clone(&store))
         .build()
         .unwrap();
     first.brokerage().subaccounts().me().await.unwrap();
     let second = builder(&server)
         .credentials("me@example.com", "secret")
+        .otp("123456")
         .token_store(Arc::clone(&store))
         .build()
         .unwrap();

@@ -44,6 +44,10 @@ _MFA_REQUIRED = (
     "Two-factor authentication is enabled for this account: pass otp= to the client "
     "(a code, a callable or whitebird.otp.TOTP) or call login(code=...)"
 )
+_CAPTCHA_REQUIRED = (
+    "The account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: "
+    "pass captcha= a solver or enable two-factor authentication"
+)
 
 logger = logging.getLogger("whitebird")
 
@@ -112,8 +116,17 @@ class _Authenticator:
             return None
         return self._token_request({"grant_type": "refresh_token", "refresh_token": refresh_token})
 
-    def _needs_code(self, mfa_enabled: bool | None) -> bool:
-        # An unknown status means 2FA exactly when a code provider is configured.
+    def _needs_code(self, mfa_enabled: bool | None, *, has_solver: bool) -> bool:
+        """Whether a password login sends a one-time code, given the account's 2FA status.
+
+        Accounts without 2FA sign in through a captcha instead, so an unknown status means 2FA
+        exactly when a code provider is configured.
+
+        Raises:
+            CaptchaRequiredError: The account has no 2FA and no captcha solver is configured.
+        """
+        if mfa_enabled is False and not has_solver:
+            raise CaptchaRequiredError(_CAPTCHA_REQUIRED)
         return self.credentials.otp is not None if mfa_enabled is None else mfa_enabled
 
     def _password_request(self, code: str | None, answer: str | None = None) -> httpx.Request:
@@ -218,7 +231,9 @@ class SyncAuthenticator(_Authenticator):
         return self._login(None)
 
     def _login(self, code: str | None) -> Tokens:
-        if code is None and self._needs_code(self._mfa_status()):
+        if code is None and self._needs_code(
+            self._mfa_status(), has_solver=self._captcha is not None
+        ):
             code = self.credentials.code()
             if code is None:
                 raise MFARequiredError(_MFA_REQUIRED)
@@ -242,10 +257,7 @@ class SyncAuthenticator(_Authenticator):
         return _captcha_answer(captcha, solver(captcha))
 
     def _mfa_status(self) -> bool | None:
-        # Only asked when it decides something: without a code provider (2FA accounts then
-        # fail early) or with a captcha solver (captcha for accounts without 2FA, code otherwise).
-        if self.credentials.otp is not None and self._captcha is None:
-            return None
+        """Asks whether the account has 2FA enabled; `None` if the check fails."""
         try:
             return _mfa_enabled(self._send(self._mfa_check_request()))
         except APIError:
@@ -308,7 +320,9 @@ class AsyncAuthenticator(_Authenticator):
         return await self._login(None)
 
     async def _login(self, code: str | None) -> Tokens:
-        if code is None and self._needs_code(await self._mfa_status()):
+        if code is None and self._needs_code(
+            await self._mfa_status(), has_solver=self._captcha is not None
+        ):
             code = await self.credentials.acode()
             if code is None:
                 raise MFARequiredError(_MFA_REQUIRED)
@@ -335,10 +349,7 @@ class AsyncAuthenticator(_Authenticator):
         return _captcha_answer(captcha, position)
 
     async def _mfa_status(self) -> bool | None:
-        # Only asked when it decides something: without a code provider (2FA accounts then
-        # fail early) or with a captcha solver (captcha for accounts without 2FA, code otherwise).
-        if self.credentials.otp is not None and self._captcha is None:
-            return None
+        """Asks whether the account has 2FA enabled; `None` if the check fails."""
         try:
             return _mfa_enabled(await self._send(self._mfa_check_request()))
         except APIError:
@@ -413,8 +424,9 @@ def _retry_captcha(error: CaptchaRequiredError, answer: str | None, attempt: int
     return False
 
 
-def _mfa_enabled(response: httpx.Response) -> bool:
-    return bool(_json_object(response).get("mfaEnabled"))
+def _mfa_enabled(response: httpx.Response) -> bool | None:
+    enabled = _json_object(response).get("mfaEnabled")
+    return enabled if isinstance(enabled, bool) else None
 
 
 def _json_object(response: httpx.Response) -> dict[str, Any]:

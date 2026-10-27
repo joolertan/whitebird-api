@@ -249,7 +249,7 @@ func TestResponseKinds(t *testing.T) {
 
 func TestRequest(t *testing.T) {
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
+	newAuthServer(t, mux).mfa = true
 	mux.HandleFunc("PUT /things/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var in map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -266,7 +266,7 @@ func TestRequest(t *testing.T) {
 		r.ParseForm()
 		w.Write([]byte(r.PostForm.Get("a")))
 	})
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode)
 	ctx := context.Background()
 
 	var thing struct {

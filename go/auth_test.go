@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+// withCode answers the TOTP code of accounts with two-factor authentication.
+var withCode = WithCodeProvider(StaticCode("123456"))
+
+// withSession gives a client a valid session, for tests that are not about signing in.
+func withSession() Option {
+	return WithTokenStore(&memoryStore{token: &Token{AccessToken: testJWT("session", time.Now().Add(time.Hour))}})
+}
+
 // bearerEcho answers with the access token it received.
 func bearerEcho(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"token": strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")})
@@ -27,9 +35,10 @@ func callEcho(t *testing.T, client *Client) string {
 	return out.Token
 }
 
-func TestLoginWithoutCode(t *testing.T) {
+func TestLoginWhenCheckFails(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.mfaFails = true
 	mux.HandleFunc("GET /echo", bearerEcho)
 	client := newTestClient(t, mux, WithCredentials("Trader@Example.com", "secret"))
 
@@ -51,9 +60,26 @@ func TestLoginWithoutCode(t *testing.T) {
 	}
 }
 
+func TestLoginWhenCheckFailsSendsCode(t *testing.T) {
+	mux := http.NewServeMux()
+	auth := newAuthServer(t, mux)
+	auth.mfaFails = true
+	client := newTestClient(t, mux,
+		WithCredentials("trader@example.com", "secret"),
+		WithCodeProvider(StaticCode("123456")),
+	)
+	if err := client.Login(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if code := auth.firstForm().Get("code"); code != "123456" {
+		t.Errorf("code = %q, want 123456", code)
+	}
+}
+
 func TestLoginWithCode(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.mfa = true
 	mux.HandleFunc("GET /echo", bearerEcho)
 	client := newTestClient(t, mux,
 		WithCredentials("trader@example.com", "secret"),
@@ -65,8 +91,28 @@ func TestLoginWithCode(t *testing.T) {
 	if code := auth.firstForm().Get("code"); code != "123456" {
 		t.Errorf("code = %q, want 123456", code)
 	}
-	if checks := auth.checks(); checks != 0 {
-		t.Errorf("MFA checks = %d, want none with a code provider", checks)
+	if checks := auth.checks(); checks != 1 {
+		t.Errorf("MFA checks = %d, want 1", checks)
+	}
+}
+
+func TestLoginWithoutTwoFactorNeedsSolver(t *testing.T) {
+	mux := http.NewServeMux()
+	auth := newAuthServer(t, mux)
+	asked := 0
+	client := newTestClient(t, mux,
+		WithCredentials("trader@example.com", "secret"),
+		WithCodeProvider(CodeFunc(func(context.Context) (string, error) { asked++; return "123456", nil })),
+	)
+	err := client.Login(context.Background())
+	if !errors.Is(err, ErrCaptchaRequired) || !strings.Contains(err.Error(), "WithCaptchaSolver") {
+		t.Errorf("Login() = %v, want ErrCaptchaRequired", err)
+	}
+	if asked != 0 {
+		t.Errorf("code provider called %d times for an account without 2FA", asked)
+	}
+	if len(auth.grants()) != 0 {
+		t.Error("client tried the password without a captcha")
 	}
 }
 
@@ -87,6 +133,7 @@ func TestLoginMFARequired(t *testing.T) {
 	t.Run("login answer", func(t *testing.T) {
 		mux := http.NewServeMux()
 		auth := newAuthServer(t, mux)
+		auth.mfaFails = true
 		auth.reply = func(url.Values) (int, string) { return http.StatusOK, `{"mfaEnabled":true}` }
 		client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
 		if err := client.Login(context.Background()); !errors.Is(err, ErrMFARequired) {
@@ -111,10 +158,14 @@ func TestLoginMFARequired(t *testing.T) {
 func TestLoginBadCredentials(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.mfa = true
 	auth.reply = func(url.Values) (int, string) {
 		return http.StatusBadRequest, `{"error":"invalid_grant","error_description":"Bad credentials"}`
 	}
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "wrong"))
+	client := newTestClient(t, mux,
+		WithCredentials("trader@example.com", "wrong"),
+		WithCodeProvider(StaticCode("123456")),
+	)
 	err := client.Login(context.Background())
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.Message != "Bad credentials" {
@@ -135,7 +186,8 @@ func TestLoginWrongCode(t *testing.T) {
 	for name, reply := range answers {
 		t.Run(name, func(t *testing.T) {
 			mux := http.NewServeMux()
-			newAuthServer(t, mux).reply = reply
+			auth := newAuthServer(t, mux)
+			auth.mfa, auth.reply = true, reply
 			client := newTestClient(t, mux,
 				WithCredentials("trader@example.com", "secret"),
 				WithCodeProvider(StaticCode("000000")),
@@ -150,7 +202,7 @@ func TestLoginWrongCode(t *testing.T) {
 
 func TestCodeProviderError(t *testing.T) {
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
+	newAuthServer(t, mux).mfa = true
 	failure := errors.New("no terminal")
 	client := newTestClient(t, mux,
 		WithCredentials("trader@example.com", "secret"),
@@ -240,8 +292,9 @@ func TestRefreshFailureFallsBackToLogin(t *testing.T) {
 		return http.StatusOK, `{"access_token":"fresh","refresh_token":"r"}`
 	}
 	mux.HandleFunc("GET /echo", bearerEcho)
+	auth.mfa = true
 	store := &memoryStore{token: &Token{AccessToken: "expired", RefreshToken: "r0", Expiry: time.Now().Add(-time.Minute)}}
-	client := newTestClient(t, mux, WithTokenStore(store), WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, WithTokenStore(store), WithCredentials("trader@example.com", "secret"), withCode)
 
 	if token := callEcho(t, client); token != "fresh" {
 		t.Errorf("token = %q, want the one from the new login", token)
@@ -291,9 +344,9 @@ func TestConcurrentCallsShareOneRefresh(t *testing.T) {
 func TestRefreshOutlivesCanceledCaller(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
-	auth.delay = 50 * time.Millisecond
+	auth.delay, auth.mfa = 50*time.Millisecond, true
 	mux.HandleFunc("GET /echo", bearerEcho)
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -315,9 +368,10 @@ func TestFileTokenStore(t *testing.T) {
 	if token, err := store.Load(context.Background()); token != nil || err != nil {
 		t.Fatalf("Load() on a missing file = %v, %v; want nil, nil", token, err)
 	}
-	first := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), WithTokenStore(store))
+	auth.mfa = true
+	first := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode, WithTokenStore(store))
 	token := callEcho(t, first)
-	second := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), WithTokenStore(store))
+	second := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode, WithTokenStore(store))
 	if got := callEcho(t, second); got != token {
 		t.Errorf("second client sent %q, want the stored token", got)
 	}

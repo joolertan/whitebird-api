@@ -50,6 +50,9 @@ const MFA_HINT =
   'Two-factor authentication is enabled for this account: pass `otp` (a code, a function ' +
   "returning one, or totp(secret) from 'whitebird-api/otp')";
 const CAPTCHA_HINT = 'Logging in needs a solved captcha: pass a `captcha` solver';
+const NO_MFA_CAPTCHA =
+  'The account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: ' +
+  'configure a captcha solver (the captcha option) or enable two-factor authentication';
 
 /**
  * Owns the OAuth tokens: logs in lazily, refreshes shortly before expiry or after a 401, and
@@ -145,9 +148,10 @@ export class Session {
         'Not logged in: pass `username` and `password`, or a `tokenStore` holding a session',
       );
     }
-    const code = await resolveCode(otp);
     // Like the web app: accounts with 2FA are asked for a code, the others for a captcha.
-    const mfaEnabled = code === undefined || captcha ? await this.#mfaEnabled(username) : undefined;
+    const mfaEnabled = await this.#mfaEnabled(username);
+    if (mfaEnabled === false && !captcha) throw new CaptchaRequiredError(NO_MFA_CAPTCHA);
+    const code = mfaEnabled === false ? undefined : await resolveCode(otp);
     if (mfaEnabled && code === undefined) throw new MFARequiredError(MFA_HINT);
     const form = {
       grant_type: 'password',
@@ -156,16 +160,19 @@ export class Session {
       ...(code !== undefined && { code }),
     };
 
+    // With an unknown status the captcha is solved only once the server asks for it.
+    const solver = code === undefined ? captcha : undefined;
     let solve = mfaEnabled === false;
     for (let attempt = 1; ; attempt++) {
-      const answer = captcha && solve ? await this.#solveCaptcha(captcha) : undefined;
+      const answer = solver && solve ? await this.#solveCaptcha(solver) : undefined;
       try {
         return await this.#passwordToken(form, answer, mfaEnabled);
       } catch (error) {
         const rejected = error instanceof APIError ? error : undefined;
         if (!rejected?.errorCode?.toUpperCase().includes('CAPTCHA')) throw error;
-        if (!captcha) {
-          throw new CaptchaRequiredError(`${rejected.message}. ${CAPTCHA_HINT}`, details(rejected));
+        if (!solver) {
+          const message = captcha ? rejected.message : `${rejected.message}. ${CAPTCHA_HINT}`;
+          throw new CaptchaRequiredError(message, details(rejected));
         }
         if (rejected.errorCode !== 'INVALID_CAPTCHA' || attempt === CAPTCHA_ATTEMPTS) {
           throw new CaptchaRequiredError(rejected.message, details(rejected));
@@ -229,7 +236,8 @@ export class Session {
         {},
         readJson,
       );
-      return (result as { mfaEnabled?: unknown } | undefined)?.mfaEnabled === true;
+      const enabled = (result as { mfaEnabled?: unknown } | undefined)?.mfaEnabled;
+      return typeof enabled === 'boolean' ? enabled : undefined;
     } catch (error) {
       if (error instanceof APIError) return undefined;
       throw error;

@@ -25,8 +25,8 @@ export interface WhitebirdOptions {
   otp?: CodeProvider;
   /**
    * Solves the slider captcha that accounts without two-factor authentication get when logging
-   * in. Without it such a login fails with {@link CaptchaRequiredError} when the captcha is
-   * enforced.
+   * in. Without it such a login fails with {@link CaptchaRequiredError} before the password is
+   * sent.
    */
   captcha?: CaptchaSolver;
   /**

@@ -158,6 +158,10 @@ language.
 - Tokens are kept in a pluggable token store (in-memory by default) so sessions survive restarts.
 - TOTP codes come from a code provider: a static code, a callback, or the `otp` extra that
   computes codes from the base32 secret.
+- Before a password login without an explicit code the client always posts the username to
+  `<oauth.mfa_status_path>`, as the web application does. With 2FA on it sends the code from the
+  provider (`MFARequiredError` without one) and no captcha; with 2FA off it never asks the
+  provider. If the check fails, a code is sent exactly when a provider is configured.
 - Captcha: the sign-in form makes accounts without 2FA solve a slider captcha. The client
   generates a UUID v4 `requestId`, calls `GET <oauth.captcha_path>?requestId=...` on `auth`
   (`{backgroundImage, puzzlePiece, positionY}`, images base64 PNG) and sends the answer with the
@@ -166,8 +170,10 @@ language.
   `{request_id, background_image: bytes, puzzle_piece: bytes, position_y}` and returns the slider
   position. When the account has no 2FA and a solver is configured, the captcha is solved before
   the token request; a rejection with status `INVALID_CAPTCHA` is retried with a fresh captcha, up
-  to 3 attempts. Without a solver the token request goes out without the header, and a rejection
-  whose `status` or `error` mentions `CAPTCHA` raises `CaptchaRequiredError`.
+  to 3 attempts. When the account has no 2FA and no solver is configured, the client raises
+  `CaptchaRequiredError` before sending the password. If the 2FA check failed, the token request
+  goes out without the header, and a rejection whose `status` or `error` mentions `CAPTCHA`
+  raises `CaptchaRequiredError`.
 - Operation MFA: operations marked `x-wb-auth: mfa` (withdrawals) need an MFA token sent as
   `x-mfa-token`. `confirm_operation(operation, code=None)` posts
   `{"operation": operation, "mfaCode": code}` to `operation_mfa.token_path` on

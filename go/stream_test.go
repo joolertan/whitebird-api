@@ -60,7 +60,7 @@ func TestStreamReconnects(t *testing.T) {
 	var mu sync.Mutex
 	var lastIDs []string
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
+	newAuthServer(t, mux).mfa = true
 	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Accept") != "text/event-stream" || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
 			t.Errorf("headers = %v", r.Header)
@@ -81,7 +81,7 @@ func TestStreamReconnects(t *testing.T) {
 			<-r.Context().Done()
 		}
 	})
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), WithMaxRetries(0))
+	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode, WithMaxRetries(0))
 	var delays []time.Duration
 	client.core.sleep = func(ctx context.Context, d time.Duration) error {
 		delays = append(delays, d)
@@ -119,11 +119,12 @@ func TestStreamStopsOnRejectedToken(t *testing.T) {
 	var connections atomic.Int32
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.mfa = true
 	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, _ *http.Request) {
 		connections.Add(1)
 		w.WriteHeader(http.StatusUnauthorized)
 	})
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode)
 
 	var errs []error
 	for _, err := range stream[notification](context.Background(), client.core, testOperation(http.MethodGet, "/sse"), nil) {

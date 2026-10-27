@@ -14,6 +14,9 @@ import (
 
 const mfaHint = "a TOTP code is required; set a code provider with WithCodeProvider"
 
+const noMFACaptchaHint = "the account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: " +
+	"configure WithCaptchaSolver or enable two-factor authentication"
+
 var errNoCredentials = fmt.Errorf("%w: no valid token and no credentials; use WithCredentials", ErrAuthentication)
 
 // session is the token state of a client. Concurrent callers that find the token stale share a
@@ -136,17 +139,18 @@ func (c *core) login(ctx context.Context) (*Token, error) {
 		"password":   {c.cfg.password},
 	}
 	// Accounts with two-factor authentication sign in with a TOTP code, the others by solving
-	// a captcha. Ask which applies unless a code provider is all there is to choose from.
-	mfa, known := false, false
-	if c.cfg.codes == nil || c.cfg.captcha != nil {
-		enabled, err := c.mfaEnabled(ctx)
-		mfa, known = enabled, err == nil
-	}
-	captcha := known && !mfa && c.cfg.captcha != nil
+	// a captcha. If the check fails, a code is sent when there is a provider.
+	mfa, err := c.mfaEnabled(ctx)
+	known := err == nil
 	switch {
 	case known && mfa && c.cfg.codes == nil:
 		return nil, &APIError{ErrorCode: errorCodeMFARequired, Message: mfaHint}
-	case c.cfg.codes != nil && !captcha:
+	case known && !mfa && c.cfg.captcha == nil:
+		return nil, &APIError{Message: noMFACaptchaHint, sentinel: ErrCaptchaRequired}
+	}
+	useCode := c.cfg.codes != nil && (mfa || !known)
+	captcha := c.cfg.captcha != nil && !useCode
+	if useCode {
 		code, err := c.cfg.codes.Code(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("whitebird: get TOTP code: %w", err)

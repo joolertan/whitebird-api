@@ -59,8 +59,9 @@ class Whitebird(_Client, Resources):
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
             function returning a fresh code (one that asks the user keeps the secret out of
-            the program), or `whitebird.otp.TOTP`. Also used to confirm sensitive
-            operations, see `confirm_operation`.
+            the program), or `whitebird.otp.TOTP`. Asked for a code only when the account has
+            two-factor authentication enabled, and to confirm sensitive operations, see
+            `confirm_operation`.
         captcha: Solves the slider captcha that Whitebird asks of accounts without two-factor
             authentication when they log in: called with a `Captcha`, returns the slider
             position. The SDK does not solve captchas itself; without a solver such a login
@@ -311,7 +312,8 @@ class AsyncWhitebird(_Client, AsyncResources):
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
             function or coroutine function returning a fresh code, or
-            `whitebird.otp.TOTP`. Also used to confirm sensitive operations, see
+            `whitebird.otp.TOTP`. Asked for a code only when the account has two-factor
+            authentication enabled, and to confirm sensitive operations, see
             `confirm_operation`.
         captcha: Solves the login captcha of accounts without two-factor authentication, see
             `Whitebird`: a function or a coroutine function.

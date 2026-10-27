@@ -149,11 +149,9 @@ impl Session {
             ));
         };
         let username = credentials.username.to_lowercase();
-        let mfa_enabled = if self.otp.is_none() || self.captcha.is_some() {
-            self.mfa_enabled(&username).await
-        } else {
-            None
-        };
+        // Like the web app: 2FA accounts send a code, the others pass a captcha. If the status
+        // is unknown, a configured code provider is taken as a sign of 2FA.
+        let mfa_enabled = self.mfa_enabled(&username).await;
         let two_factor = mfa_enabled.unwrap_or(self.otp.is_some());
         let code = match &self.otp {
             Some(otp) if two_factor => Some(otp.code().await?),
@@ -161,6 +159,9 @@ impl Session {
             _ => None,
         };
         let solver = self.captcha.as_ref().filter(|_| !two_factor);
+        if mfa_enabled == Some(false) && solver.is_none() {
+            return Err(captcha_required());
+        }
 
         let mut attempt = 1;
         loop {
@@ -369,6 +370,17 @@ fn uuid_v4() -> String {
         &hex[16..20],
         &hex[20..]
     )
+}
+
+fn captcha_required() -> Error {
+    ApiError::new(
+        ErrorKind::CaptchaRequired,
+        StatusCode::OK,
+        "the account has no two-factor authentication, so Whitebird asks for a captcha at \
+         sign-in: configure ClientBuilder::captcha or enable two-factor authentication",
+        &[],
+    )
+    .into()
 }
 
 fn mfa_required(status: StatusCode, body: &[u8]) -> Error {

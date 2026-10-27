@@ -49,9 +49,11 @@
 //		whitebird.WithCodeProvider(totp),
 //	)
 //
-// Without a code provider, a login to such an account fails with [ErrMFARequired]. Accounts
-// without two-factor authentication solve a slider captcha instead: [WithCaptchaSolver] provides
-// the solution, and without it a login the server challenges fails with [ErrCaptchaRequired].
+// Before a password login the client asks whether the account has two-factor authentication,
+// as the web application does. Without a code provider, a login to such an account fails with
+// [ErrMFARequired]. Accounts without two-factor authentication solve a slider captcha instead:
+// [WithCaptchaSolver] provides the solution, and without it their login fails with
+// [ErrCaptchaRequired] before the password is sent.
 //
 // Sensitive operations such as withdrawals also need an operation MFA token, sent with every
 // request once set. With a code provider the client gets one when needed; otherwise call

@@ -73,7 +73,10 @@ describe('generated methods', () => {
   it('sends multipart parts with their declared media type', async () => {
     const route = 'POST /api/v2/qualification';
     const api = new MockApi({ [route]: () => new Response(null) });
-    const request = { requestedInvestorStatus: 'QUALIFIED_INVESTOR', certifiedExpert: true } as const;
+    const request = {
+      requestedInvestorStatus: 'QUALIFIED_INVESTOR',
+      certifiedExpert: true,
+    } as const;
 
     await client(api).kyc.qualification.submit({
       request,

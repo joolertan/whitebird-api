@@ -155,7 +155,31 @@ async fn gives_up_after_three_rejected_answers() {
 #[tokio::test]
 async fn reports_captcha_required_without_a_solver() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    mfa_check(false).expect(1).mount(&server).await;
+    serve_captchas(&server).await;
+    password_grant()
+        .respond_with(grant("unused", "unused"))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    let error = builder(&server)
+        .credentials("me@example.com", "secret")
+        .build()
+        .unwrap()
+        .login()
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.kind(), Some(ErrorKind::CaptchaRequired));
+    assert!(error.is_authentication());
+    let requests = server.received_requests().await.unwrap();
+    assert!(requests_to(&requests, CAPTCHA_PATH).is_empty());
+}
+
+#[tokio::test]
+async fn maps_a_captcha_demand_when_the_status_is_unknown() {
+    let server = MockServer::start().await;
     serve_captchas(&server).await;
     password_grant()
         .respond_with(ResponseTemplate::new(400).set_body_json(json!({

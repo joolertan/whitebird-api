@@ -60,7 +60,6 @@ func TestConfirmOperation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
-			newAuthServer(t, mux)
 			mux.HandleFunc("POST "+operationMFAPath, func(w http.ResponseWriter, _ *http.Request) {
 				if tt.header != "" {
 					w.Header().Set("X-Mfa-Token", tt.header)
@@ -70,7 +69,7 @@ func TestConfirmOperation(t *testing.T) {
 			mux.HandleFunc("GET /echo", func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(r.Header.Get("X-Mfa-Token")))
 			})
-			client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+			client := newTestClient(t, mux, withSession())
 
 			token, err := client.ConfirmOperation(context.Background(), "WITHDRAWAL", "654321")
 			if err != nil || token != "mfa-1" {
@@ -86,11 +85,10 @@ func TestConfirmOperation(t *testing.T) {
 
 func TestConfirmOperationErrors(t *testing.T) {
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
 	mux.HandleFunc("POST "+operationMFAPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(`{}`))
 	})
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, withSession())
 
 	if _, err := client.ConfirmOperation(context.Background(), "WITHDRAWAL", ""); !errors.Is(err, ErrMFARequired) {
 		t.Errorf("ConfirmOperation() without a code = %v, want ErrMFARequired", err)
@@ -102,7 +100,7 @@ func TestConfirmOperationErrors(t *testing.T) {
 
 func TestMFAOperationConfirmsFirst(t *testing.T) {
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
+	newAuthServer(t, mux).mfa = true
 	m := newMFAServer(t, mux)
 	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), WithCodeProvider(StaticCode("654321")))
 
@@ -118,7 +116,7 @@ func TestMFAOperationConfirmsFirst(t *testing.T) {
 
 func TestMFAOperationRenewsRefusedToken(t *testing.T) {
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
+	newAuthServer(t, mux).mfa = true
 	m := newMFAServer(t, mux)
 	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), WithCodeProvider(StaticCode("654321")))
 	client.SetMFAToken("expired")
@@ -142,9 +140,8 @@ func TestMFAOperationRenewsRefusedToken(t *testing.T) {
 
 func TestMFAOperationWithoutCodeProvider(t *testing.T) {
 	mux := http.NewServeMux()
-	newAuthServer(t, mux)
 	m := newMFAServer(t, mux)
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, withSession())
 
 	if err := withdraw(client); !errors.Is(err, ErrMFARequired) {
 		t.Errorf("withdraw() = %v, want ErrMFARequired", err)

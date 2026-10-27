@@ -21,6 +21,8 @@ const captchaImages = () =>
     puzzlePiece: `data:image/png;base64,${btoa('\x04')}`,
     positionY: 42,
   });
+const withMfa = () => Response.json({ mfaEnabled: true });
+const withoutMfa = () => Response.json({ mfaEnabled: false });
 const invalidCaptcha = () =>
   Response.json({ status: 'INVALID_CAPTCHA', message: 'Invalid captcha' }, { status: 400 });
 const mfaDenied = () =>
@@ -55,12 +57,22 @@ describe('login', () => {
     expect(bearer(api.calls(ME)[0] as Request)).toBe(access);
   });
 
-  it('sends a static code and skips the MFA check', async () => {
-    const api = new MockApi({ [ME]: subaccount });
+  it('sends the code to accounts with 2FA', async () => {
+    const api = new MockApi({ [MFA_CHECK]: withMfa, [ME]: subaccount });
     await client(api, { otp: '123456' }).brokerage.subaccounts.me();
 
+    expect(api.calls(MFA_CHECK)).toHaveLength(1);
     expect(await form(api.calls(TOKEN)[0] as Request)).toMatchObject({ code: '123456' });
-    expect(api.calls(MFA_CHECK)).toHaveLength(0);
+    expect(api.calls(TOKEN)[0]?.headers.has('captcha')).toBe(false);
+  });
+
+  it('still sends the code when the 2FA status check fails', async () => {
+    const api = new MockApi({ [MFA_CHECK]: () => new Response(null, { status: 500 }) });
+
+    await client(api, { otp: '123456', maxRetries: 0 }).login();
+
+    expect(api.calls(MFA_CHECK)).toHaveLength(1);
+    expect(await form(api.calls(TOKEN)[0] as Request)).toMatchObject({ code: '123456' });
   });
 
   it('asks the code provider for a fresh code on every login', async () => {
@@ -110,6 +122,8 @@ describe('login', () => {
 
   it('reports wrong credentials as AuthenticationError', async () => {
     const api = new MockApi({
+      [MFA_CHECK]: withoutMfa,
+      [CAPTCHA]: captchaImages,
       [TOKEN]: () =>
         Response.json(
           { error: 'invalid_grant', error_description: 'Bad credentials' },
@@ -117,7 +131,7 @@ describe('login', () => {
         ),
     });
 
-    const error = await client(api)
+    const error = await client(api, { captcha: () => 10 })
       .login()
       .catch((e: unknown) => e);
 
@@ -159,7 +173,7 @@ describe('login', () => {
 describe('captcha', () => {
   it('is solved before logging in when the account has no 2FA', async () => {
     const solver = vi.fn((_captcha: Captcha) => 120.4);
-    const api = new MockApi({ [CAPTCHA]: captchaImages });
+    const api = new MockApi({ [MFA_CHECK]: withoutMfa, [CAPTCHA]: captchaImages });
 
     await client(api, { captcha: solver }).login();
 
@@ -180,6 +194,7 @@ describe('captcha', () => {
 
   it('is solved again when rejected', async () => {
     const api = new MockApi({
+      [MFA_CHECK]: withoutMfa,
       [CAPTCHA]: captchaImages,
       [TOKEN]: [invalidCaptcha, () => Response.json(tokenResponse())],
     });
@@ -193,7 +208,11 @@ describe('captcha', () => {
   });
 
   it('gives up after three attempts', async () => {
-    const api = new MockApi({ [CAPTCHA]: captchaImages, [TOKEN]: invalidCaptcha });
+    const api = new MockApi({
+      [MFA_CHECK]: withoutMfa,
+      [CAPTCHA]: captchaImages,
+      [TOKEN]: invalidCaptcha,
+    });
 
     const error = await client(api, { captcha: () => 10 })
       .login()
@@ -217,6 +236,31 @@ describe('captcha', () => {
     expect((error as Error).message).toMatch(/`captcha` solver/);
     expect(api.calls(TOKEN)[0]?.headers.has('captcha')).toBe(false);
     expect(api.calls(TOKEN)).toHaveLength(1);
+  });
+
+  it('is required before sending the password when the account has no 2FA', async () => {
+    const otp = vi.fn(() => '123456');
+    const api = new MockApi({ [MFA_CHECK]: withoutMfa });
+
+    const error = await client(api, { otp })
+      .login()
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(CaptchaRequiredError);
+    expect((error as Error).message).toMatch(/captcha solver/);
+    expect(otp).not.toHaveBeenCalled();
+    expect(api.calls(TOKEN)).toHaveLength(0);
+  });
+
+  it('replaces the code for accounts without 2FA', async () => {
+    const otp = vi.fn(() => '123456');
+    const api = new MockApi({ [MFA_CHECK]: withoutMfa, [CAPTCHA]: captchaImages });
+
+    await client(api, { otp, captcha: () => 10 }).login();
+
+    expect(otp).not.toHaveBeenCalled();
+    expect(await form(api.calls(TOKEN)[0] as Request)).not.toHaveProperty('code');
+    expect(captchaAnswer(api.calls(TOKEN)[0])).toMatchObject({ sliderPosition: 10 });
   });
 
   it('is not solved for accounts with 2FA', async () => {

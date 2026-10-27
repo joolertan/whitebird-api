@@ -67,7 +67,9 @@ impl Client {
     /// Logs in with the configured credentials and returns the new tokens.
     ///
     /// Login otherwise happens lazily on the first authenticated call; calling this first
-    /// surfaces credential and two-factor problems early.
+    /// surfaces credential and two-factor problems early. The client first asks whether the
+    /// account has two-factor authentication on, then sends a code from the
+    /// [code provider](ClientBuilder::otp) or, for accounts without it, a captcha answer.
     ///
     /// # Errors
     ///
@@ -428,7 +430,9 @@ impl ClientBuilder {
     }
 
     /// Sets where TOTP codes come from when two-factor authentication is on: a fixed code
-    /// (`&str`), a [`CodeProvider::from_fn`] callback or, with the `otp` feature, a `Totp`.
+    /// (`&str`), a [`CodeProvider::from_fn`] or [`CodeProvider::new`] callback or, with the
+    /// `otp` feature, a `Totp`. The provider is not asked when signing in to an account without
+    /// two-factor authentication.
     pub fn otp(mut self, provider: impl Into<CodeProvider>) -> Self {
         self.otp = Some(provider.into());
         self

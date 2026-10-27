@@ -104,6 +104,7 @@ def test_captcha_required_without_solver(
     generate: respx.Route,
     body: dict[str, Any],
 ) -> None:
+    mfa.respond(404)
     token = respx_mock.post(TOKEN_URL).respond(400, json=body)
 
     with pytest.raises(CaptchaRequiredError, match="Solve the captcha") as raised:
@@ -112,6 +113,38 @@ def test_captcha_required_without_solver(
     assert isinstance(raised.value, AuthenticationError)
     assert "captcha" not in token.calls.last.request.headers
     assert not generate.called
+
+
+def test_account_without_two_factor_needs_a_solver(
+    make_client: ClientFactory, respx_mock: respx.MockRouter, mfa: respx.Route
+) -> None:
+    token = respx_mock.post(TOKEN_URL)
+    asked: list[str] = []
+
+    def ask() -> str:
+        asked.append("code")
+        return "123456"
+
+    with pytest.raises(CaptchaRequiredError, match="captcha= a solver"):
+        make_client("me@example.com", "secret", otp=ask).login()
+
+    assert mfa.called
+    assert not asked
+    assert not token.called
+
+
+async def test_async_account_without_two_factor_needs_a_solver(
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter, mfa: respx.Route
+) -> None:
+    token = respx_mock.post(TOKEN_URL)
+
+    async def ask() -> str:
+        raise AssertionError("the code provider must not be called")
+
+    with pytest.raises(CaptchaRequiredError, match="two-factor"):
+        await make_async_client("me@example.com", "secret", otp=ask).login()
+
+    assert not token.called
 
 
 def test_no_captcha_for_two_factor_accounts(

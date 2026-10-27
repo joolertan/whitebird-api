@@ -131,8 +131,9 @@ again. In Node.js, `client.logout()` forgets the client's tokens and clears the 
 
 The sign-in form makes accounts **without** 2FA solve a slider captcha: a background image with a
 cut-out and a puzzle piece that has to be slid into place. The SDKs never solve captchas
-themselves. If the server asks for one and no solver is configured, signing in raises
-`CaptchaRequiredError`. Enabling 2FA on the account avoids the captcha altogether.
+themselves. Before signing in, the client asks whether the account has 2FA; if it has not and no
+solver is configured, signing in raises `CaptchaRequiredError` without sending the password.
+Enabling 2FA on the account avoids the captcha altogether.
 
 A solver receives the captcha (request id, both PNG images, the piece's vertical offset) and
 returns the horizontal offset of the piece. The client sends the answer with the sign-in request

@@ -5,7 +5,9 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use whitebird::{BoxError, Client, CodeProvider, TokenStore, Tokens, Totp};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use whitebird::{BoxError, Captcha, CaptchaSolver, Client, CodeProvider, TokenStore, Tokens, Totp};
 
 /// Error type of the examples' `main` functions.
 pub type Error = Box<dyn std::error::Error>;
@@ -51,7 +53,8 @@ pub fn var(name: &str) -> Result<String, Error> {
 
 /// A client signed in as `WHITEBIRD_USERNAME` / `WHITEBIRD_PASSWORD` that keeps its session in
 /// `whitebird-session.json`. Two-factor codes are asked for in the terminal, or computed from
-/// `WHITEBIRD_TOTP_SECRET` when it is set.
+/// `WHITEBIRD_TOTP_SECRET` when it is set; accounts without two-factor authentication solve the
+/// sign-in captcha on a page opened in a browser.
 ///
 /// # Errors
 ///
@@ -64,6 +67,7 @@ pub fn client() -> Result<Client, Error> {
     Ok(Client::builder()
         .credentials(var("WHITEBIRD_USERNAME")?, var("WHITEBIRD_PASSWORD")?)
         .otp(codes)
+        .captcha(CaptchaSolver::from_fn(|captcha| ask_captcha(&captcha)))
         .token_store(FileTokenStore::new("whitebird-session.json"))
         .build()?)
 }
@@ -76,3 +80,38 @@ fn ask_code() -> Result<String, BoxError> {
     io::stdin().read_line(&mut code)?;
     Ok(code.trim().to_owned())
 }
+
+/// Writes the captcha to a page with a slider and reads the position a person found there.
+fn ask_captcha(captcha: &Captcha) -> Result<u32, BoxError> {
+    let page = CAPTCHA_PAGE
+        .replace("{background}", &STANDARD.encode(&captcha.background_image))
+        .replace("{piece}", &STANDARD.encode(&captcha.puzzle_piece))
+        .replace("{y}", &captcha.position_y.to_string());
+    let path = env::temp_dir().join("whitebird-captcha.html");
+    fs::write(&path, page)?;
+    print!(
+        "Open {} in a browser, slide the piece into the gap and enter the number shown: ",
+        path.display()
+    );
+    io::stdout().flush()?;
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    Ok(answer.trim().parse()?)
+}
+
+const CAPTCHA_PAGE: &str = r#"<!doctype html>
+<meta charset="utf-8">
+<title>Whitebird captcha</title>
+<div style="position: relative; width: 290px; height: 192px">
+  <img src="data:image/png;base64,{background}">
+  <img id="piece" src="data:image/png;base64,{piece}" style="position: absolute; left: 0; top: {y}px">
+</div>
+<input id="slider" type="range" min="0" max="250" value="0" style="width: 290px">
+<p>Slider position: <b id="value">0</b></p>
+<script>
+  slider.oninput = () => {
+    piece.style.left = slider.value + "px";
+    value.textContent = slider.value;
+  };
+</script>
+"#;

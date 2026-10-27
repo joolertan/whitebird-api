@@ -18,6 +18,10 @@ export WHITEBIRD_PASSWORD=...
 export WHITEBIRD_TOTP_SECRET=...   # optional: base32 2FA secret, computes the codes instead of asking
 ```
 
+Accounts without two-factor authentication get a slider captcha at sign-in instead: the examples
+write it to `whitebird-captcha.html` in the temporary directory, where you slide the piece into
+place and type the position it shows.
+
 | Command | What it does |
 | --- | --- |
 | `node market-data.ts [demo]` | Instruments, order book and candles; no account needed |

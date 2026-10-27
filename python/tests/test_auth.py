@@ -27,10 +27,15 @@ def api(respx_mock: respx.MockRouter) -> respx.Route:
     return respx_mock.get(f"{API}/me").respond(json={"ok": True})
 
 
-def test_login_without_two_factor(
+@pytest.fixture
+def two_factor(respx_mock: respx.MockRouter) -> respx.Route:
+    return respx_mock.post(MFA_URL).respond(json={"mfaEnabled": True})
+
+
+def test_password_login_when_the_status_is_unknown(
     make_client: ClientFactory, respx_mock: respx.MockRouter, api: respx.Route
 ) -> None:
-    mfa = respx_mock.post(MFA_URL).respond(json={"mfaEnabled": False})
+    mfa = respx_mock.post(MFA_URL).respond(404)
     access_token = jwt()
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens(access_token))
     client = make_client("Me@Example.com", "secret")
@@ -53,20 +58,35 @@ def test_login_with_code_provider(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
     api: respx.Route,
+    two_factor: respx.Route,
     otp: CodeProvider,
 ) -> None:
-    mfa = respx_mock.post(MFA_URL)
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
     client = make_client("me@example.com", "secret", otp=otp)
 
     client.request("api", "GET", "/me")
 
-    assert not mfa.called
+    assert two_factor.called
+    assert form(token.calls.last.request)["code"] == "123456"
+    assert "captcha" not in token.calls.last.request.headers
+
+
+def test_code_is_sent_when_the_status_check_fails(
+    make_client: ClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    respx_mock.post(MFA_URL).respond(404)
+    token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
+
+    make_client("me@example.com", "secret", otp=lambda: "123456").login()
+
     assert form(token.calls.last.request)["code"] == "123456"
 
 
 def test_login_with_totp(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, api: respx.Route
+    make_client: ClientFactory,
+    respx_mock: respx.MockRouter,
+    api: respx.Route,
+    two_factor: respx.Route,
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
     otp = TOTP("JBSWY3DPEHPK3PXP")
@@ -123,7 +143,10 @@ def test_mfa_required_from_token_endpoint(
     ids=["invalid_grant", "mfaEnabled"],
 )
 def test_wrong_code(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, response: httpx.Response
+    make_client: ClientFactory,
+    respx_mock: respx.MockRouter,
+    two_factor: respx.Route,
+    response: httpx.Response,
 ) -> None:
     respx_mock.post(TOKEN_URL).mock(return_value=response)
     client = make_client("me@example.com", "secret", otp="000000")
@@ -137,7 +160,7 @@ def test_wrong_code(
 
 
 def test_wrong_password(make_client: ClientFactory, respx_mock: respx.MockRouter) -> None:
-    respx_mock.post(MFA_URL).respond(json={"mfaEnabled": False})
+    respx_mock.post(MFA_URL).respond(404)
     respx_mock.post(TOKEN_URL).respond(
         400, json={"error": "invalid_grant", "error_description": "Bad credentials"}
     )
@@ -218,7 +241,7 @@ def test_refresh_happens_once_per_request(
 def test_rejected_refresh_falls_back_to_password(
     make_client: ClientFactory, respx_mock: respx.MockRouter, api: respx.Route
 ) -> None:
-    respx_mock.post(MFA_URL).respond(json={"mfaEnabled": False})
+    respx_mock.post(MFA_URL).respond(404)
     token = respx_mock.post(TOKEN_URL).mock(
         side_effect=[httpx.Response(400, json={"error": "invalid_grant"}), tokens()]
     )
@@ -291,7 +314,7 @@ async def test_async_concurrent_requests_share_one_refresh(
 async def test_async_login_and_reactive_refresh(
     make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
 ) -> None:
-    respx_mock.post(MFA_URL).respond(json={"mfaEnabled": False})
+    respx_mock.post(MFA_URL).respond(404)
     first, second = jwt(subject="first"), jwt(subject="second")
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[tokens(first), tokens(second)])
     api = respx_mock.get(f"{API}/me").mock(
@@ -319,7 +342,7 @@ async def test_async_mfa_required(
 
 
 async def test_async_login_awaits_the_code_provider(
-    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
 
@@ -335,7 +358,7 @@ async def test_async_login_awaits_the_code_provider(
 
 
 def test_sync_client_rejects_a_coroutine_code_provider(
-    make_client: ClientFactory, respx_mock: respx.MockRouter
+    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
 ) -> None:
     token = respx_mock.post(TOKEN_URL)
 

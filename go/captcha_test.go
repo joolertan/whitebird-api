@@ -94,6 +94,7 @@ func TestLoginRetriesInvalidCaptcha(t *testing.T) {
 func TestLoginCaptchaRequired(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.mfaFails = true
 	auth.reply = func(url.Values) (int, string) {
 		return http.StatusBadRequest, `{"status":"CAPTCHA_REQUIRED","message":"Solve the captcha"}`
 	}
