@@ -27,6 +27,10 @@ ResponseKind = Literal["json", "binary", "text", "empty", "sse"]
 Auth = Literal["none", "user", "mfa"]
 Status = Literal["stable", "experimental", "deprecated"]
 Envelope = Literal["retcode"]
+# What an operation does to the client's session: `replace` stores the token pair the response
+# carries (password change), `end` forgets the session after the call, whatever its outcome
+# (logout).
+SessionEffect = Literal["replace", "end"]
 
 
 @dataclass(frozen=True)
@@ -156,6 +160,7 @@ class Operation:
     pagination: Pagination | None = None
     mfa_operation: str | None = None
     envelope: Envelope | None = None
+    session: SessionEffect | None = None
 
     @property
     def deprecated(self) -> bool:

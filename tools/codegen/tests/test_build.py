@@ -25,6 +25,7 @@ def test_resources_follow_x_wb_resource(ir: IR) -> None:
         "orders",
         "products",
         "profile",
+        "session",
         "tickers",
     ]
     assert [op.name for op in ir.root.children["orders"].children["documents"].operations] == [
@@ -45,7 +46,29 @@ def test_pagination_in_query(ir: IR) -> None:
     assert op.auth == "none"
     assert op.response.type == TypeRef.page(TypeRef.model("Product"))
     assert op.pagination is not None and op.pagination.location == "query"
-    assert [p.name for p in op.query_params] == ["page", "size", "category", "tags"]
+    assert [p.name for p in op.query_params] == [
+        "page",
+        "size",
+        "category",
+        "tags",
+        "labels",
+        "sort",
+    ]
+    labels = op.query_params[4]
+    assert labels.wire == "labels[]"
+    assert op.query_params[5].default == "name,asc"
+
+
+def test_page_response_without_page_parameter_is_not_paginated(ir: IR) -> None:
+    op = operation(ir, "productsFeatured")
+    assert op.response.type == TypeRef.page(TypeRef.model("Product"))
+    assert op.pagination is None
+
+
+def test_session_effects(ir: IR) -> None:
+    assert operation(ir, "sessionLogout").session == "end"
+    assert operation(ir, "sessionChangePassword").session == "replace"
+    assert operation(ir, "productsList").session is None
 
 
 def test_pagination_in_body(ir: IR) -> None:
@@ -177,6 +200,7 @@ def test_multipart_part_content_types(ir: IR) -> None:
     assert {f.wire: f.content_type for f in body.fields} == {
         "file": None,
         "crop": "application/json",
+        "caption": "text/plain",
     }
 
 

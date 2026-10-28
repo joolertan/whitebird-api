@@ -1,7 +1,8 @@
 """Imports a service's public OpenAPI document into ``spec/services``.
 
-Annotations added by hand (``operationId``, ``x-wb-*``) survive re-imports: they are matched by
-method and path.
+Annotations added by hand survive re-imports: ``operationId``, ``x-wb-*``, summaries and
+descriptions of operations (matched by method and path) and descriptions of schema properties
+(matched by schema and property name).
 """
 
 from __future__ import annotations
@@ -22,11 +23,16 @@ EXCLUDED_OPERATION = re.compile(r"admin", re.IGNORECASE)
 STEM_SUFFIXES = frozenset({"request", "response", "filter", "details", "data", "calculation"})
 PRESERVED = (
     "operationId",
+    "summary",
+    "description",
     "x-wb-resource",
     "x-wb-name",
     "x-wb-auth",
     "x-wb-status",
     "x-wb-first-seen",
+    "x-wb-response",
+    "x-wb-envelope",
+    "x-wb-session",
 )
 PAGEABLE = [
     {
@@ -87,6 +93,9 @@ def convert(source: Schema, service: str, url: str, existing: Schema | None) -> 
             paths.setdefault(path, {})[method] = operation
 
     schemas = _hoist_enums(copy.deepcopy(source.get("components", {}).get("schemas", {})))
+    _keep_descriptions(schemas, (existing or {}).get("components", {}).get("schemas", {}))
+    _exclusive_bounds(paths)
+    _exclusive_bounds(schemas)
     document: Schema = {
         "openapi": "3.1.0",
         "info": {
@@ -109,6 +118,33 @@ def _annotations(document: Schema) -> dict[tuple[str, str], Schema]:
         for method, operation in item.items():
             found[(method, path)] = {key: operation[key] for key in PRESERVED if key in operation}
     return found
+
+
+def _keep_descriptions(schemas: Schema, previous: Schema) -> None:
+    """Keeps property descriptions written into the spec by hand."""
+    for name, schema in schemas.items():
+        old = previous.get(name, {}).get("properties", {})
+        for prop_name, prop in schema.get("properties", {}).items():
+            description = old.get(prop_name, {}).get("description")
+            if description:
+                prop["description"] = description
+
+
+def _exclusive_bounds(node: Any) -> None:
+    """Rewrites OpenAPI 3.0 boolean ``exclusiveMinimum``/``exclusiveMaximum`` in the 3.1 form."""
+    if isinstance(node, dict):
+        for exclusive, bound in (("exclusiveMinimum", "minimum"), ("exclusiveMaximum", "maximum")):
+            flag = node.get(exclusive)
+            if not isinstance(flag, bool):
+                continue
+            del node[exclusive]
+            if flag and bound in node:
+                node[exclusive] = node.pop(bound)
+        for value in node.values():
+            _exclusive_bounds(value)
+    elif isinstance(node, list):
+        for value in node:
+            _exclusive_bounds(value)
 
 
 def _operation(raw: Schema) -> Schema:

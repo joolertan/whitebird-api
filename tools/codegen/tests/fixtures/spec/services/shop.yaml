@@ -17,6 +17,8 @@ paths:
         - {name: size, in: query, schema: {type: integer, default: 20}}
         - {name: category, in: query, schema: {$ref: "#/components/schemas/Category"}}
         - {name: tags, in: query, schema: {type: array, items: {type: string}}}
+        - {name: "labels[]", in: query, schema: {type: array, items: {type: string}}}
+        - {name: sort, in: query, schema: {type: string, default: "name,asc"}}
       responses:
         "200":
           description: OK
@@ -151,14 +153,63 @@ paths:
                   type: object
                   properties:
                     size: {type: integer}
+                caption:
+                  type: object
+                  properties:
+                    text: {type: string}
             encoding:
               crop: {contentType: application/json}
+              caption: {contentType: text/plain}
       responses:
         "200":
           description: OK
           content:
             text/plain:
               schema: {type: string}
+  /api/v1/products/featured:
+    post:
+      operationId: productsFeatured
+      x-wb-resource: products
+      x-wb-name: featured
+      x-wb-auth: none
+      summary: A single page of featured products, without page parameters
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PageProduct"}
+  /api/v1/session/logout:
+    post:
+      operationId: sessionLogout
+      x-wb-resource: session
+      x-wb-name: logout
+      x-wb-session: end
+      responses:
+        "200":
+          description: OK
+  /api/v1/session/password:
+    put:
+      operationId: sessionChangePassword
+      x-wb-resource: session
+      x-wb-name: change_password
+      x-wb-session: replace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword: {type: string}
+                newPassword: {type: string}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TokenPair"}
   /api/v1/cart/clear:
     post:
       operationId: cartClear
@@ -233,6 +284,7 @@ components:
         quantity: {type: integer}
         priority: {$ref: "#/components/schemas/Priority"}
         note: {type: string}
+        channel: {type: string, default: web, description: The web app always sends it.}
     Order:
       type: object
       required: [id, status]
@@ -255,6 +307,12 @@ components:
       properties:
         content: {type: array, items: {$ref: "#/components/schemas/Order"}}
         totalElements: {type: integer, format: int64}
+    TokenPair:
+      type: object
+      properties:
+        access_token: {type: string}
+        refresh_token: {type: string}
+        expires_in: {type: integer}
     Ticker:
       type: object
       properties:

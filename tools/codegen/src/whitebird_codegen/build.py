@@ -30,6 +30,7 @@ from .ir import (
     Response,
     ResponseKind,
     Service,
+    SessionEffect,
     Status,
     TypeRef,
 )
@@ -151,6 +152,10 @@ class Builder:
         if auth not in get_args(Auth) or status not in get_args(Status):
             self._problem(f"{where}: invalid x-wb-auth {auth!r} or x-wb-status {status!r}")
             return
+        session = raw.get("x-wb-session")
+        if session not in (None, *get_args(SessionEffect)):
+            self._problem(f"{where}: invalid x-wb-session {session!r}")
+            return
 
         hint = naming.pascal(op_id)
         params = [
@@ -198,6 +203,7 @@ class Builder:
                 pagination=self._pagination(response, query, body),
                 mfa_operation=raw.get("x-wb-mfa-operation"),
                 envelope=cast(Envelope | None, envelope),
+                session=cast(SessionEffect | None, session),
             )
         )
 
@@ -286,8 +292,12 @@ class Builder:
             return None
         body_names = {f.wire for f in body.fields} if body else set()
         query_names = {p.wire for p in query}
-        in_body = "page" in body_names and "page" not in query_names
-        return Pagination(response.type.item, "page", "size", "body" if in_body else "query")
+        # A page response without a page parameter is a single page, not a listing to walk.
+        if "page" in query_names:
+            return Pagination(response.type.item, "page", "size", "query")
+        if "page" in body_names:
+            return Pagination(response.type.item, "page", "size", "body")
+        return None
 
     def _deref(self, schema: Schema) -> Schema:
         while "$ref" in schema:
