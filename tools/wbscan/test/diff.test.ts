@@ -43,7 +43,7 @@ const inventory: Inventory = {
     }),
     endpoint('admin-service', 'POST', '/api/v1/audit/record'),
     endpoint('exchange-core', 'POST', '/api/v1/admin/approve/{requestId}'),
-    endpoint('exchange-core', 'GET', '/api/v1/orders', { query: ['page', 'size', 'status'] }),
+    endpoint('exchange-core', 'GET', '/api/v1/orders', { query: ['assets', 'page', 'size', 'status'] }),
     endpoint('exchange-core', 'POST', '/api/v1/quote', { body: { kind: 'json', fields: ['amount', 'currency'] } }),
     endpoint('exchange-core', 'POST', '/api/v1/subaccount/add/{id}'),
     endpoint('trading-service', 'POST', '/api/v1/orders'),
@@ -95,7 +95,7 @@ describe('diffInventory', async () => {
     );
   });
 
-  it('reports request fields the spec lacks, not spec-only ones', () => {
+  it('reports request fields the spec lacks, not spec-only ones; `name[]` matches `name`', () => {
     assert.deepEqual(report.changedEndpoints, [
       { service: 'exchange-core', method: 'GET', path: '/api/v1/orders', query: ['status'] },
       { service: 'exchange-core', method: 'POST', path: '/api/v1/quote', body: ['currency'] },

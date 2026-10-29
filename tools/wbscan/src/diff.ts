@@ -136,7 +136,11 @@ export function parseSpec(file: string, text: string): SpecFile {
       const op = item[method];
       if (!isObject(op)) continue;
       const params = [...shared, ...(Array.isArray(op.parameters) ? op.parameters : [])].map((p) => deref(doc, p));
-      const query = params.filter(isObject).filter((p) => p.in === 'query' && typeof p.name === 'string').map((p) => p.name as string);
+      // `assets[]` in the spec is the axios array style; the inventory records the plain name.
+      const query = params
+        .filter(isObject)
+        .filter((p) => p.in === 'query' && typeof p.name === 'string')
+        .map((p) => (p.name as string).replace(/\[\]$/, ''));
       operations.push({
         method: method.toUpperCase(),
         path,

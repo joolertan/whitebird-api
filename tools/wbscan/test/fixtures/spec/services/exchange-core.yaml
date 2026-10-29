@@ -9,6 +9,7 @@ paths:
       parameters:
         - { name: page, in: query, schema: { type: integer } }
         - { name: size, in: query, schema: { type: integer } }
+        - { name: 'assets[]', in: query, schema: { type: array, items: { type: string } } }
   /api/v1/orders/{orderId}:
     delete: {}
   /api/v1/quote:
