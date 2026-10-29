@@ -24,9 +24,10 @@ paths:
       parameters:
       - name: provider
         in: query
-        description: Verification provider; the web app defaults to `SUMSUB`.
+        description: Verification provider.
         schema:
           $ref: '#/components/schemas/KycProvider'
+          default: SUMSUB
       responses:
         '200':
           description: OK
@@ -193,7 +194,7 @@ paths:
                   description: Attachments, sent as one part per file.
             encoding:
               request:
-                contentType: application/json
+                contentType: text/plain
       responses:
         '200':
           description: OK
@@ -252,8 +253,9 @@ components:
     KycVerificationRequest:
       type: object
       description: >-
-        The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (from geo,
-        default `BY`), `countryFlag: false`, `residencePermitInBelarusPresent: true`,
+        The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (the
+        questionnaire's own value, else the code of the country reported by `auth.geo`, else `BY`),
+        `countryFlag: false`, `residencePermitInBelarusPresent: true`,
         `exchangeInPersonalInterests: true`, `notUSTaxpayer: true`, `userConfirmed: false`,
         `firstStageConfirmed: true`, `secondStageConfirmed: false` and `emailVerified: true`.
       properties:

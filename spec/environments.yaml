@@ -17,8 +17,9 @@ operation_mfa:
 
 services:
   accounting: {title: Accounting, production: https://accounting-service.whitebird.io}
+  accounting_spot: {title: Spot accounting, production: https://api.whitebird.io, demo: https://api-demo.whitebird.io}
   alfa: {title: Alfa-Bank payments, production: https://alfa-service.whitebird.io}
-  api: {title: API gateway, production: https://api.whitebird.io, demo: https://api-demo.whitebird.io}
+  api: {title: API gateway, production: https://api.whitebird.io}
   assist: {title: Assist payments, production: https://assist-service.whitebird.io}
   auth: {title: Authorization server, production: https://authorization-server.whitebird.io}
   bepaid: {title: bePaid payments, production: https://bepaid-service.whitebird.io}

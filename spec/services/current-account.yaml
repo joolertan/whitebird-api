@@ -202,25 +202,11 @@ components:
   schemas:
     CurrentAccountReportRequest:
       type: object
-      description: |
-        Shared document-request body. The web app sends `{}` for invoices; the fields exist for
-        statements served by the same code path.
+      description: The web app always sends `{}` for invoices.
       properties:
-        limit:
-          type: integer
-        completionDateFrame:
-          $ref: '#/components/schemas/CurrentAccountDateFrame'
         type:
           type: string
-        format:
-          type: string
-    CurrentAccountDateFrame:
-      type: object
-      properties:
-        start:
-          type: string
-        end:
-          type: string
+          description: Document type; its code path could send it, but never does for invoices.
     CurrentAccountFiatOpType:
       type: string
       description: '`BALANCE` for wallet deposits, `BROKER` for brokerage payments; omitted for exchange orders.'

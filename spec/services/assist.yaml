@@ -33,7 +33,9 @@ paths:
 
         The user enters the card details and passes 3-D Secure on the Assist page, then the
         browser is sent back to `returnUrl`. The web app passes
-        `https://whitebird.io/account/payments?card_bind=success`.
+        `https://whitebird.io/account/payments?card_bind=success`. Assist appends `billnumber` to
+        it, and reaching that page does not prove the card was bound: check
+        `payments.methods.list`.
       parameters:
       - name: type
         in: query
@@ -62,9 +64,9 @@ paths:
       x-wb-first-seen: '2026-11-07'
       summary: Get an Assist card binding URL
       description: |
-        Older variant of `card_bind_form`. The current web app only references it from unused
-        legacy code and never reads the response; it presumably returns a URL of the Assist
-        binding page to open in a browser, which sends the user back to `returnUrl`.
+        Older variant of `card_bind_form`. The current web app only builds this request in unused
+        legacy code and never sends it; it presumably returns a URL of the Assist binding page to
+        open in a browser, which sends the user back to `returnUrl`.
       parameters:
       - name: type
         in: query

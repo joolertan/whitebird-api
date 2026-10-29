@@ -49,7 +49,10 @@ paths:
   /api/v1/brokerage/balance-order/crypto/withdrawal:
     post:
       summary: Create Crypto Withdrawal
-      description: Create a crypto withdrawal balance order
+      description: |
+        Create a crypto withdrawal balance order. The order stays `AWAITING_CLIENT_CONFIRMATION`
+        until the client confirms it with the token emailed to them (`confirm_crypto_withdrawal`);
+        it then moves to `AWAITING_ADMIN_CONFIRMATION`.
       requestBody:
         content:
           application/json:
@@ -88,6 +91,7 @@ paths:
       operationId: brokerageBalanceOrdersConfirmCryptoWithdrawal
       x-wb-resource: brokerage.balance_orders
       x-wb-name: confirm_crypto_withdrawal
+      x-wb-auth: none
       x-wb-source: openapi
       x-wb-first-seen: '2026-11-07'
   /api/v1/brokerage/balance-order/fiat/deposit:
@@ -216,7 +220,10 @@ paths:
       x-wb-first-seen: '2026-11-07'
     post:
       summary: Add Crypto Address
-      description: Add a crypto address for the current subaccount
+      description: |
+        Add a crypto address for the current subaccount. Errors: 403 when the account has no
+        two-factor authentication (the web app asks to enable it), 400 `INVALID_ADDRESS` or
+        `MAX_NUMBER_REACHED`.
       requestBody:
         content:
           application/json:
@@ -507,7 +514,10 @@ paths:
   /api/v1/brokerage/subaccount/add/individual:
     post:
       summary: Add Subaccount (Individual)
-      description: Add an Individual subaccount for current broker
+      description: |
+        Add an Individual subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+        taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+        in `fields[]`.
       requestBody:
         content:
           application/json:
@@ -529,7 +539,10 @@ paths:
   /api/v1/brokerage/subaccount/add/individual-entrepreneur:
     post:
       summary: Add Subaccount (Individual Entrepreneur)
-      description: Add an Individual Entrepreneur subaccount for current broker
+      description: |
+        Add an Individual Entrepreneur subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+        taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+        in `fields[]`.
       requestBody:
         content:
           application/json:
@@ -551,7 +564,10 @@ paths:
   /api/v1/brokerage/subaccount/add/organization:
     post:
       summary: Add Subaccount (Organization)
-      description: Add an Organization subaccount for current broker
+      description: |
+        Add an Organization subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+        taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+        in `fields[]`.
       requestBody:
         content:
           application/json:
@@ -827,8 +843,7 @@ components:
         assetNetwork:
           $ref: '#/components/schemas/Network'
         amount:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
     CryptoWithdrawalCalculation:
       type: object
@@ -862,8 +877,7 @@ components:
         assetNetwork:
           $ref: '#/components/schemas/Network'
         amount:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
     DateFrame:
       type: object
@@ -892,13 +906,16 @@ components:
           format: uuid
         fiatProviderType:
           $ref: '#/components/schemas/ProviderType'
+          description: The web app sends `CA` (current account).
         internalToken:
           type: string
+          description: Settlement account to deposit from, the `id` of an account from
+            `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
         assetCode:
           type: string
+          description: The web app sends `RUB`.
         amount:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
     FiatWithdrawalRequest:
       required:
@@ -912,13 +929,15 @@ components:
           format: uuid
         fiatProviderType:
           $ref: '#/components/schemas/ProviderType'
+          description: The web app sends `CA` (current account).
         paymentToken:
           type: string
+          description: Bank account to withdraw to, the `id` of a method from `brokerage.payments.methods`.
         assetCode:
           type: string
+          description: The web app sends `RUB`.
         amount:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
     Network:
       type: string
@@ -1069,8 +1088,7 @@ components:
         fromAsset:
           type: string
         fromAmount:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
         toAsset:
           type: string
@@ -1079,8 +1097,7 @@ components:
           description: Asset pair in format BASE/QUOTE
           example: USDT/RUB
         exchangeRateValue:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
     OtcOrderCalculateResponse:
       type: object
@@ -1142,8 +1159,7 @@ components:
         fromAsset:
           type: string
         fromAmount:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
         toAsset:
           type: string
@@ -1152,8 +1168,7 @@ components:
           description: Asset pair in format BASE/QUOTE
           example: USDT/RUB
         exchangeRateValue:
-          minimum: 0.0
-          exclusiveMinimum: true
+          exclusiveMinimum: 0
           type: number
     OtcOrderResponse:
       type: object

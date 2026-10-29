@@ -95,13 +95,12 @@ paths:
       x-wb-status: experimental
       x-wb-source: bundle
       x-wb-first-seen: '2026-11-07'
-      summary: Get the order number of a pending MTS deposit
+      summary: Get the number of a pending MTS deposit
       description: |
         Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
-        (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the cashier
-        or enters in the transfer form. This endpoint returns the number of the client's pending
-        deposit. The response shape is unknown: the web app declares the call but never reads
-        the result.
+        (`MTS_MULTITRANSFER`) are matched by a number that the client gives to the cashier or
+        enters in the transfer form. The web app declares this call (as a phone number code of the
+        pending deposit) but never sends it, so the meaning and shape of the answer are unknown.
       responses:
         '200':
           description: OK
@@ -127,9 +126,11 @@ paths:
         2. For a static QR code (`payments[0].qrType == "static"`) the payer chooses the amount
            and gets the amount to pay from `commission`; otherwise the amount is
            `payments[0].settlementAmount`.
-        3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
-           (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or by
-           selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+        3. Pay through the exchange API: from a RUB balance, first
+           `balance.withdrawals.calculate_fiat` with `fiatProviderType: MTS_QR`,
+           `paymentToken: qrTicketId`, `commissionType: ADD` and the amount, then
+           `balance.withdrawals.create_fiat` with the same fields plus `accountType`; or by selling
+           crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
            token: qrTicketId}`.
       requestBody:
         required: true

@@ -62,6 +62,7 @@ paths:
         in: query
         schema:
           type: string
+          default: 11111111-1111-1111-1111-111111111111
       responses:
         '200':
           description: OK
@@ -543,19 +544,13 @@ components:
       type: object
       description: |
         Filter of a statement. All fields are optional; the web app sends `limit` and
-        `completionDateFrame` for exchange statements and nothing for invoices.
+        `completionDateFrame` for exchange statements.
       properties:
         limit:
           type: integer
           default: 20
         completionDateFrame:
           $ref: '#/components/schemas/ReportDateFrame'
-        type:
-          type: string
-          description: Document type (`PDF`, `XLSX`).
-        format:
-          type: string
-          description: Document format (`PDF`).
     ReportDateFrame:
       type: object
       description: |
@@ -571,11 +566,17 @@ components:
       allOf:
       - $ref: '#/components/schemas/ReportRequest'
       - type: object
+        required: [transactionTypes]
         properties:
           transactionTypes:
             type: array
+            description: Operation types to include; pass all three for no filter.
             items:
               $ref: '#/components/schemas/ReportOperationType'
+          type:
+            type: string
+            description: Document type (`PDF`, `XLSX`); the web app does not choose one for this
+              statement.
           statuses:
             type: array
             items:
@@ -788,11 +789,11 @@ components:
       properties:
         buy:
           type: string
-          description: Percent, decimal comma.
+          description: Percent as a decimal string, e.g. `1.5`.
           x-wb-inferred: true
         sell:
           type: string
-          description: Percent, decimal comma.
+          description: Percent as a decimal string, e.g. `1.5`.
           x-wb-inferred: true
     PaymentDirectionCommission:
       type: object

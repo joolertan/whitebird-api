@@ -1,0 +1,99 @@
+openapi: 3.1.0
+info:
+  title: Spot accounting API (gateway)
+  version: '1'
+  description: |
+    Wallet balances with USD valuation, served by the API gateway under `/api/v2/accounting`.
+    The spot trading terminal reads them from the gateway of the selected environment:
+    `api.whitebird.io` in production and `api-demo.whitebird.io` in demo
+    (`VITE_TRADING_BASE_URL_ACCOUNTING_SPOT_*`). Reconstructed from the whitebird.io web app.
+x-wb-service: accounting_spot
+servers:
+- url: https://api.whitebird.io
+paths:
+  /api/v2/accounting/client/account/enhanced:
+    post:
+      operationId: accountingAccountsGetEnhanced
+      x-wb-resource: accounting.accounts
+      x-wb-name: get_enhanced
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: Get balances with USD valuation
+      description: |
+        Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for
+        the wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
+        `amount` is the reserved amount). In the demo environment this reads the demo trading
+        balances.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountingAccountRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountingEnhancedAccount'
+components:
+  schemas:
+    AccountingAccountType:
+      type: string
+      enum: [USER_BALANCE, USER_PAYMENT, USER_EXCHANGE, USER_FEES, USER_PAYMENT_RESERVING,
+        USER_SPOT_RESERVING, REFERRER_BALANCE, ICO_BALANCE]
+    AccountingAccountRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/AccountingAccountType'
+        assets:
+          type: [array, 'null']
+          description: Asset codes to include; all assets when null.
+          items:
+            type: string
+    AccountingEnhancedBalance:
+      type: object
+      properties:
+        currency:
+          type: string
+          x-wb-inferred: true
+        amount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        usdAmount:
+          type: number
+          format: decimal
+          description: Value in USD.
+          x-wb-inferred: true
+        usdRate:
+          type: number
+          format: decimal
+          description: Price in USD.
+          x-wb-inferred: true
+        fiat:
+          type: boolean
+          x-wb-inferred: true
+        type:
+          $ref: '#/components/schemas/AccountingAccountType'
+          x-wb-inferred: true
+        reservedAmount:
+          type: number
+          format: decimal
+          x-wb-inferred: true
+        reserved:
+          type: number
+          format: decimal
+          description: Older name of `reservedAmount`.
+          x-wb-inferred: true
+    AccountingEnhancedAccount:
+      type: object
+      properties:
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountingEnhancedBalance'
+          x-wb-inferred: true

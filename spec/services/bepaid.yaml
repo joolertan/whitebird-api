@@ -22,9 +22,10 @@ paths:
       x-wb-first-seen: '2026-11-07'
       summary: Get a bePaid card binding URL
       description: |
-        Legacy: the current web app never reads the response. Like the other binding endpoints it
-        presumably returns the URL of the bePaid page where the user enters the card details and
-        passes 3-D Secure in a browser before being sent back to `returnUrl`.
+        Legacy: the current web app only builds this request in unused code and never sends it.
+        Like the other binding endpoints it presumably returns the URL of the bePaid page where
+        the user enters the card details and passes 3-D Secure in a browser before being sent back
+        to `returnUrl`.
       parameters:
       - name: returnUrl
         in: query

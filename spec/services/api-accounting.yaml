@@ -34,31 +34,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountingAccount'
-  /api/v2/accounting/client/account/enhanced:
-    post:
-      operationId: accountingAccountsGetEnhanced
-      x-wb-resource: accounting.accounts
-      x-wb-name: get_enhanced
-      x-wb-status: experimental
-      x-wb-source: bundle
-      summary: Get balances with USD valuation
-      description: |
-        Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for
-        the wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
-        `amount` is the reserved amount).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AccountingAccountRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountingEnhancedAccount'
   /api/v2/accounting/client/transactions:
     post:
       operationId: accountingTransactionsList
@@ -174,11 +149,10 @@ components:
     Sort:
       name: sort
       in: query
-      description: Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
+      description: Sort criteria in the format `property,(asc|desc)`.
       schema:
-        type: array
-        items:
-          type: string
+        type: string
+        default: creationDate,desc
   schemas:
     AccountingAccountType:
       type: string
@@ -219,49 +193,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AccountingBalance'
-          x-wb-inferred: true
-    AccountingEnhancedBalance:
-      type: object
-      properties:
-        currency:
-          type: string
-          x-wb-inferred: true
-        amount:
-          type: number
-          format: decimal
-          x-wb-inferred: true
-        usdAmount:
-          type: number
-          format: decimal
-          description: Value in USD.
-          x-wb-inferred: true
-        usdRate:
-          type: number
-          format: decimal
-          description: Price in USD.
-          x-wb-inferred: true
-        fiat:
-          type: boolean
-          x-wb-inferred: true
-        type:
-          $ref: '#/components/schemas/AccountingAccountType'
-          x-wb-inferred: true
-        reservedAmount:
-          type: number
-          format: decimal
-          x-wb-inferred: true
-        reserved:
-          type: number
-          format: decimal
-          description: Older name of `reservedAmount`.
-          x-wb-inferred: true
-    AccountingEnhancedAccount:
-      type: object
-      properties:
-        balances:
-          type: array
-          items:
-            $ref: '#/components/schemas/AccountingEnhancedBalance'
           x-wb-inferred: true
     AccountingTransactionType:
       type: string

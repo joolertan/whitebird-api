@@ -26,9 +26,12 @@ paths:
       x-wb-first-seen: '2026-11-07'
       summary: Check whether an account has 2FA enabled
       description: |
-        Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without
-        the slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve the
-        captcha from `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`.
+        Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
+        with 2FA first send the password grant without code and without captcha; when the answer
+        is `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP
+        code in `code`. Accounts without 2FA must solve the captcha from
+        `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`; when this check
+        fails the web app does not send the password at all.
       requestBody:
         required: true
         content:
@@ -53,7 +56,8 @@ paths:
         Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution is
         the horizontal offset of the piece (the web slider ranges 0-250) and is sent to
         `POST /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
-        `base64(JSON.stringify({"sliderPosition": <int>, "requestId": "<requestId>"}))`.
+        `base64(JSON.stringify({"sliderPosition": "<offset>", "requestId": "<requestId>"}))`. The
+        sign-in form sends the offset as a string of digits, the registration form as a number.
         A wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
         captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
         temporarily locked.
@@ -343,9 +347,13 @@ paths:
       operationId: userLogout
       x-wb-resource: user
       x-wb-name: logout
+      x-wb-session: end
       x-wb-source: bundle
       x-wb-first-seen: '2026-11-07'
       summary: Sign out and revoke the current tokens
+      description: |
+        The client forgets its session (tokens, operation MFA token and the token store) after the
+        call, also when the call fails, as the web app does.
       responses:
         '200': {description: OK}
   /api/v1/user/gender:
@@ -400,7 +408,8 @@ paths:
       x-wb-source: bundle
       x-wb-first-seen: '2026-11-07'
       summary: Confirm the new email address with the emailed code
-      description: The web app signs the user out after a successful change.
+      description: The web app signs the user out after a successful change; sign in again with
+        the new address.
       requestBody:
         required: true
         content:
@@ -442,14 +451,17 @@ paths:
       operationId: userPasswordChange
       x-wb-resource: user.password
       x-wb-name: change
+      x-wb-session: replace
       x-wb-status: experimental
       x-wb-source: bundle
       x-wb-first-seen: '2026-11-07'
       summary: Change the password and get new tokens
       description: |
-        The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS` (wrong
-        old password), `BAD_REQUEST` with `fields[].fieldName = newPassword` and message
-        `INVALID_PASSWORD` (weak new password), `INVALID_CODE` (2FA code missing or wrong).
+        The previous tokens stop working; the client stores the returned pair as its session and
+        uses `newPassword` for later sign-ins. Errors:
+        `BAD_CREDENTIALS` (wrong old password), `BAD_REQUEST` with
+        `fields[].fieldName = newPassword` and message `INVALID_PASSWORD` (weak new password),
+        `INVALID_CODE` (2FA code missing or wrong).
       requestBody:
         required: true
         content:
@@ -561,7 +573,8 @@ paths:
       parameters:
       - name: recaptcha
         in: header
-        description: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`).
+        description: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`, or
+          `SETTINGS_CHANGE_PHONE_MFA` when repeating the call with `mfaSecret`).
         schema: {type: string}
       requestBody:
         required: true
@@ -705,7 +718,7 @@ components:
       type: object
       required: [username]
       properties:
-        username: {type: string, description: Account email.}
+        username: {type: string, description: Account email as the user typed it.}
     AuthMfaStatus:
       type: object
       properties:

@@ -13,12 +13,14 @@ paths:
       operationId: tradingDemoDeposit
       x-wb-resource: trading.demo
       x-wb-name: deposit
+      x-wb-envelope: retcode
       x-wb-status: experimental
       x-wb-source: bundle
       x-wb-first-seen: '2026-11-07'
       summary: Top up the demo account
       description: Credits virtual funds to the trading account. Meant for the demo environment
-        (`trading-demo-service`); a deposit limit applies.
+        (`trading-demo-service`); a deposit limit applies. The answer is a `retCode` envelope like
+        the order management responses; the web app ignores its `result`.
       requestBody:
         required: true
         content:
@@ -27,6 +29,9 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema: {}
 components:
   schemas:
     TradingDemoDepositRequest:

@@ -18,9 +18,8 @@ paths:
       x-wb-source: bundle
       summary: Accept the public offer
       description: >-
-        Sent before verification when the user profile has no `offerAgreement` yet. The web app
-        retries a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the client
-        record is still being created.
+        Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
+        `kyc.submit` answered `firstStageConfirmed: true`, for MSI before `kyc.msi.authenticate`.
       requestBody:
         required: true
         content:
@@ -137,23 +136,32 @@ paths:
       parameters:
       - name: isUl
         in: query
-        description: Legal entity identification; the web app always sends `false`.
+        description: Legal entity identification.
         schema:
           type: boolean
+          default: false
       - name: redirectUrl
         in: query
+        required: true
+        description: Page MSI returns to after a successful identification.
         schema:
           type: string
       - name: duplicateUrl
         in: query
+        required: true
+        description: Page MSI returns to when the person is already identified for another account.
         schema:
           type: string
       - name: failureUrl
         in: query
+        required: true
+        description: Page MSI returns to when the identification failed.
         schema:
           type: string
       - name: docExpiredUrl
         in: query
+        required: true
+        description: Page MSI returns to when the identity document has expired.
         schema:
           type: string
       responses:
@@ -372,6 +380,12 @@ components:
           type: string
           x-wb-inferred: true
         iframeUrl:
+          type: string
+          x-wb-inferred: true
+        accessLink:
+          type: string
+          x-wb-inferred: true
+        sdkLink:
           type: string
           x-wb-inferred: true
         status:

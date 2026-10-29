@@ -99,8 +99,9 @@ Route pushes by `topic` (exact string match with the subscribed topic). Fall bac
 Behaviour of the web app (bundle), which the SDK should mirror:
 
 - Reconnect automatically after any close except code 1008, without attempt limit.
-- Delay `min(2000 ms * 2^attempt, 30 s)` (attempt = 0 for the first retry), reset to 0 after a
-  successful open. The terminal configures 2000 ms as the base delay (the class default is 1000).
+- Delay: the code computes `min(2000 ms * 2^attempt, 30 s)`, but every connection attempt resets
+  the attempt counter, so in practice the terminal retries every 2000 ms (its configured base
+  delay; the class default is 1000 ms). An SDK may keep a real exponential backoff.
 - After reconnecting, resubscribe every active topic in one `subscribe` message. Order book
   topics send a fresh snapshot, so drop local book state on disconnect.
 - Messages sent while disconnected are queued and flushed on open; a queued `subscribe` and
@@ -147,8 +148,8 @@ every 100 ms:
 Applying deltas: for each level, size `"0"` removes the price, any other size replaces it; keep
 bids sorted descending and asks ascending. Deltas may have empty `b` or `a`. Because `u` is not
 contiguous, gaps cannot be detected; the app does not try. Resynchronise by resubscribing (a new
-snapshot follows). `u` uses the same sequence as `id` of the REST snapshot
-`GET /api/v1/market/orderbook`.
+snapshot follows). The REST snapshot `GET /api/v1/market/orderbook` carries an `id` that appears to
+follow the same sequence; the app never loads that snapshot (its unused REST mapper reads `u`).
 
 ### Ticker: `tickers.{symbol}` (bundle)
 
@@ -165,8 +166,8 @@ snapshot follows). `u` uses the same sequence as `id` of the REST snapshot
 | `price24hPcnt` | decimal string | 24 h change as a fraction (`0.0123` = +1.23 %) |
 
 The app parses every value with `parseFloat`, so numbers would work as well. Bybit tickers usually
-push the full object each time; the app merges partial updates field by field, so treat missing
-fields as unchanged.
+push the full object each time. The app drops a push without `lastPrice`; otherwise it merges the
+fields that are present, so treat missing fields as unchanged.
 
 ### Candles: `kline.{interval}.{symbol}` (bundle)
 
@@ -237,12 +238,15 @@ Pushes carry `topic` equal to the topic name and the payload in `data`. All thre
 | `tpOrderType`, `slOrderType` | string | `Limit` / `Market` |
 | `stopOrderType` | string | `TakeProfit` / `StopLoss` for TP/SL legs |
 | `createdTime`, `updatedTime` | string | epoch ms |
-| `translate` | object, optional | ready-made notification: `{"kind": <status>, "en": {"title", "message"}, "ru": {"title", "message"}}` |
+| `translate` | object, optional | ready-made notification: `{"kind": <status>, "en": {"title", "message"}, "ru": {"title", "message"}}`; the app shows it only when `kind` equals the mapped status below (`New`, `Filled`, ...) |
 
-Status mapping used by the app: `CREATED`/`PLACED` -> New, `PROCESSING` -> PartiallyFilled,
-`CLOSED` -> Filled, `CANCELLED`, `REJECTED`, `TRIGGERED`, `UNTRIGGERED`, `UNKNOWN` as is. An
-order leaves the open-orders list when it is cancelled, rejected or filled, or when it is
-`TRIGGERED` with no remaining quantity. Each push contains only the changed orders; merge by `id`.
+Status mapping used by the app (Bybit terms): `CREATED`/`PLACED` -> `New`, `PROCESSING` ->
+`PartiallyFilled`, `CLOSED` -> `Filled`, `CANCELLED` -> `Cancelled`, `REJECTED` -> `Rejected`,
+`TRIGGERED` -> `Triggered`, `UNTRIGGERED` -> `Untriggered`, `UNKNOWN` -> `Unknown`. An order leaves
+the open-orders list when its mapped status is `Filled`, `Cancelled`, `Rejected` or
+`Deactivated`, or when it is `Triggered` and either `leavesQty` is at most 1e-8 or
+`stopOrderType` is `TakeProfit` / `StopLoss`. Each push contains only the changed orders; merge
+by `id`.
 
 ### `execution`
 
@@ -265,9 +269,11 @@ a number). Deduplicate by `id`.
 | `usdRate` | decimal, optional | USD rate, used when `usdValue` is absent |
 
 The app sums entries per asset: available = `USER_BALANCE` amounts, locked =
-`USER_SPOT_RESERVING` amounts, total = available + locked. These are the same account types the
-REST balance call uses (`POST https://api.whitebird.io/api/v2/accounting/client/account/enhanced`
-with `{"type": "USER_BALANCE" | "USER_SPOT_RESERVING", "assets": [...]}`, one request per type).
+`USER_SPOT_RESERVING` amounts, total = available + locked. An entry with any other `type` (or
+none) counts as the whole balance: its `amount` is added to available. These are the same account types the
+REST balance call uses (`POST /api/v2/accounting/client/account/enhanced` on `api.whitebird.io`,
+or `api-demo.whitebird.io` in demo, with `{"type": "USER_BALANCE" | "USER_SPOT_RESERVING",
+"assets": [...]}`, one request per type).
 
 ## Trade socket
 
@@ -298,10 +304,12 @@ Response, matched by `reqId` (bundle):
 {"reqId": "req-1794066456337-1", "op": "order.create", "retCode": 0, "retMsg": "OK", "data": {"orderId": "..."}}
 ```
 
-- Success when `success` is `true`, or `retCode` (alias `code`) is `0` or `200`, or there is no
-  code and no `error`. Otherwise the error is `retCode` + `retMsg` (alias `message`), with the
-  `retCode` values listed in `order-management.yaml` (12 = order not found, 3 = insufficient
-  balance, ...).
+- The request manager accepts a reply when `success` is `true`, or `retCode` (alias `code`) is
+  `0` or `200`, or there is no code and no `error`. Otherwise the error is `retCode` + `retMsg`
+  (alias `message`), with the `retCode` values listed in `order-management.yaml` (12 = order not
+  found, 3 = insufficient balance, ...).
+- The create, amend and cancel actions of the app are stricter: they fail unless `retCode` is
+  exactly `0`, so a reply with `success: true` and no `retCode` counts as a failure there.
 - The order id is read from `result.orderId`, then `data.orderId`; accept both.
 - The app falls back to REST when the trade socket is not connected; the SDK can expose the trade
   socket as an optional low-latency transport for the same three methods.

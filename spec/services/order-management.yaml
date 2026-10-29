@@ -11,10 +11,14 @@ info:
     low, 5 take-profit price too high, 6 stop-loss price too low, 7 take-profit price too low, 8
     stop-loss price too high, 9 order price too high, 10 sell limit price too low, 11 order price
     too low, 12 order not found, 13 too many quantity decimals, 14 too many price decimals, 15
-    order not changed, 16 rate limit exceeded, 17 invalid request, 18 internal error, 20 order
-    modification not supported, 21 TP/SL disabled, 22 take-profit above market, 23 stop-loss below
-    market, 24 take-profit below market, 25 stop-loss above market. Orders can also be placed,
-    amended and cancelled over the `/ws/trade` WebSocket with the same payloads.
+    order not changed, 16 rate limit exceeded, 17 invalid request, 18 internal error, 19 unmapped
+    provider error, 20 order modification not supported, 21 TP/SL disabled, 22 take-profit above
+    market, 23 stop-loss below market, 24 take-profit below market, 25 stop-loss above market, 403
+    trading is forbidden. The web terminal also treats a `retCode` of 400 as 17, 429 as 16 and
+    5xx as 18, and accepts `retCode` 200 as success; when `retCode` / `retMsg` are missing it
+    reads `code` / `message`. Error responses with a non-2xx status may carry the same body.
+    Orders can also be placed, amended and cancelled over the `/ws/trade` WebSocket with the same
+    payloads.
 x-wb-service: order_management
 servers:
 - url: https://order-management-service.whitebird.io
@@ -126,6 +130,9 @@ paths:
       x-wb-source: bundle
       x-wb-first-seen: '2026-11-07'
       summary: List closed orders in a time range
+      description: |
+        The web app only sends `startTime` and `endTime`; the other filters follow the Bybit
+        convention and are not verified. The result is a plain list without a cursor.
       parameters:
       - name: symbol
         in: query
@@ -150,9 +157,6 @@ paths:
       - name: limit
         in: query
         schema: {type: integer}
-      - name: cursor
-        in: query
-        schema: {type: string}
       responses:
         '200':
           description: OK
@@ -190,11 +194,13 @@ paths:
         schema: {type: integer, default: 30}
       - name: sortBy
         in: query
-        description: Sort field; the web terminal uses `exchangeTime`.
-        schema: {type: string}
+        description: Sort field, e.g. `exchangeTime` (creation time).
+        schema: {type: string, default: exchangeTime}
       - name: sortDir
         in: query
-        schema: {$ref: '#/components/schemas/TradingSortDirection'}
+        schema:
+          $ref: '#/components/schemas/TradingSortDirection'
+          default: DESC
       responses:
         '200':
           description: OK
@@ -225,8 +231,8 @@ paths:
         schema: {type: integer, format: int64}
       - name: limit
         in: query
-        description: The web app asks for 1000.
-        schema: {type: integer}
+        description: Maximum number of executions.
+        schema: {type: integer, default: 1000}
       responses:
         '200':
           description: OK
@@ -345,7 +351,9 @@ components:
         price: {type: string, description: Limit price; leave out for market orders.}
         timeInForce:
           $ref: '#/components/schemas/TradingTimeInForce'
-          description: The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders.
+          default: GTC
+          description: '`PostOnly` for maker-only limit orders. The web terminal sends `GTC` also
+            for market orders.'
         orderLinkId: {type: string, description: Client order id.}
         takeProfit: {type: string, description: Take-profit trigger price.}
         stopLoss: {type: string, description: Stop-loss trigger price.}
@@ -450,7 +458,8 @@ components:
       type: object
       description: Fill of an order; also pushed on the `execution` WebSocket topic.
       properties:
-        id: {type: string, x-wb-inferred: true, description: Execution id.}
+        id: {type: string, x-wb-inferred: true, description: Execution id; the main web app treats
+            it as the id of the order.}
         orderId: {type: string, x-wb-inferred: true}
         symbol: {type: string, x-wb-inferred: true}
         category: {type: string, x-wb-inferred: true}

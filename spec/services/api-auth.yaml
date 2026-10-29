@@ -39,7 +39,10 @@ paths:
               schema: {type: string}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/AuthMfaToken'}
+              schema:
+                oneOf:
+                - type: string
+                - {$ref: '#/components/schemas/AuthMfaToken'}
 components:
   schemas:
     AuthMfaOperation:

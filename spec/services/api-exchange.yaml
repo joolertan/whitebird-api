@@ -28,7 +28,8 @@ paths:
         electronic wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER`
         (bank card / bank account of a payment provider). Set the amount on exactly one leg; the
         other one is computed. The quote `id` is then passed to `exchange.orders.create`.
-        The web app re-requests the quote every 15 s while the form is open.
+        The quote is valid until `expirationDate`; the web app requests a new one 2 s before that
+        (`expirationDate` - `creationDate` - 2 s), or every 15 s when the dates are missing.
 
         Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
         `AMOUNT_TOO_SMALL`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.
@@ -95,6 +96,10 @@ paths:
         `OP_MAX_VOLUME_FOR_PERIOD_REACHED`, `OP_MAX_NUM_FOR_PERIOD_REACHED`,
         `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON` (anti-fraud),
         `EXCHANGE_UNAVAILABLE`.
+
+        Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`
+        (see `user.antifraud` and `kyc.liveness`); after the check, send the same request again. If
+        the quote expired meanwhile it fails with `QUOTE_NOT_FOUND`: request a new quote.
       requestBody:
         required: true
         content:
@@ -169,6 +174,7 @@ paths:
         in: query
         schema:
           $ref: '#/components/schemas/ExchangeDestination'
+          default: EXCHANGE
       responses:
         '200':
           description: OK
@@ -227,8 +233,9 @@ paths:
       x-wb-source: bundle
       summary: List assets available for a destination
       description: |
-        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app falls
-        back to `11111111-1111-1111-1111-111111111111` when embedded without one.
+        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app always
+        sends one, `11111111-1111-1111-1111-111111111111` (Whitebird itself) unless embedded in a
+        merchant's widget.
       parameters:
       - name: destination
         in: query
@@ -238,6 +245,7 @@ paths:
         in: query
         schema:
           type: string
+          default: 11111111-1111-1111-1111-111111111111
       responses:
         '200':
           description: OK
@@ -272,7 +280,8 @@ paths:
       description: |
         Returns the Whitebird address to send the crypto to (`depositCryptoAddress`). Errors:
         `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already uses
-        the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+        the network), `INVALID_CRYPTO_ADDRESS`, `INVALID_MFA_STATUS` (two-factor authentication must
+        be enabled), `EXCHANGE_UNAVAILABLE`.
       requestBody:
         required: true
         content:
@@ -300,7 +309,8 @@ paths:
         `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice
         (see `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
         `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
-        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `INVALID_MFA_STATUS` (two-factor authentication
+        must be enabled), `EXCHANGE_UNAVAILABLE`.
       requestBody:
         required: true
         content:
@@ -369,7 +379,10 @@ paths:
       description: |
         Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount
         and network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without it
-        the service answers "Operation denied, requires mfa checking". Errors:
+        the service answers "Operation denied, requires mfa checking" in `message` or in `status`.
+        Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`;
+        after the check, send the same request again (calculate again on `INVALID_CALCULATION`).
+        Errors:
         `INVALID_CALCULATION` (calculation expired, calculate again),
         `ACTIVE_WITHDRAWAL_REQUEST_FOUND`, `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`,
         `DESTINATION_ADDRESS_IS_INTERNAL`, `INVALID_AMOUNT` (commission exceeds the amount),
@@ -400,8 +413,8 @@ paths:
       description: |
         Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card /
         payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
-        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the
-        crypto withdrawal.
+        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors, MFA refusal
+        and anti-fraud checks as the crypto withdrawal.
       requestBody:
         required: true
         content:
@@ -470,7 +483,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BalanceRejectRequest'
+              $ref: '#/components/schemas/BalanceRejectCryptoRequest'
       responses:
         '200':
           description: OK
@@ -490,7 +503,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BalanceRejectRequest'
+              $ref: '#/components/schemas/BalanceRejectFiatRequest'
       responses:
         '200':
           description: OK
@@ -563,6 +576,35 @@ paths:
               schema:
                 type: string
                 format: binary
+  /api/v3/exchange/merchant-admin/order/history:
+    post:
+      operationId: merchantOrdersHistory
+      x-wb-resource: merchant.orders
+      x-wb-name: history
+      x-wb-status: experimental
+      x-wb-source: bundle
+      summary: List orders made through the merchant's widget
+      description: |
+        For accounts with the `MERCHANT` role: orders of the merchant's clients, newest first. The
+        web app filters by creation date, statuses, assets and client id, the same filter as
+        `merchant.download_report`.
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Size'
+      - $ref: '#/components/parameters/Sort'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantOrderFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantOrderPage'
   /api/v2/exchange/client/payment/method:
     post:
       operationId: paymentsMethodsList
@@ -654,11 +696,10 @@ components:
     Sort:
       name: sort
       in: query
-      description: Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
+      description: Sort criteria in the format `property,(asc|desc)`.
       schema:
-        type: array
-        items:
-          type: string
+        type: string
+        default: creationDate,desc
   schemas:
     ExchangeDestination:
       type: string
@@ -1051,6 +1092,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExchangeOrderStatus'
+        assets:
+          type: array
+          description: Orders with one of these assets on either leg.
+          items:
+            type: string
+        operationTypes:
+          type: array
+          description: Orders with one of these leg types on either leg.
+          items:
+            $ref: '#/components/schemas/ExchangeLegType'
         creationDateFrame:
           $ref: '#/components/schemas/ExchangeDateFrame'
     ExchangeOrderPage:
@@ -1079,7 +1130,7 @@ components:
           type: boolean
     ExchangeAssetCategory:
       type: string
-      enum: [CRYPTO, STABLECOIN, STOCK, FIAT]
+      enum: [CRYPTO, STABLECOIN, GOLD, ETF, STOCK, EARN, FIAT]
     ExchangeCryptoAsset:
       type: object
       properties:
@@ -1271,6 +1322,15 @@ components:
           type: number
           format: decimal
           x-wb-inferred: true
+        grossAmount:
+          type: number
+          format: decimal
+          description: Amount debited; the web app shows it as the withdrawal amount.
+          x-wb-inferred: true
+        creationDate:
+          type: string
+          format: date-time
+          x-wb-inferred: true
         expirationDate:
           type: string
           format: date-time
@@ -1302,16 +1362,29 @@ components:
           $ref: '#/components/schemas/BalanceCommissionType'
         bankIdentifier:
           type: string
-    BalanceRejectRequest:
+    BalanceRejectOperationType:
+      type: string
+      enum: [crypto, fiat]
+    BalanceRejectCryptoRequest:
       type: object
       required: [transactionId]
       properties:
         transactionId:
           type: string
         operationType:
+          $ref: '#/components/schemas/BalanceRejectOperationType'
+          default: crypto
+          description: Same as the path segment.
+    BalanceRejectFiatRequest:
+      type: object
+      required: [transactionId]
+      properties:
+        transactionId:
           type: string
-          description: Same as the path segment (`crypto` or `fiat`).
-          enum: [crypto, fiat]
+        operationType:
+          $ref: '#/components/schemas/BalanceRejectOperationType'
+          default: fiat
+          description: Same as the path segment.
     BalanceCurrentOperation:
       type: object
       properties:
@@ -1389,12 +1462,14 @@ components:
           x-wb-inferred: true
     BalanceOperationFilter:
       type: object
+      required: [transactionTypes]
       properties:
         limit:
           type: integer
           default: 20
         transactionTypes:
           type: array
+          description: Operation types to list; pass all three for no filter.
           items:
             $ref: '#/components/schemas/BalanceOperationType'
         statuses:
@@ -1516,6 +1591,57 @@ components:
             type: string
         clientId:
           type: [string, 'null']
+    MerchantOrderFilter:
+      type: object
+      properties:
+        limit:
+          type: integer
+          default: 20
+        creationDateFrame:
+          $ref: '#/components/schemas/ExchangeDateFrame'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeOrderStatus'
+        assets:
+          type: array
+          items:
+            type: string
+        clientId:
+          type: [string, 'null']
+          description: Only the orders of this client.
+    MerchantOrder:
+      description: Exchange order of a merchant's client.
+      allOf:
+      - $ref: '#/components/schemas/ExchangeOrder'
+      - type: object
+        properties:
+          clientId:
+            type: string
+            description: The client who placed the order.
+            x-wb-inferred: true
+    MerchantOrderPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantOrder'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+        size:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
     PaymentOrderType:
       type: string
       enum: [BUY, SELL]

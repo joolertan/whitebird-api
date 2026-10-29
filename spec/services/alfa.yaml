@@ -146,8 +146,9 @@ paths:
       description: |
         Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set,
         the user identifies through MSI (the Belarusian interbank identification system) by
-        opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check in
-        its own UI and then calls `client_info` to get the bank's application page.
+        opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub liveness check
+        (WebSDK with a token from `kyc.sumsub.token` with `levelType=LIVENESS`) and then calls
+        `client_info` to get the bank's application page.
       responses:
         '200':
           description: OK
