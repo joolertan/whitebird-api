@@ -22,7 +22,7 @@ from whitebird._generated.models import (
     BalanceOperation,
     BalanceOperationStatus,
     BalanceOperationType,
-    BalanceRejectRequestOperationType,
+    BalanceRejectOperationType,
     PaymentProviderType,
 )
 from whitebird._resource import AsyncResource, SyncResource
@@ -90,7 +90,8 @@ class BalanceDepositsResource(SyncResource):
 
         Returns the Whitebird address to send the crypto to (`depositCryptoAddress`). Errors:
         `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already uses
-        the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+        the network), `INVALID_CRYPTO_ADDRESS`, `INVALID_MFA_STATUS` (two-factor authentication must
+        be enabled), `EXCHANGE_UNAVAILABLE`.
 
         Args:
             account_type: `accountType` body field.
@@ -138,7 +139,8 @@ class BalanceDepositsResource(SyncResource):
         `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice (see
         `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
         `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
-        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `INVALID_MFA_STATUS` (two-factor authentication
+        must be enabled), `EXCHANGE_UNAVAILABLE`.
 
         Args:
             account_type: `accountType` body field.
@@ -254,14 +256,14 @@ class BalanceOperationsResource(SyncResource):
         self,
         *,
         transaction_id: str,
-        operation_type: BalanceRejectRequestOperationType | str | None = None,
+        operation_type: BalanceRejectOperationType | str = BalanceRejectOperationType.CRYPTO,
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Cancel an active crypto deposit.
 
         Args:
             transaction_id: `transactionId` body field.
-            operation_type: Same as the path segment (`crypto` or `fiat`).
+            operation_type: Same as the path segment.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -283,14 +285,14 @@ class BalanceOperationsResource(SyncResource):
         self,
         *,
         transaction_id: str,
-        operation_type: BalanceRejectRequestOperationType | str | None = None,
+        operation_type: BalanceRejectOperationType | str = BalanceRejectOperationType.FIAT,
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Cancel an active fiat deposit.
 
         Args:
             transaction_id: `transactionId` body field.
-            operation_type: Same as the path segment (`crypto` or `fiat`).
+            operation_type: Same as the path segment.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -311,11 +313,11 @@ class BalanceOperationsResource(SyncResource):
     def list(
         self,
         *,
+        transaction_types: Sequence[BalanceOperationType | str],
         page: int = 0,
         size: int = 20,
-        sort: Sequence[str] | None = None,
+        sort: str = "creationDate,desc",
         limit: int = 20,
-        transaction_types: Sequence[BalanceOperationType | str] | None = None,
         statuses: Sequence[BalanceOperationStatus | str] | None = None,
         currencies: Sequence[str] | None = None,
         from_: date | None = None,
@@ -326,12 +328,11 @@ class BalanceOperationsResource(SyncResource):
         """List deposits, withdrawals and referral rewards.
 
         Args:
+            transaction_types: Operation types to list; pass all three for no filter.
             page: Zero-based page index.
             size: Page size.
-            sort: Sort criteria in the format `property,(asc|desc)`; the web app uses
-                `creationDate,desc`.
+            sort: Sort criteria in the format `property,(asc|desc)`.
             limit: `limit` body field.
-            transaction_types: `transactionTypes` body field.
             statuses: `statuses` body field.
             currencies: `currencies` body field.
             from_: `from` body field.
@@ -380,12 +381,14 @@ class BalanceWithdrawalsResource(SyncResource):
 
         Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount and
         network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without it the
-        service answers "Operation denied, requires mfa checking". Errors: `INVALID_CALCULATION`
-        (calculation expired, calculate again), `ACTIVE_WITHDRAWAL_REQUEST_FOUND`,
-        `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`,
-        `INVALID_AMOUNT` (commission exceeds the amount), `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
-        `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`, `AML_FRAUD_VALIDATION_ERROR`,
-        `BALANCE_OPERATION_PROCESSING_ERROR`.
+        service answers "Operation denied, requires mfa checking" in `message` or in `status`.
+        Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`;
+        after the check, send the same request again (calculate again on `INVALID_CALCULATION`).
+        Errors: `INVALID_CALCULATION` (calculation expired, calculate again),
+        `ACTIVE_WITHDRAWAL_REQUEST_FOUND`, `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`,
+        `DESTINATION_ADDRESS_IS_INTERNAL`, `INVALID_AMOUNT` (commission exceeds the amount),
+        `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`, `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`,
+        `AML_FRAUD_VALIDATION_ERROR`, `BALANCE_OPERATION_PROCESSING_ERROR`.
 
         Args:
             account_type: `accountType` body field.
@@ -430,8 +433,8 @@ class BalanceWithdrawalsResource(SyncResource):
 
         Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card /
         payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
-        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the
-        crypto withdrawal.
+        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors, MFA
+        refusal and anti-fraud checks as the crypto withdrawal.
 
         Args:
             account_type: `accountType` body field.
@@ -606,7 +609,8 @@ class AsyncBalanceDepositsResource(AsyncResource):
 
         Returns the Whitebird address to send the crypto to (`depositCryptoAddress`). Errors:
         `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already uses
-        the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+        the network), `INVALID_CRYPTO_ADDRESS`, `INVALID_MFA_STATUS` (two-factor authentication must
+        be enabled), `EXCHANGE_UNAVAILABLE`.
 
         Args:
             account_type: `accountType` body field.
@@ -654,7 +658,8 @@ class AsyncBalanceDepositsResource(AsyncResource):
         `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice (see
         `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
         `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
-        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+        `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `INVALID_MFA_STATUS` (two-factor authentication
+        must be enabled), `EXCHANGE_UNAVAILABLE`.
 
         Args:
             account_type: `accountType` body field.
@@ -770,14 +775,14 @@ class AsyncBalanceOperationsResource(AsyncResource):
         self,
         *,
         transaction_id: str,
-        operation_type: BalanceRejectRequestOperationType | str | None = None,
+        operation_type: BalanceRejectOperationType | str = BalanceRejectOperationType.CRYPTO,
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Cancel an active crypto deposit.
 
         Args:
             transaction_id: `transactionId` body field.
-            operation_type: Same as the path segment (`crypto` or `fiat`).
+            operation_type: Same as the path segment.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -799,14 +804,14 @@ class AsyncBalanceOperationsResource(AsyncResource):
         self,
         *,
         transaction_id: str,
-        operation_type: BalanceRejectRequestOperationType | str | None = None,
+        operation_type: BalanceRejectOperationType | str = BalanceRejectOperationType.FIAT,
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Cancel an active fiat deposit.
 
         Args:
             transaction_id: `transactionId` body field.
-            operation_type: Same as the path segment (`crypto` or `fiat`).
+            operation_type: Same as the path segment.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -827,11 +832,11 @@ class AsyncBalanceOperationsResource(AsyncResource):
     def list(
         self,
         *,
+        transaction_types: Sequence[BalanceOperationType | str],
         page: int = 0,
         size: int = 20,
-        sort: Sequence[str] | None = None,
+        sort: str = "creationDate,desc",
         limit: int = 20,
-        transaction_types: Sequence[BalanceOperationType | str] | None = None,
         statuses: Sequence[BalanceOperationStatus | str] | None = None,
         currencies: Sequence[str] | None = None,
         from_: date | None = None,
@@ -842,12 +847,11 @@ class AsyncBalanceOperationsResource(AsyncResource):
         """List deposits, withdrawals and referral rewards.
 
         Args:
+            transaction_types: Operation types to list; pass all three for no filter.
             page: Zero-based page index.
             size: Page size.
-            sort: Sort criteria in the format `property,(asc|desc)`; the web app uses
-                `creationDate,desc`.
+            sort: Sort criteria in the format `property,(asc|desc)`.
             limit: `limit` body field.
-            transaction_types: `transactionTypes` body field.
             statuses: `statuses` body field.
             currencies: `currencies` body field.
             from_: `from` body field.
@@ -896,12 +900,14 @@ class AsyncBalanceWithdrawalsResource(AsyncResource):
 
         Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount and
         network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without it the
-        service answers "Operation denied, requires mfa checking". Errors: `INVALID_CALCULATION`
-        (calculation expired, calculate again), `ACTIVE_WITHDRAWAL_REQUEST_FOUND`,
-        `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`,
-        `INVALID_AMOUNT` (commission exceeds the amount), `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
-        `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`, `AML_FRAUD_VALIDATION_ERROR`,
-        `BALANCE_OPERATION_PROCESSING_ERROR`.
+        service answers "Operation denied, requires mfa checking" in `message` or in `status`.
+        Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`;
+        after the check, send the same request again (calculate again on `INVALID_CALCULATION`).
+        Errors: `INVALID_CALCULATION` (calculation expired, calculate again),
+        `ACTIVE_WITHDRAWAL_REQUEST_FOUND`, `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`,
+        `DESTINATION_ADDRESS_IS_INTERNAL`, `INVALID_AMOUNT` (commission exceeds the amount),
+        `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`, `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`,
+        `AML_FRAUD_VALIDATION_ERROR`, `BALANCE_OPERATION_PROCESSING_ERROR`.
 
         Args:
             account_type: `accountType` body field.
@@ -946,8 +952,8 @@ class AsyncBalanceWithdrawalsResource(AsyncResource):
 
         Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card /
         payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
-        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the
-        crypto withdrawal.
+        `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors, MFA
+        refusal and anti-fraud checks as the crypto withdrawal.
 
         Args:
             account_type: `accountType` body field.

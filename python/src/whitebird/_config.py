@@ -22,6 +22,7 @@ class Config:
     base_urls: Mapping[str, str]
     timeout: float | httpx.Timeout | None
     max_retries: int
+    language: str | None = None
 
     @classmethod
     def create(
@@ -30,6 +31,7 @@ class Config:
         overrides: Mapping[str, str] | None,
         timeout: float | httpx.Timeout | None,
         max_retries: int,
+        language: str | None = None,
     ) -> Config:
         """Resolves the base URL of every service for `environment`, applying `overrides`."""
         if environment not in get_args(Environment):
@@ -44,7 +46,15 @@ class Config:
             base_urls={service: url.rstrip("/") for service, url in urls.items()},
             timeout=timeout,
             max_retries=max_retries,
+            language=language,
         )
+
+    def headers(self) -> dict[str, str]:
+        """Returns the headers sent with every request: `User-Agent` and `Accept-Language`."""
+        headers = {"User-Agent": USER_AGENT}
+        if self.language:
+            headers["Accept-Language"] = self.language
+        return headers
 
     def url(self, service: str, path: str) -> str:
         """Returns the absolute URL of `path` on `service`."""

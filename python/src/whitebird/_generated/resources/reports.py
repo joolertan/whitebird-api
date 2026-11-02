@@ -19,11 +19,10 @@ class ReportsResource(SyncResource):
     def download_balance(
         self,
         *,
+        transaction_types: Sequence[ReportOperationType | str],
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
-        transaction_types: Sequence[ReportOperationType | str] | None = None,
         statuses: Sequence[str] | None = None,
         currencies: Sequence[str] | None = None,
         from_: date | None = None,
@@ -35,11 +34,10 @@ class ReportsResource(SyncResource):
         PDF statement of wallet deposits, withdrawals and referral rewards matching the filter.
 
         Args:
+            transaction_types: Operation types to include; pass all three for no filter.
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
-            transaction_types: `transactionTypes` body field.
+            type: Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
             statuses: `statuses` body field.
             currencies: `currencies` body field.
             from_: `from` body field.
@@ -60,9 +58,8 @@ class ReportsResource(SyncResource):
             json={
                 "limit": limit,
                 "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
                 "transactionTypes": transaction_types,
+                "type": type,
                 "statuses": statuses,
                 "currencies": currencies,
                 "from": from_,
@@ -75,11 +72,10 @@ class ReportsResource(SyncResource):
     def email_balance(
         self,
         *,
+        transaction_types: Sequence[ReportOperationType | str],
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
-        transaction_types: Sequence[ReportOperationType | str] | None = None,
         statuses: Sequence[str] | None = None,
         currencies: Sequence[str] | None = None,
         from_: date | None = None,
@@ -92,11 +88,10 @@ class ReportsResource(SyncResource):
         e-mail.
 
         Args:
+            transaction_types: Operation types to include; pass all three for no filter.
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
-            transaction_types: `transactionTypes` body field.
+            type: Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
             statuses: `statuses` body field.
             currencies: `currencies` body field.
             from_: `from` body field.
@@ -114,9 +109,8 @@ class ReportsResource(SyncResource):
             json={
                 "limit": limit,
                 "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
                 "transactionTypes": transaction_types,
+                "type": type,
                 "statuses": statuses,
                 "currencies": currencies,
                 "from": from_,
@@ -130,8 +124,6 @@ class ReportsResource(SyncResource):
         *,
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
-        type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> bytes:
         """Download the exchange operations statement.
@@ -142,8 +134,6 @@ class ReportsResource(SyncResource):
         Args:
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -157,12 +147,7 @@ class ReportsResource(SyncResource):
             "exchange",
             "POST",
             "/api/v1/client/exchange/report",
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"limit": limit, "completionDateFrame": completion_date_frame},
             cast_to=bytes,
             options=options,
         )
@@ -172,8 +157,6 @@ class ReportsResource(SyncResource):
         *,
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
-        type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> None:
         """Email the exchange operations statement.
@@ -181,8 +164,6 @@ class ReportsResource(SyncResource):
         Args:
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -193,12 +174,7 @@ class ReportsResource(SyncResource):
             "exchange",
             "POST",
             "/api/v1/client/exchange/email/report",
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"limit": limit, "completionDateFrame": completion_date_frame},
             options=options,
         )
 
@@ -255,11 +231,10 @@ class AsyncReportsResource(AsyncResource):
     async def download_balance(
         self,
         *,
+        transaction_types: Sequence[ReportOperationType | str],
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
-        transaction_types: Sequence[ReportOperationType | str] | None = None,
         statuses: Sequence[str] | None = None,
         currencies: Sequence[str] | None = None,
         from_: date | None = None,
@@ -271,11 +246,10 @@ class AsyncReportsResource(AsyncResource):
         PDF statement of wallet deposits, withdrawals and referral rewards matching the filter.
 
         Args:
+            transaction_types: Operation types to include; pass all three for no filter.
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
-            transaction_types: `transactionTypes` body field.
+            type: Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
             statuses: `statuses` body field.
             currencies: `currencies` body field.
             from_: `from` body field.
@@ -296,9 +270,8 @@ class AsyncReportsResource(AsyncResource):
             json={
                 "limit": limit,
                 "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
                 "transactionTypes": transaction_types,
+                "type": type,
                 "statuses": statuses,
                 "currencies": currencies,
                 "from": from_,
@@ -311,11 +284,10 @@ class AsyncReportsResource(AsyncResource):
     async def email_balance(
         self,
         *,
+        transaction_types: Sequence[ReportOperationType | str],
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
-        transaction_types: Sequence[ReportOperationType | str] | None = None,
         statuses: Sequence[str] | None = None,
         currencies: Sequence[str] | None = None,
         from_: date | None = None,
@@ -328,11 +300,10 @@ class AsyncReportsResource(AsyncResource):
         e-mail.
 
         Args:
+            transaction_types: Operation types to include; pass all three for no filter.
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
-            transaction_types: `transactionTypes` body field.
+            type: Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
             statuses: `statuses` body field.
             currencies: `currencies` body field.
             from_: `from` body field.
@@ -350,9 +321,8 @@ class AsyncReportsResource(AsyncResource):
             json={
                 "limit": limit,
                 "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
                 "transactionTypes": transaction_types,
+                "type": type,
                 "statuses": statuses,
                 "currencies": currencies,
                 "from": from_,
@@ -366,8 +336,6 @@ class AsyncReportsResource(AsyncResource):
         *,
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
-        type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> bytes:
         """Download the exchange operations statement.
@@ -378,8 +346,6 @@ class AsyncReportsResource(AsyncResource):
         Args:
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -393,12 +359,7 @@ class AsyncReportsResource(AsyncResource):
             "exchange",
             "POST",
             "/api/v1/client/exchange/report",
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"limit": limit, "completionDateFrame": completion_date_frame},
             cast_to=bytes,
             options=options,
         )
@@ -408,8 +369,6 @@ class AsyncReportsResource(AsyncResource):
         *,
         limit: int = 20,
         completion_date_frame: ReportDateFrame | None = None,
-        type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> None:
         """Email the exchange operations statement.
@@ -417,8 +376,6 @@ class AsyncReportsResource(AsyncResource):
         Args:
             limit: `limit` body field.
             completion_date_frame: `completionDateFrame` body field.
-            type: Document type (`PDF`, `XLSX`).
-            format: Document format (`PDF`).
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -429,12 +386,7 @@ class AsyncReportsResource(AsyncResource):
             "exchange",
             "POST",
             "/api/v1/client/exchange/email/report",
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"limit": limit, "completionDateFrame": completion_date_frame},
             options=options,
         )
 

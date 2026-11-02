@@ -1,4 +1,7 @@
+import asyncio
 import json
+import threading
+import time
 from typing import Any
 
 import httpx
@@ -70,18 +73,74 @@ def test_confirm_operation_without_token(client: Whitebird, respx_mock: respx.Mo
     assert client.mfa_token is None
 
 
-def test_token_is_obtained_before_the_operation(
+def test_operation_is_confirmed_when_refused(
     make_client: ClientFactory, respx_mock: respx.MockRouter
 ) -> None:
-    confirm = respx_mock.post(CONFIRM_URL).respond(json={"mfaToken": "mfa-1"})
-    route = respx_mock.post(WITHDRAW).respond(json={"id": 1})
-    client = with_otp(make_client)
+    confirm = respx_mock.post(CONFIRM_URL).respond(json={"mfaToken": " mfa-1\n"})
+    route = respx_mock.post(WITHDRAW).mock(
+        side_effect=[REFUSED, httpx.Response(200, json={"id": 1}), httpx.Response(204)]
+    )
+    client = make_client(token_store=MemoryTokenStore(session()), otp=" 123456 ")
 
     assert withdraw(client) == {"id": 1}
     withdraw(client)
 
     assert confirm.call_count == 1
-    assert [call.request.headers["x-mfa-token"] for call in route.calls] == ["mfa-1", "mfa-1"]
+    assert json.loads(confirm.calls.last.request.content)["mfaCode"] == "123456"
+    assert [call.request.headers.get("x-mfa-token") for call in route.calls] == [
+        None,
+        "mfa-1",
+        "mfa-1",
+    ]
+
+
+def test_refusal_in_status_is_recognised(
+    make_client: ClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    respx_mock.post(CONFIRM_URL).respond(json={"mfaToken": "mfa-1"})
+    refused = httpx.Response(403, json={"status": "Operation denied, requires mfa checking"})
+    route = respx_mock.post(WITHDRAW).mock(side_effect=[refused, httpx.Response(204)])
+
+    withdraw(with_otp(make_client))
+
+    assert route.calls.last.request.headers["x-mfa-token"] == "mfa-1"
+
+
+def test_concurrent_refusals_share_one_confirmation(
+    make_client: ClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    calls = 4
+    refused_together = threading.Barrier(calls, timeout=5)
+
+    def confirm_slowly(request: httpx.Request) -> httpx.Response:
+        time.sleep(0.05)
+        return httpx.Response(200, json={"mfaToken": "mfa-1"})
+
+    def operation(request: httpx.Request) -> httpx.Response:
+        if "x-mfa-token" not in request.headers:
+            refused_together.wait()
+            return REFUSED
+        return httpx.Response(204)
+
+    confirm = respx_mock.post(CONFIRM_URL).mock(side_effect=confirm_slowly)
+    respx_mock.post(WITHDRAW).mock(side_effect=operation)
+    client = with_otp(make_client)
+    errors: list[Exception] = []
+
+    def call() -> None:
+        try:
+            withdraw(client)
+        except Exception as error:
+            errors.append(error)
+
+    threads = [threading.Thread(target=call) for _ in range(calls)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors
+    assert confirm.call_count == 1
 
 
 def test_refused_operation_is_confirmed_and_retried_once(
@@ -125,9 +184,35 @@ async def test_async_operation_mfa(
 
     await client.request("api", "POST", "/withdraw", json={}, mfa_operation="WITHDRAWAL")
 
-    assert [call.request.headers["x-mfa-token"] for call in route.calls] == ["mfa-1", "mfa-2"]
-    assert await client.confirm_operation("WITHDRAWAL", code="111111") == "mfa-3"
+    assert [call.request.headers.get("x-mfa-token") for call in route.calls] == [None, "mfa-1"]
+    assert await client.confirm_operation("WITHDRAWAL", code="111111") == "mfa-2"
     assert json.loads(confirm.calls.last.request.content)["mfaCode"] == "111111"
+
+
+async def test_async_concurrent_refusals_share_one_confirmation(
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
+) -> None:
+    async def confirm_slowly(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(0.02)
+        return httpx.Response(200, json={"mfaToken": "mfa-1"})
+
+    def operation(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(204) if "x-mfa-token" in request.headers else REFUSED
+
+    confirm = respx_mock.post(CONFIRM_URL).mock(side_effect=confirm_slowly)
+    respx_mock.post(WITHDRAW).mock(side_effect=operation)
+    client: AsyncWhitebird = make_async_client(
+        token_store=MemoryTokenStore(session()), otp="123456"
+    )
+
+    await asyncio.gather(
+        *(
+            client.request("api", "POST", "/withdraw", json={}, mfa_operation="WITHDRAWAL")
+            for _ in range(4)
+        )
+    )
+
+    assert confirm.call_count == 1
 
 
 async def test_async_confirm_operation_awaits_the_code_provider(

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+import threading
 import time
 from collections.abc import Mapping
 from typing import Any, Literal, TypeVar, overload
@@ -12,7 +13,7 @@ from typing import Any, Literal, TypeVar, overload
 import httpx
 
 from . import _http
-from ._auth import AsyncAuthenticator, Credentials, SyncAuthenticator
+from ._auth import AsyncAuthenticator, Credentials, SyncAuthenticator, clean_code
 from ._config import Config
 from ._exceptions import MFARequiredError, TransportError, error_from_response
 from ._generated.services import OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH
@@ -27,13 +28,32 @@ logger = logging.getLogger("whitebird")
 _STREAM_HEADERS = {"Accept": "text/event-stream", "Cache-Control": "no-cache"}
 
 
+SessionEffect = Literal["replace", "end"]
+"""What a call does to the session: `replace` stores the token pair it answers with (a password
+change), `end` forgets the session once it is done, whatever its outcome (a logout)."""
+
+
 class _Engine:
     """State and request preparation shared by the sync and async engines."""
 
-    def __init__(self, config: Config, credentials: Credentials) -> None:
+    _auth: SyncAuthenticator | AsyncAuthenticator
+
+    def __init__(self, config: Config) -> None:
         self.config = config
-        self.mfa_token: str | None = None
-        self._credentials = credentials
+
+    @property
+    def _credentials(self) -> Credentials:
+        # Read through the authenticator: a password change replaces its credentials.
+        return self._auth.credentials
+
+    @property
+    def mfa_token(self) -> str | None:
+        """Operation MFA token sent as `x-mfa-token`; kept with the session."""
+        return self._auth.mfa_token
+
+    @mfa_token.setter
+    def mfa_token(self, token: str | None) -> None:
+        self._auth.mfa_token = token
 
     def _prepare(
         self,
@@ -67,6 +87,7 @@ class _Engine:
         )
 
     def _confirmation(self, operation: str, code: str | None) -> dict[str, Any]:
+        code = clean_code(code)
         if code is None:
             raise MFARequiredError(
                 f"Confirming the {operation} operation needs a one-time code: pass code= or "
@@ -80,10 +101,25 @@ class _Engine:
             options={},
         )
 
-    def _retries(self, method: str, options: RequestOptions) -> int:
-        if not _http.is_retryable(method, options):
-            return 0
-        return options.get("max_retries", self.config.max_retries)
+    def _retries(self, options: RequestOptions) -> int:
+        return max(options.get("max_retries", self.config.max_retries), 0)
+
+    def _session_end(self, session: SessionEffect | None) -> None:
+        if session == "end":
+            self._auth.end_session()
+
+    def _session_replace(
+        self,
+        session: SessionEffect | None,
+        response: httpx.Response,
+        json: object,
+        generation: int,
+    ) -> None:
+        if session == "replace":
+            new_password = json.get("newPassword") if isinstance(json, Mapping) else None
+            self._auth.replace_session(
+                response, generation, new_password if isinstance(new_password, str) else None
+            )
 
     def _stream_options(self, options: RequestOptions | None) -> RequestOptions:
         timeout = self.config.timeout
@@ -123,10 +159,13 @@ def _transport_error(error: httpx.TransportError) -> TransportError:
 class SyncEngine(_Engine):
     """Performs API calls for `Whitebird`."""
 
+    _auth: SyncAuthenticator
+
     def __init__(self, http: httpx.Client, config: Config, auth: SyncAuthenticator) -> None:
-        super().__init__(config, auth.credentials)
+        super().__init__(config)
         self._http = http
         self._auth = auth
+        self._confirming = threading.Lock()
 
     @overload
     def request(
@@ -145,6 +184,7 @@ class SyncEngine(_Engine):
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
         mfa_operation: str | None = ...,
+        session: SessionEffect | None = ...,
         cast_to: type[T],
         options: RequestOptions | None = ...,
     ) -> T: ...
@@ -166,6 +206,7 @@ class SyncEngine(_Engine):
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
         mfa_operation: str | None = ...,
+        session: SessionEffect | None = ...,
         cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> Any: ...
@@ -186,13 +227,15 @@ class SyncEngine(_Engine):
         authenticated: bool = True,
         envelope: _http.Envelope | None = None,
         mfa_operation: str | None = None,
+        session: SessionEffect | None = None,
         cast_to: Any = None,
         options: RequestOptions | None = None,
     ) -> Any:
         """Sends a call and decodes its response (see `_http.prepare` and `_http.decode`).
 
-        A call with an `mfa_operation` sends the operation MFA token, obtaining one first when
-        none is set and again when the call is refused for MFA, if `otp` is configured.
+        A call with an `mfa_operation` that Whitebird refuses for MFA is confirmed (see
+        `confirm_operation`) and sent once more, if `otp` is configured. `session` applies the
+        effect of the call on the session.
         """
         options = options or {}
         request = self._http.build_request(
@@ -210,10 +253,15 @@ class SyncEngine(_Engine):
                 options=options,
             )
         )
-        if mfa_operation is None:
-            response = self.send(request, authenticated=authenticated, options=options)
-        else:
-            response = self._send_confirmed(request, mfa_operation, options)
+        generation = self._auth.generation
+        try:
+            if mfa_operation is None:
+                response = self.send(request, authenticated=authenticated, options=options)
+            else:
+                response = self._send_confirmed(request, mfa_operation, options)
+        finally:
+            self._session_end(session)
+        self._session_replace(session, response, json, generation)
         return _http.decode(response, cast_to, envelope)
 
     def paginate(
@@ -319,23 +367,28 @@ class SyncEngine(_Engine):
 
     def confirm_operation(self, operation: str, code: str | None = None) -> str:
         """Obtains an operation MFA token, sets it as `mfa_token` and returns it."""
-        code = code or self._credentials.code()
+        code = clean_code(code) or self._credentials.code()
         request = self._http.build_request(**self._confirmation(operation, code))
         response = self.send(request, authenticated=True, options={})
-        self.mfa_token = _http.operation_mfa_token(response)
-        return self.mfa_token
+        token = _http.operation_mfa_token(response)
+        self.mfa_token = token
+        return token
 
     def _send_confirmed(
         self, request: httpx.Request, operation: str, options: RequestOptions
     ) -> httpx.Response:
-        if self.mfa_token is None and self._credentials.otp is not None:
-            request.headers[_http.MFA_HEADER] = self.confirm_operation(operation)
         try:
             return self.send(request, authenticated=True, options=options)
         except MFARequiredError:
             if self._credentials.otp is None:
                 raise
-        request.headers[_http.MFA_HEADER] = self.confirm_operation(operation)
+        rejected = request.headers.get(_http.MFA_HEADER)
+        with self._confirming:
+            # Calls refused together share one confirmation: the first one obtains the token.
+            token = self.mfa_token
+            if token is None or token == rejected:
+                token = self.confirm_operation(operation)
+        request.headers[_http.MFA_HEADER] = token
         return self.send(request, authenticated=True, options=options)
 
     def send(
@@ -348,10 +401,13 @@ class SyncEngine(_Engine):
     ) -> httpx.Response:
         """Sends a prepared request.
 
-        Adds the bearer token, renews the session once on 401, retries idempotent requests on
-        network errors, 429, 502, 503 and 504, and raises the matching `APIError` otherwise.
+        Adds the bearer token, renews the session once on 401, and raises the matching
+        `APIError` for an error answer. Requests that only read (GET, HEAD, OPTIONS, or marked
+        `idempotent`) are retried after network errors, timeouts and HTTP 429, 502, 503 and 504;
+        other requests only after HTTP 429 or when the connection could not be established.
         """
-        retries = self._retries(request.method, options)
+        retries = self._retries(options)
+        idempotent = _http.is_idempotent(request.method, options)
         attempt = 0
         renewed = False
         while True:
@@ -361,7 +417,7 @@ class SyncEngine(_Engine):
             try:
                 response = self._http.send(request, stream=stream)
             except httpx.TransportError as error:
-                if attempt >= retries:
+                if attempt >= retries or not _http.is_retryable_error(error, idempotent):
                     raise _transport_error(error) from error
                 delay = _http.retry_delay(attempt)
             else:
@@ -370,7 +426,8 @@ class SyncEngine(_Engine):
                     self._auth.refresh(token)
                     renewed = True
                     continue
-                if response.status_code not in _http.RETRY_STATUSES or attempt >= retries:
+                retry = _http.is_retryable_status(response.status_code, idempotent)
+                if not retry or attempt >= retries:
                     if response.is_error:
                         response.read()
                         raise error_from_response(response)
@@ -385,10 +442,13 @@ class SyncEngine(_Engine):
 class AsyncEngine(_Engine):
     """Performs API calls for `AsyncWhitebird`."""
 
+    _auth: AsyncAuthenticator
+
     def __init__(self, http: httpx.AsyncClient, config: Config, auth: AsyncAuthenticator) -> None:
-        super().__init__(config, auth.credentials)
+        super().__init__(config)
         self._http = http
         self._auth = auth
+        self._confirming = asyncio.Lock()
 
     @overload
     async def request(
@@ -407,6 +467,7 @@ class AsyncEngine(_Engine):
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
         mfa_operation: str | None = ...,
+        session: SessionEffect | None = ...,
         cast_to: type[T],
         options: RequestOptions | None = ...,
     ) -> T: ...
@@ -428,6 +489,7 @@ class AsyncEngine(_Engine):
         authenticated: bool = ...,
         envelope: _http.Envelope | None = ...,
         mfa_operation: str | None = ...,
+        session: SessionEffect | None = ...,
         cast_to: object = ...,
         options: RequestOptions | None = ...,
     ) -> Any: ...
@@ -448,13 +510,15 @@ class AsyncEngine(_Engine):
         authenticated: bool = True,
         envelope: _http.Envelope | None = None,
         mfa_operation: str | None = None,
+        session: SessionEffect | None = None,
         cast_to: Any = None,
         options: RequestOptions | None = None,
     ) -> Any:
         """Sends a call and decodes its response (see `_http.prepare` and `_http.decode`).
 
-        A call with an `mfa_operation` sends the operation MFA token, obtaining one first when
-        none is set and again when the call is refused for MFA, if `otp` is configured.
+        A call with an `mfa_operation` that Whitebird refuses for MFA is confirmed (see
+        `confirm_operation`) and sent once more, if `otp` is configured. `session` applies the
+        effect of the call on the session.
         """
         options = options or {}
         request = self._http.build_request(
@@ -472,10 +536,15 @@ class AsyncEngine(_Engine):
                 options=options,
             )
         )
-        if mfa_operation is None:
-            response = await self.send(request, authenticated=authenticated, options=options)
-        else:
-            response = await self._send_confirmed(request, mfa_operation, options)
+        generation = self._auth.generation
+        try:
+            if mfa_operation is None:
+                response = await self.send(request, authenticated=authenticated, options=options)
+            else:
+                response = await self._send_confirmed(request, mfa_operation, options)
+        finally:
+            self._session_end(session)
+        self._session_replace(session, response, json, generation)
         return _http.decode(response, cast_to, envelope)
 
     def paginate(
@@ -581,23 +650,28 @@ class AsyncEngine(_Engine):
 
     async def confirm_operation(self, operation: str, code: str | None = None) -> str:
         """Obtains an operation MFA token, sets it as `mfa_token` and returns it."""
-        code = code or await self._credentials.acode()
+        code = clean_code(code) or await self._credentials.acode()
         request = self._http.build_request(**self._confirmation(operation, code))
         response = await self.send(request, authenticated=True, options={})
-        self.mfa_token = _http.operation_mfa_token(response)
-        return self.mfa_token
+        token = _http.operation_mfa_token(response)
+        self.mfa_token = token
+        return token
 
     async def _send_confirmed(
         self, request: httpx.Request, operation: str, options: RequestOptions
     ) -> httpx.Response:
-        if self.mfa_token is None and self._credentials.otp is not None:
-            request.headers[_http.MFA_HEADER] = await self.confirm_operation(operation)
         try:
             return await self.send(request, authenticated=True, options=options)
         except MFARequiredError:
             if self._credentials.otp is None:
                 raise
-        request.headers[_http.MFA_HEADER] = await self.confirm_operation(operation)
+        rejected = request.headers.get(_http.MFA_HEADER)
+        async with self._confirming:
+            # Calls refused together share one confirmation: the first one obtains the token.
+            token = self.mfa_token
+            if token is None or token == rejected:
+                token = await self.confirm_operation(operation)
+        request.headers[_http.MFA_HEADER] = token
         return await self.send(request, authenticated=True, options=options)
 
     async def send(
@@ -609,7 +683,8 @@ class AsyncEngine(_Engine):
         stream: bool = False,
     ) -> httpx.Response:
         """Sends a prepared request; see `SyncEngine.send`."""
-        retries = self._retries(request.method, options)
+        retries = self._retries(options)
+        idempotent = _http.is_idempotent(request.method, options)
         attempt = 0
         renewed = False
         while True:
@@ -619,7 +694,7 @@ class AsyncEngine(_Engine):
             try:
                 response = await self._http.send(request, stream=stream)
             except httpx.TransportError as error:
-                if attempt >= retries:
+                if attempt >= retries or not _http.is_retryable_error(error, idempotent):
                     raise _transport_error(error) from error
                 delay = _http.retry_delay(attempt)
             else:
@@ -628,7 +703,8 @@ class AsyncEngine(_Engine):
                     await self._auth.refresh(token)
                     renewed = True
                     continue
-                if response.status_code not in _http.RETRY_STATUSES or attempt >= retries:
+                retry = _http.is_retryable_status(response.status_code, idempotent)
+                if not retry or attempt >= retries:
                     if response.is_error:
                         await response.aread()
                         raise error_from_response(response)

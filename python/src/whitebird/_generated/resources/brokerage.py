@@ -169,7 +169,9 @@ class BrokerageBalanceOrdersResource(SyncResource):
     ) -> BalanceOrderResponse:
         """Create Crypto Withdrawal.
 
-        Create a crypto withdrawal balance order.
+        Create a crypto withdrawal balance order. The order stays `AWAITING_CLIENT_CONFIRMATION`
+        until the client confirms it with the token emailed to them (`confirm_crypto_withdrawal`);
+        it then moves to `AWAITING_ADMIN_CONFIRMATION`.
 
         Args:
             subaccount_id: `subaccountId` body field.
@@ -209,6 +211,8 @@ class BrokerageBalanceOrdersResource(SyncResource):
 
         Client confirmation step for crypto withdrawal by token (public).
 
+        Public endpoint: works without credentials.
+
         Args:
             token: `token` body field.
             **options: Per-request options, see `RequestOptions`.
@@ -221,6 +225,7 @@ class BrokerageBalanceOrdersResource(SyncResource):
             "POST",
             "/api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client",
             json={"token": token},
+            authenticated=False,
             cast_to=BalanceOrderResponse,
             options=options,
         )
@@ -241,10 +246,11 @@ class BrokerageBalanceOrdersResource(SyncResource):
 
         Args:
             subaccount_id: `subaccountId` body field.
-            fiat_provider_type: `fiatProviderType` body field.
-            asset_code: `assetCode` body field.
+            fiat_provider_type: The web app sends `CA` (current account).
+            asset_code: The web app sends `RUB`.
             amount: `amount` body field.
-            internal_token: `internalToken` body field.
+            internal_token: Settlement account to deposit from, the `id` of an account from
+                `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
             **options: Per-request options, see `RequestOptions`.
 
         Returns:
@@ -281,10 +287,11 @@ class BrokerageBalanceOrdersResource(SyncResource):
 
         Args:
             subaccount_id: `subaccountId` body field.
-            fiat_provider_type: `fiatProviderType` body field.
+            fiat_provider_type: The web app sends `CA` (current account).
             amount: `amount` body field.
-            payment_token: `paymentToken` body field.
-            asset_code: `assetCode` body field.
+            payment_token: Bank account to withdraw to, the `id` of a method from
+                `brokerage.payments.methods`.
+            asset_code: The web app sends `RUB`.
             **options: Per-request options, see `RequestOptions`.
 
         Returns:
@@ -397,7 +404,9 @@ class BrokerageCryptoAddressesResource(SyncResource):
     ) -> CryptoAddressResponse:
         """Add Crypto Address.
 
-        Add a crypto address for the current subaccount.
+        Add a crypto address for the current subaccount. Errors: 403 when the account has no
+        two-factor authentication (the web app asks to enable it), 400 `INVALID_ADDRESS` or
+        `MAX_NUMBER_REACHED`.
 
         Args:
             address: `address` body field.
@@ -835,7 +844,9 @@ class BrokerageSubaccountsResource(SyncResource):
     ) -> SubaccountResponse:
         """Add Subaccount (Individual).
 
-        Add an Individual subaccount for current broker.
+        Add an Individual subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+        taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors in
+        `fields[]`.
 
         Args:
             custom_id: `customId` body field.
@@ -914,7 +925,9 @@ class BrokerageSubaccountsResource(SyncResource):
     ) -> SubaccountResponse:
         """Add Subaccount (Individual Entrepreneur).
 
-        Add an Individual Entrepreneur subaccount for current broker.
+        Add an Individual Entrepreneur subaccount for current broker. Errors: status `USER_EXISTS`
+        (the email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and
+        per-field errors in `fields[]`.
 
         Args:
             custom_id: `customId` body field.
@@ -974,7 +987,9 @@ class BrokerageSubaccountsResource(SyncResource):
     ) -> SubaccountResponse:
         """Add Subaccount (Organization).
 
-        Add an Organization subaccount for current broker.
+        Add an Organization subaccount for current broker. Errors: status `USER_EXISTS` (the email
+        is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+        in `fields[]`.
 
         Args:
             custom_id: `customId` body field.
@@ -1248,7 +1263,9 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
     ) -> BalanceOrderResponse:
         """Create Crypto Withdrawal.
 
-        Create a crypto withdrawal balance order.
+        Create a crypto withdrawal balance order. The order stays `AWAITING_CLIENT_CONFIRMATION`
+        until the client confirms it with the token emailed to them (`confirm_crypto_withdrawal`);
+        it then moves to `AWAITING_ADMIN_CONFIRMATION`.
 
         Args:
             subaccount_id: `subaccountId` body field.
@@ -1288,6 +1305,8 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
 
         Client confirmation step for crypto withdrawal by token (public).
 
+        Public endpoint: works without credentials.
+
         Args:
             token: `token` body field.
             **options: Per-request options, see `RequestOptions`.
@@ -1300,6 +1319,7 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
             "POST",
             "/api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client",
             json={"token": token},
+            authenticated=False,
             cast_to=BalanceOrderResponse,
             options=options,
         )
@@ -1320,10 +1340,11 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
 
         Args:
             subaccount_id: `subaccountId` body field.
-            fiat_provider_type: `fiatProviderType` body field.
-            asset_code: `assetCode` body field.
+            fiat_provider_type: The web app sends `CA` (current account).
+            asset_code: The web app sends `RUB`.
             amount: `amount` body field.
-            internal_token: `internalToken` body field.
+            internal_token: Settlement account to deposit from, the `id` of an account from
+                `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
             **options: Per-request options, see `RequestOptions`.
 
         Returns:
@@ -1360,10 +1381,11 @@ class AsyncBrokerageBalanceOrdersResource(AsyncResource):
 
         Args:
             subaccount_id: `subaccountId` body field.
-            fiat_provider_type: `fiatProviderType` body field.
+            fiat_provider_type: The web app sends `CA` (current account).
             amount: `amount` body field.
-            payment_token: `paymentToken` body field.
-            asset_code: `assetCode` body field.
+            payment_token: Bank account to withdraw to, the `id` of a method from
+                `brokerage.payments.methods`.
+            asset_code: The web app sends `RUB`.
             **options: Per-request options, see `RequestOptions`.
 
         Returns:
@@ -1476,7 +1498,9 @@ class AsyncBrokerageCryptoAddressesResource(AsyncResource):
     ) -> CryptoAddressResponse:
         """Add Crypto Address.
 
-        Add a crypto address for the current subaccount.
+        Add a crypto address for the current subaccount. Errors: 403 when the account has no
+        two-factor authentication (the web app asks to enable it), 400 `INVALID_ADDRESS` or
+        `MAX_NUMBER_REACHED`.
 
         Args:
             address: `address` body field.
@@ -1914,7 +1938,9 @@ class AsyncBrokerageSubaccountsResource(AsyncResource):
     ) -> SubaccountResponse:
         """Add Subaccount (Individual).
 
-        Add an Individual subaccount for current broker.
+        Add an Individual subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+        taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors in
+        `fields[]`.
 
         Args:
             custom_id: `customId` body field.
@@ -1993,7 +2019,9 @@ class AsyncBrokerageSubaccountsResource(AsyncResource):
     ) -> SubaccountResponse:
         """Add Subaccount (Individual Entrepreneur).
 
-        Add an Individual Entrepreneur subaccount for current broker.
+        Add an Individual Entrepreneur subaccount for current broker. Errors: status `USER_EXISTS`
+        (the email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and
+        per-field errors in `fields[]`.
 
         Args:
             custom_id: `customId` body field.
@@ -2053,7 +2081,9 @@ class AsyncBrokerageSubaccountsResource(AsyncResource):
     ) -> SubaccountResponse:
         """Add Subaccount (Organization).
 
-        Add an Organization subaccount for current broker.
+        Add an Organization subaccount for current broker. Errors: status `USER_EXISTS` (the email
+        is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+        in `fields[]`.
 
         Args:
             custom_id: `customId` body field.

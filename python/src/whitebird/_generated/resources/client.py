@@ -73,7 +73,7 @@ class ClientResource(SyncResource):
     def features(
         self,
         *,
-        merchant_id: str | None = None,
+        merchant_id: str = "11111111-1111-1111-1111-111111111111",
         **options: Unpack[RequestOptions],
     ) -> list[ClientFeature | str]:
         """List feature flags enabled for the client.
@@ -164,7 +164,7 @@ class AsyncClientResource(AsyncResource):
     async def features(
         self,
         *,
-        merchant_id: str | None = None,
+        merchant_id: str = "11111111-1111-1111-1111-111111111111",
         **options: Unpack[RequestOptions],
     ) -> list[ClientFeature | str]:
         """List feature flags enabled for the client.

@@ -14,10 +14,12 @@ from whitebird._generated.models import (
     ExchangeOrderStatus,
     Merchant,
     MerchantClientCounts,
+    MerchantOrder,
     MerchantPair,
     MerchantReportFileType,
 )
 from whitebird._resource import AsyncResource, SyncResource
+from whitebird.pagination import AsyncPager, Page, SyncPager
 from whitebird.types import RequestOptions
 
 
@@ -28,6 +30,11 @@ class MerchantResource(SyncResource):
     def api_keys(self) -> MerchantApiKeysResource:
         """Operations of `client.merchant.api_keys`."""
         return MerchantApiKeysResource(self._engine)
+
+    @cached_property
+    def orders(self) -> MerchantOrdersResource:
+        """Operations of `client.merchant.orders`."""
+        return MerchantOrdersResource(self._engine)
 
     @cached_property
     def statistics(self) -> MerchantStatisticsResource:
@@ -218,6 +225,63 @@ class MerchantApiKeysResource(SyncResource):
         )
 
 
+class MerchantOrdersResource(SyncResource):
+    """Operations of `client.merchant.orders`."""
+
+    def history(
+        self,
+        *,
+        page: int = 0,
+        size: int = 20,
+        sort: str = "creationDate,desc",
+        limit: int = 20,
+        creation_date_frame: ExchangeDateFrame | None = None,
+        statuses: Sequence[ExchangeOrderStatus | str] | None = None,
+        assets: Sequence[str] | None = None,
+        client_id: str | None = None,
+        **options: Unpack[RequestOptions],
+    ) -> SyncPager[MerchantOrder]:
+        """List orders made through the merchant's widget.
+
+        For accounts with the `MERCHANT` role: orders of the merchant's clients, newest first. The
+        web app filters by creation date, statuses, assets and client id, the same filter as
+        `merchant.download_report`.
+
+        Args:
+            page: Zero-based page index.
+            size: Page size.
+            sort: Sort criteria in the format `property,(asc|desc)`.
+            limit: `limit` body field.
+            creation_date_frame: `creationDateFrame` body field.
+            statuses: `statuses` body field.
+            assets: `assets` body field.
+            client_id: Only the orders of this client.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            A pager over the `MerchantOrder` items of every page.
+        """
+        return self._engine.paginate(
+            "api",
+            "POST",
+            "/api/v3/exchange/merchant-admin/order/history",
+            params={"page": page, "size": size, "sort": sort},
+            json={
+                "limit": limit,
+                "creationDateFrame": creation_date_frame,
+                "statuses": statuses,
+                "assets": assets,
+                "clientId": client_id,
+            },
+            cast_to=Page[MerchantOrder],
+            options=options,
+        )
+
+
 class MerchantStatisticsResource(SyncResource):
     """Operations of `client.merchant.statistics`."""
 
@@ -349,6 +413,11 @@ class AsyncMerchantResource(AsyncResource):
     def api_keys(self) -> AsyncMerchantApiKeysResource:
         """Operations of `client.merchant.api_keys`."""
         return AsyncMerchantApiKeysResource(self._engine)
+
+    @cached_property
+    def orders(self) -> AsyncMerchantOrdersResource:
+        """Operations of `client.merchant.orders`."""
+        return AsyncMerchantOrdersResource(self._engine)
 
     @cached_property
     def statistics(self) -> AsyncMerchantStatisticsResource:
@@ -535,6 +604,63 @@ class AsyncMerchantApiKeysResource(AsyncResource):
             "/api/v1/merchant/current/remove/apiKey/{apiKeyId}",
             path_params={"apiKeyId": api_key_id},
             cast_to=Merchant,
+            options=options,
+        )
+
+
+class AsyncMerchantOrdersResource(AsyncResource):
+    """Operations of `client.merchant.orders`."""
+
+    def history(
+        self,
+        *,
+        page: int = 0,
+        size: int = 20,
+        sort: str = "creationDate,desc",
+        limit: int = 20,
+        creation_date_frame: ExchangeDateFrame | None = None,
+        statuses: Sequence[ExchangeOrderStatus | str] | None = None,
+        assets: Sequence[str] | None = None,
+        client_id: str | None = None,
+        **options: Unpack[RequestOptions],
+    ) -> AsyncPager[MerchantOrder]:
+        """List orders made through the merchant's widget.
+
+        For accounts with the `MERCHANT` role: orders of the merchant's clients, newest first. The
+        web app filters by creation date, statuses, assets and client id, the same filter as
+        `merchant.download_report`.
+
+        Args:
+            page: Zero-based page index.
+            size: Page size.
+            sort: Sort criteria in the format `property,(asc|desc)`.
+            limit: `limit` body field.
+            creation_date_frame: `creationDateFrame` body field.
+            statuses: `statuses` body field.
+            assets: `assets` body field.
+            client_id: Only the orders of this client.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            A pager over the `MerchantOrder` items of every page.
+        """
+        return self._engine.paginate(
+            "api",
+            "POST",
+            "/api/v3/exchange/merchant-admin/order/history",
+            params={"page": page, "size": size, "sort": sort},
+            json={
+                "limit": limit,
+                "creationDateFrame": creation_date_frame,
+                "statuses": statuses,
+                "assets": assets,
+                "clientId": client_id,
+            },
+            cast_to=Page[MerchantOrder],
             options=options,
         )
 

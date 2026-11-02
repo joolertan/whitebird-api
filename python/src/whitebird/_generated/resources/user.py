@@ -79,16 +79,22 @@ class UserResource(SyncResource):
     ) -> None:
         """Sign out and revoke the current tokens.
 
+        The client forgets its session (tokens, operation MFA token and the token store) after the
+        call, also when the call fails, as the web app does.
+
         Args:
             **options: Per-request options, see `RequestOptions`.
 
         Note:
-            Reconstructed from the Whitebird web application; fields may be missing.
+            Reconstructed from the Whitebird web application; fields may be missing. Ends the
+            session: afterwards, whatever the outcome, the client forgets its tokens and the
+            operation MFA token and clears the token store.
         """
         self._engine.request(
             "auth",
             "POST",
             "/api/v1/user/logout",
+            session="end",
             options=options,
         )
 
@@ -221,7 +227,8 @@ class UserEmailResource(SyncResource):
     ) -> UserEmailChangeConfirmation:
         """Confirm the new email address with the emailed code.
 
-        The web app signs the user out after a successful change.
+        The web app signs the user out after a successful change; sign in again with the new
+        address.
 
         Args:
             code: `code` body field.
@@ -349,9 +356,10 @@ class UserPasswordResource(SyncResource):
     ) -> UserTokenPair:
         """Change the password and get new tokens.
 
-        The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS` (wrong
-        old password), `BAD_REQUEST` with `fields[].fieldName = newPassword` and message
-        `INVALID_PASSWORD` (weak new password), `INVALID_CODE` (2FA code missing or wrong).
+        The previous tokens stop working; the client stores the returned pair as its session and
+        uses `newPassword` for later sign-ins. Errors: `BAD_CREDENTIALS` (wrong old password),
+        `BAD_REQUEST` with `fields[].fieldName = newPassword` and message `INVALID_PASSWORD` (weak
+        new password), `INVALID_CODE` (2FA code missing or wrong).
 
         Args:
             old_password: `oldPassword` body field.
@@ -362,7 +370,8 @@ class UserPasswordResource(SyncResource):
 
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
+            the Whitebird web application; fields may be missing. The client keeps the token pair of
+            the response as its new session.
 
         Returns:
             The response as `UserTokenPair`.
@@ -376,6 +385,7 @@ class UserPasswordResource(SyncResource):
                 "newPassword": new_password,
                 "mfaSecret": mfa_secret,
             },
+            session="replace",
             cast_to=UserTokenPair,
             options=options,
         )
@@ -496,7 +506,8 @@ class UserPhoneResource(SyncResource):
             country_code: ISO 3166-1 alpha-2 country of the number.
             phone_number: `phoneNumber` body field.
             mfa_secret: Current TOTP code when 2FA is enabled.
-            recaptcha: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`).
+            recaptcha: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`, or
+                `SETTINGS_CHANGE_PHONE_MFA` when repeating the call with `mfaSecret`).
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -706,16 +717,22 @@ class AsyncUserResource(AsyncResource):
     ) -> None:
         """Sign out and revoke the current tokens.
 
+        The client forgets its session (tokens, operation MFA token and the token store) after the
+        call, also when the call fails, as the web app does.
+
         Args:
             **options: Per-request options, see `RequestOptions`.
 
         Note:
-            Reconstructed from the Whitebird web application; fields may be missing.
+            Reconstructed from the Whitebird web application; fields may be missing. Ends the
+            session: afterwards, whatever the outcome, the client forgets its tokens and the
+            operation MFA token and clears the token store.
         """
         await self._engine.request(
             "auth",
             "POST",
             "/api/v1/user/logout",
+            session="end",
             options=options,
         )
 
@@ -848,7 +865,8 @@ class AsyncUserEmailResource(AsyncResource):
     ) -> UserEmailChangeConfirmation:
         """Confirm the new email address with the emailed code.
 
-        The web app signs the user out after a successful change.
+        The web app signs the user out after a successful change; sign in again with the new
+        address.
 
         Args:
             code: `code` body field.
@@ -976,9 +994,10 @@ class AsyncUserPasswordResource(AsyncResource):
     ) -> UserTokenPair:
         """Change the password and get new tokens.
 
-        The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS` (wrong
-        old password), `BAD_REQUEST` with `fields[].fieldName = newPassword` and message
-        `INVALID_PASSWORD` (weak new password), `INVALID_CODE` (2FA code missing or wrong).
+        The previous tokens stop working; the client stores the returned pair as its session and
+        uses `newPassword` for later sign-ins. Errors: `BAD_CREDENTIALS` (wrong old password),
+        `BAD_REQUEST` with `fields[].fieldName = newPassword` and message `INVALID_PASSWORD` (weak
+        new password), `INVALID_CODE` (2FA code missing or wrong).
 
         Args:
             old_password: `oldPassword` body field.
@@ -989,7 +1008,8 @@ class AsyncUserPasswordResource(AsyncResource):
 
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
+            the Whitebird web application; fields may be missing. The client keeps the token pair of
+            the response as its new session.
 
         Returns:
             The response as `UserTokenPair`.
@@ -1003,6 +1023,7 @@ class AsyncUserPasswordResource(AsyncResource):
                 "newPassword": new_password,
                 "mfaSecret": mfa_secret,
             },
+            session="replace",
             cast_to=UserTokenPair,
             options=options,
         )
@@ -1123,7 +1144,8 @@ class AsyncUserPhoneResource(AsyncResource):
             country_code: ISO 3166-1 alpha-2 country of the number.
             phone_number: `phoneNumber` body field.
             mfa_secret: Current TOTP code when 2FA is enabled.
-            recaptcha: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`).
+            recaptcha: Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`, or
+                `SETTINGS_CHANGE_PHONE_MFA` when repeating the call with `mfaSecret`).
             **options: Per-request options, see `RequestOptions`.
 
         Note:

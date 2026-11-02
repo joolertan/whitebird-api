@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 from typing_extensions import Unpack
 
@@ -14,7 +15,6 @@ from whitebird._generated.models import (
     AuthMediaCapabilities,
     AuthMfaOperation,
     AuthMfaStatus,
-    AuthMfaToken,
     AuthWebGlData,
 )
 from whitebird._resource import AsyncResource, SyncResource
@@ -30,7 +30,7 @@ class AuthResource(SyncResource):
         operation: AuthMfaOperation | str,
         mfa_code: str,
         **options: Unpack[RequestOptions],
-    ) -> AuthMfaToken:
+    ) -> Any:
         """Exchange a TOTP code for an operation MFA token.
 
         Sensitive operations (in this build: balance withdrawals, `POST
@@ -52,14 +52,13 @@ class AuthResource(SyncResource):
             the Whitebird web application; fields may be missing.
 
         Returns:
-            The response as `AuthMfaToken`.
+            The decoded JSON response.
         """
         return self._engine.request(
             "api",
             "POST",
             "/api/v2/auth/mfa/merchant/client/token",
             json={"operation": operation, "mfaCode": mfa_code},
-            cast_to=AuthMfaToken,
             options=options,
         )
 
@@ -71,14 +70,17 @@ class AuthResource(SyncResource):
     ) -> AuthMfaStatus:
         """Check whether an account has 2FA enabled.
 
-        Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without the
-        slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve the
-        captcha from `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`.
+        Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
+        with 2FA first send the password grant without code and without captcha; when the answer is
+        `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP code
+        in `code`. Accounts without 2FA must solve the captcha from `GET /api/v1/captcha/generate`.
+        Unknown users answer status `NOT_FOUND`; when this check fails the web app does not send the
+        password at all.
 
         Public endpoint: works without credentials.
 
         Args:
-            username: Account email.
+            username: Account email as the user typed it.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -109,9 +111,10 @@ class AuthResource(SyncResource):
         Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution is
         the horizontal offset of the piece (the web slider ranges 0-250) and is sent to `POST
         /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
-        `base64(JSON.stringify({"sliderPosition": <int>, "requestId": "<requestId>"}))`. A wrong
-        answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new captcha
-        with a fresh `requestId`. Status/message `Too many requests` means the account is
+        `base64(JSON.stringify({"sliderPosition": "<offset>", "requestId": "<requestId>"}))`. The
+        sign-in form sends the offset as a string of digits, the registration form as a number. A
+        wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
+        captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
         temporarily locked.
 
         Public endpoint: works without credentials.
@@ -325,7 +328,7 @@ class AsyncAuthResource(AsyncResource):
         operation: AuthMfaOperation | str,
         mfa_code: str,
         **options: Unpack[RequestOptions],
-    ) -> AuthMfaToken:
+    ) -> Any:
         """Exchange a TOTP code for an operation MFA token.
 
         Sensitive operations (in this build: balance withdrawals, `POST
@@ -347,14 +350,13 @@ class AsyncAuthResource(AsyncResource):
             the Whitebird web application; fields may be missing.
 
         Returns:
-            The response as `AuthMfaToken`.
+            The decoded JSON response.
         """
         return await self._engine.request(
             "api",
             "POST",
             "/api/v2/auth/mfa/merchant/client/token",
             json={"operation": operation, "mfaCode": mfa_code},
-            cast_to=AuthMfaToken,
             options=options,
         )
 
@@ -366,14 +368,17 @@ class AsyncAuthResource(AsyncResource):
     ) -> AuthMfaStatus:
         """Check whether an account has 2FA enabled.
 
-        Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without the
-        slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve the
-        captcha from `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`.
+        Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
+        with 2FA first send the password grant without code and without captcha; when the answer is
+        `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP code
+        in `code`. Accounts without 2FA must solve the captcha from `GET /api/v1/captcha/generate`.
+        Unknown users answer status `NOT_FOUND`; when this check fails the web app does not send the
+        password at all.
 
         Public endpoint: works without credentials.
 
         Args:
-            username: Account email.
+            username: Account email as the user typed it.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -404,9 +409,10 @@ class AsyncAuthResource(AsyncResource):
         Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution is
         the horizontal offset of the piece (the web slider ranges 0-250) and is sent to `POST
         /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
-        `base64(JSON.stringify({"sliderPosition": <int>, "requestId": "<requestId>"}))`. A wrong
-        answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new captcha
-        with a fresh `requestId`. Status/message `Too many requests` means the account is
+        `base64(JSON.stringify({"sliderPosition": "<offset>", "requestId": "<requestId>"}))`. The
+        sign-in form sends the offset as a string of digits, the registration form as a number. A
+        wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
+        captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
         temporarily locked.
 
         Public endpoint: works without credentials.

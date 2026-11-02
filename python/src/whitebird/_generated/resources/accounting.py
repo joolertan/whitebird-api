@@ -37,6 +37,41 @@ class AccountingResource(SyncResource):
 class AccountingAccountsResource(SyncResource):
     """Operations of `client.accounting.accounts`."""
 
+    def get_enhanced(
+        self,
+        *,
+        type: AccountingAccountType | str,
+        assets: Sequence[str] | None = None,
+        **options: Unpack[RequestOptions],
+    ) -> AccountingEnhancedAccount:
+        """Get balances with USD valuation.
+
+        Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for the
+        wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
+        `amount` is the reserved amount). In the demo environment this reads the demo trading
+        balances.
+
+        Args:
+            type: `type` body field.
+            assets: Asset codes to include; all assets when null.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The response as `AccountingEnhancedAccount`.
+        """
+        return self._engine.request(
+            "accounting_spot",
+            "POST",
+            "/api/v2/accounting/client/account/enhanced",
+            json={"type": type, "assets": assets},
+            cast_to=AccountingEnhancedAccount,
+            options=options,
+        )
+
     def get(
         self,
         *,
@@ -71,40 +106,6 @@ class AccountingAccountsResource(SyncResource):
             options=options,
         )
 
-    def get_enhanced(
-        self,
-        *,
-        type: AccountingAccountType | str,
-        assets: Sequence[str] | None = None,
-        **options: Unpack[RequestOptions],
-    ) -> AccountingEnhancedAccount:
-        """Get balances with USD valuation.
-
-        Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for the
-        wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
-        `amount` is the reserved amount).
-
-        Args:
-            type: `type` body field.
-            assets: Asset codes to include; all assets when null.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The response as `AccountingEnhancedAccount`.
-        """
-        return self._engine.request(
-            "api",
-            "POST",
-            "/api/v2/accounting/client/account/enhanced",
-            json={"type": type, "assets": assets},
-            cast_to=AccountingEnhancedAccount,
-            options=options,
-        )
-
 
 class AccountingTransactionsResource(SyncResource):
     """Operations of `client.accounting.transactions`."""
@@ -114,7 +115,7 @@ class AccountingTransactionsResource(SyncResource):
         *,
         page: int = 0,
         size: int = 20,
-        sort: Sequence[str] | None = None,
+        sort: str = "creationDate,desc",
         transaction_types: Sequence[AccountingTransactionType | str] | None = None,
         account_type: AccountingAccountType | str | None = None,
         **options: Unpack[RequestOptions],
@@ -127,8 +128,7 @@ class AccountingTransactionsResource(SyncResource):
         Args:
             page: Zero-based page index.
             size: Page size.
-            sort: Sort criteria in the format `property,(asc|desc)`; the web app uses
-                `creationDate,desc`.
+            sort: Sort criteria in the format `property,(asc|desc)`.
             transaction_types: `transactionTypes` body field.
             account_type: `accountType` body field.
             **options: Per-request options, see `RequestOptions`.
@@ -226,6 +226,41 @@ class AsyncAccountingResource(AsyncResource):
 class AsyncAccountingAccountsResource(AsyncResource):
     """Operations of `client.accounting.accounts`."""
 
+    async def get_enhanced(
+        self,
+        *,
+        type: AccountingAccountType | str,
+        assets: Sequence[str] | None = None,
+        **options: Unpack[RequestOptions],
+    ) -> AccountingEnhancedAccount:
+        """Get balances with USD valuation.
+
+        Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for the
+        wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
+        `amount` is the reserved amount). In the demo environment this reads the demo trading
+        balances.
+
+        Args:
+            type: `type` body field.
+            assets: Asset codes to include; all assets when null.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The response as `AccountingEnhancedAccount`.
+        """
+        return await self._engine.request(
+            "accounting_spot",
+            "POST",
+            "/api/v2/accounting/client/account/enhanced",
+            json={"type": type, "assets": assets},
+            cast_to=AccountingEnhancedAccount,
+            options=options,
+        )
+
     async def get(
         self,
         *,
@@ -260,40 +295,6 @@ class AsyncAccountingAccountsResource(AsyncResource):
             options=options,
         )
 
-    async def get_enhanced(
-        self,
-        *,
-        type: AccountingAccountType | str,
-        assets: Sequence[str] | None = None,
-        **options: Unpack[RequestOptions],
-    ) -> AccountingEnhancedAccount:
-        """Get balances with USD valuation.
-
-        Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for the
-        wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
-        `amount` is the reserved amount).
-
-        Args:
-            type: `type` body field.
-            assets: Asset codes to include; all assets when null.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The response as `AccountingEnhancedAccount`.
-        """
-        return await self._engine.request(
-            "api",
-            "POST",
-            "/api/v2/accounting/client/account/enhanced",
-            json={"type": type, "assets": assets},
-            cast_to=AccountingEnhancedAccount,
-            options=options,
-        )
-
 
 class AsyncAccountingTransactionsResource(AsyncResource):
     """Operations of `client.accounting.transactions`."""
@@ -303,7 +304,7 @@ class AsyncAccountingTransactionsResource(AsyncResource):
         *,
         page: int = 0,
         size: int = 20,
-        sort: Sequence[str] | None = None,
+        sort: str = "creationDate,desc",
         transaction_types: Sequence[AccountingTransactionType | str] | None = None,
         account_type: AccountingAccountType | str | None = None,
         **options: Unpack[RequestOptions],
@@ -316,8 +317,7 @@ class AsyncAccountingTransactionsResource(AsyncResource):
         Args:
             page: Zero-based page index.
             size: Page size.
-            sort: Sort criteria in the format `property,(asc|desc)`; the web app uses
-                `creationDate,desc`.
+            sort: Sort criteria in the format `property,(asc|desc)`.
             transaction_types: `transactionTypes` body field.
             account_type: `accountType` body field.
             **options: Per-request options, see `RequestOptions`.

@@ -1,6 +1,7 @@
 import os
 import stat
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -44,13 +45,45 @@ def test_file_store_is_private(tmp_path: Path) -> None:
     assert [path.name for path in tmp_path.iterdir()] == ["session.json"]
 
 
-def test_file_store_ignores_unreadable_files(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not json",
+        '{"refresh_token": "r"}',
+        '["a"]',
+        '{"access_token": 1}',
+        '{"access_token": ""}',
+        '{"access_token": "a", "refresh_token": 5}',
+        '{"access_token": "a", "expires_at": "1700000000"}',
+        '{"access_token": "a", "expires_at": true}',
+    ],
+)
+def test_file_store_ignores_invalid_files(tmp_path: Path, content: str) -> None:
     path = tmp_path / "session.json"
-    path.write_text("not json")
+    path.write_text(content)
     assert FileTokenStore(path).load() is None
 
-    path.write_text('{"refresh_token": "r"}')
-    assert FileTokenStore(path).load() is None
+
+def test_file_store_saves_from_many_threads(tmp_path: Path) -> None:
+    store = FileTokenStore(tmp_path / "session.json")
+    errors: list[Exception] = []
+
+    def save(index: int) -> None:
+        try:
+            for attempt in range(50):
+                store.save(Tokens(f"a{index}-{attempt}"))
+        except Exception as error:
+            errors.append(error)
+
+    threads = [threading.Thread(target=save, args=(index,)) for index in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors
+    assert store.load() is not None
+    assert [path.name for path in tmp_path.iterdir()] == ["session.json"]
 
 
 def test_file_store_expands_user(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -9,7 +9,8 @@ def main() -> None:
         wallet = client.accounting.accounts.get_enhanced(type=AccountingAccountType.USER_BALANCE)
         for balance in wallet.balances or []:
             if balance.amount:
-                print(f"{balance.currency:>6} {balance.amount:>24} ~ {balance.usd_amount} USD")
+                currency = balance.currency or "?"
+                print(f"{currency:>6} {balance.amount:>24} ~ {balance.usd_amount} USD")
 
 
 if __name__ == "__main__":

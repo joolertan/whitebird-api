@@ -565,6 +565,8 @@ def _method(op: Operation, types: Types) -> MethodView:
         method.arguments.append(f"envelope={op.envelope!r}")
     if op.auth == "mfa" and op.mfa_operation:
         method.arguments.append(f"mfa_operation={op.mfa_operation!r}")
+    if op.session:
+        method.arguments.append(f"session={op.session!r}")
     _notes(op, types, method)
     _output(op, types, method)
     if op.auth == "mfa":
@@ -666,6 +668,13 @@ def _notes(op: Operation, types: Types, method: MethodView) -> None:
         )
     elif op.auth == "mfa":
         notes.append("Requires an operation MFA token, see `Whitebird.mfa_token`.")
+    if op.session == "end":
+        notes.append(
+            "Ends the session: afterwards, whatever the outcome, the client forgets its tokens "
+            "and the operation MFA token and clears the token store."
+        )
+    elif op.session == "replace":
+        notes.append("The client keeps the token pair of the response as its new session.")
     if notes:
         method.doc.section("Note", [(None, " ".join(notes))])
     if op.deprecated:

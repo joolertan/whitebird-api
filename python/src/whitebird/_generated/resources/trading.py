@@ -6,6 +6,7 @@ from __future__ import annotations
 import builtins
 from decimal import Decimal
 from functools import cached_property
+from typing import Any
 
 from typing_extensions import Unpack
 
@@ -129,11 +130,12 @@ class TradingDemoResource(SyncResource):
         asset: str,
         amount: Decimal | float,
         **options: Unpack[RequestOptions],
-    ) -> None:
+    ) -> Any:
         """Top up the demo account.
 
         Credits virtual funds to the trading account. Meant for the demo environment
-        (`trading-demo-service`); a deposit limit applies.
+        (`trading-demo-service`); a deposit limit applies. The answer is a `retCode` envelope like
+        the order management responses; the web app ignores its `result`.
 
         Args:
             asset: Coin to credit; the web app always sends `USDT`.
@@ -143,12 +145,16 @@ class TradingDemoResource(SyncResource):
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
             the Whitebird web application; fields may be missing.
+
+        Returns:
+            The decoded JSON response.
         """
-        self._engine.request(
+        return self._engine.request(
             "trading",
             "POST",
             "/api/v1/demo/balance/deposit",
             json={"asset": asset, "amount": amount},
+            envelope="retcode",
             options=options,
         )
 
@@ -162,7 +168,7 @@ class TradingExecutionsResource(SyncResource):
         symbol: str | None = None,
         start_time: int | None = None,
         end_time: int | None = None,
-        limit: int | None = None,
+        limit: int = 1000,
         **options: Unpack[RequestOptions],
     ) -> builtins.list[TradingExecution]:
         """List trade executions.
@@ -171,7 +177,7 @@ class TradingExecutionsResource(SyncResource):
             symbol: `symbol` query parameter.
             start_time: Epoch milliseconds.
             end_time: Epoch milliseconds.
-            limit: The web app asks for 1000.
+            limit: Maximum number of executions.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -270,7 +276,7 @@ class TradingOrdersResource(SyncResource):
         type: TradingOrderType | str,
         qty: str,
         price: str | None = None,
-        time_in_force: TradingTimeInForce | str | None = None,
+        time_in_force: TradingTimeInForce | str = TradingTimeInForce.GTC,
         order_link_id: str | None = None,
         take_profit: str | None = None,
         stop_loss: str | None = None,
@@ -291,7 +297,8 @@ class TradingOrdersResource(SyncResource):
             qty: Quantity in the base coin. For market buys it is the amount to spend in the quote
                 coin.
             price: Limit price; leave out for market orders.
-            time_in_force: The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders.
+            time_in_force: `PostOnly` for maker-only limit orders. The web terminal sends `GTC` also
+                for market orders.
             order_link_id: Client order id.
             take_profit: Take-profit trigger price.
             stop_loss: Stop-loss trigger price.
@@ -408,10 +415,12 @@ class TradingOrdersResource(SyncResource):
         start_time: int | None = None,
         end_time: int | None = None,
         limit: int | None = None,
-        cursor: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> builtins.list[TradingOrder]:
         """List closed orders in a time range.
+
+        The web app only sends `startTime` and `endTime`; the other filters follow the Bybit
+        convention and are not verified. The result is a plain list without a cursor.
 
         Args:
             symbol: `symbol` query parameter.
@@ -421,7 +430,6 @@ class TradingOrdersResource(SyncResource):
             start_time: Epoch milliseconds.
             end_time: Epoch milliseconds.
             limit: `limit` query parameter.
-            cursor: `cursor` query parameter.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -443,7 +451,6 @@ class TradingOrdersResource(SyncResource):
                 "startTime": start_time,
                 "endTime": end_time,
                 "limit": limit,
-                "cursor": cursor,
             },
             envelope="retcode",
             cast_to=list[TradingOrder],
@@ -458,8 +465,8 @@ class TradingOrdersResource(SyncResource):
         end_time: int | None = None,
         page: int = 0,
         size: int = 30,
-        sort_by: str | None = None,
-        sort_dir: TradingSortDirection | str | None = None,
+        sort_by: str = "exchangeTime",
+        sort_dir: TradingSortDirection | str = TradingSortDirection.DESC,
         **options: Unpack[RequestOptions],
     ) -> SyncPager[TradingOrderRecord]:
         """List order history page by page.
@@ -470,7 +477,7 @@ class TradingOrdersResource(SyncResource):
             end_time: Epoch milliseconds.
             page: `page` query parameter.
             size: `size` query parameter.
-            sort_by: Sort field; the web terminal uses `exchangeTime`.
+            sort_by: Sort field, e.g. `exchangeTime` (creation time).
             sort_dir: `sortDir` query parameter.
             **options: Per-request options, see `RequestOptions`.
 
@@ -635,11 +642,12 @@ class AsyncTradingDemoResource(AsyncResource):
         asset: str,
         amount: Decimal | float,
         **options: Unpack[RequestOptions],
-    ) -> None:
+    ) -> Any:
         """Top up the demo account.
 
         Credits virtual funds to the trading account. Meant for the demo environment
-        (`trading-demo-service`); a deposit limit applies.
+        (`trading-demo-service`); a deposit limit applies. The answer is a `retCode` envelope like
+        the order management responses; the web app ignores its `result`.
 
         Args:
             asset: Coin to credit; the web app always sends `USDT`.
@@ -649,12 +657,16 @@ class AsyncTradingDemoResource(AsyncResource):
         Note:
             Experimental: the endpoint may change or disappear without notice. Reconstructed from
             the Whitebird web application; fields may be missing.
+
+        Returns:
+            The decoded JSON response.
         """
-        await self._engine.request(
+        return await self._engine.request(
             "trading",
             "POST",
             "/api/v1/demo/balance/deposit",
             json={"asset": asset, "amount": amount},
+            envelope="retcode",
             options=options,
         )
 
@@ -668,7 +680,7 @@ class AsyncTradingExecutionsResource(AsyncResource):
         symbol: str | None = None,
         start_time: int | None = None,
         end_time: int | None = None,
-        limit: int | None = None,
+        limit: int = 1000,
         **options: Unpack[RequestOptions],
     ) -> builtins.list[TradingExecution]:
         """List trade executions.
@@ -677,7 +689,7 @@ class AsyncTradingExecutionsResource(AsyncResource):
             symbol: `symbol` query parameter.
             start_time: Epoch milliseconds.
             end_time: Epoch milliseconds.
-            limit: The web app asks for 1000.
+            limit: Maximum number of executions.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -776,7 +788,7 @@ class AsyncTradingOrdersResource(AsyncResource):
         type: TradingOrderType | str,
         qty: str,
         price: str | None = None,
-        time_in_force: TradingTimeInForce | str | None = None,
+        time_in_force: TradingTimeInForce | str = TradingTimeInForce.GTC,
         order_link_id: str | None = None,
         take_profit: str | None = None,
         stop_loss: str | None = None,
@@ -797,7 +809,8 @@ class AsyncTradingOrdersResource(AsyncResource):
             qty: Quantity in the base coin. For market buys it is the amount to spend in the quote
                 coin.
             price: Limit price; leave out for market orders.
-            time_in_force: The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders.
+            time_in_force: `PostOnly` for maker-only limit orders. The web terminal sends `GTC` also
+                for market orders.
             order_link_id: Client order id.
             take_profit: Take-profit trigger price.
             stop_loss: Stop-loss trigger price.
@@ -914,10 +927,12 @@ class AsyncTradingOrdersResource(AsyncResource):
         start_time: int | None = None,
         end_time: int | None = None,
         limit: int | None = None,
-        cursor: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> builtins.list[TradingOrder]:
         """List closed orders in a time range.
+
+        The web app only sends `startTime` and `endTime`; the other filters follow the Bybit
+        convention and are not verified. The result is a plain list without a cursor.
 
         Args:
             symbol: `symbol` query parameter.
@@ -927,7 +942,6 @@ class AsyncTradingOrdersResource(AsyncResource):
             start_time: Epoch milliseconds.
             end_time: Epoch milliseconds.
             limit: `limit` query parameter.
-            cursor: `cursor` query parameter.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -949,7 +963,6 @@ class AsyncTradingOrdersResource(AsyncResource):
                 "startTime": start_time,
                 "endTime": end_time,
                 "limit": limit,
-                "cursor": cursor,
             },
             envelope="retcode",
             cast_to=list[TradingOrder],
@@ -964,8 +977,8 @@ class AsyncTradingOrdersResource(AsyncResource):
         end_time: int | None = None,
         page: int = 0,
         size: int = 30,
-        sort_by: str | None = None,
-        sort_dir: TradingSortDirection | str | None = None,
+        sort_by: str = "exchangeTime",
+        sort_dir: TradingSortDirection | str = TradingSortDirection.DESC,
         **options: Unpack[RequestOptions],
     ) -> AsyncPager[TradingOrderRecord]:
         """List order history page by page.
@@ -976,7 +989,7 @@ class AsyncTradingOrdersResource(AsyncResource):
             end_time: Epoch milliseconds.
             page: `page` query parameter.
             size: `size` query parameter.
-            sort_by: Sort field; the web terminal uses `exchangeTime`.
+            sort_by: Sort field, e.g. `exchangeTime` (creation time).
             sort_dir: `sortDir` query parameter.
             **options: Per-request options, see `RequestOptions`.
 

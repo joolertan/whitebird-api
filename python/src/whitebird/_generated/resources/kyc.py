@@ -86,9 +86,8 @@ class KycResource(SyncResource):
     ) -> Any:
         """Accept the public offer.
 
-        Sent before verification when the user profile has no `offerAgreement` yet. The web app
-        retries a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the
-        client record is still being created.
+        Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
+        `kyc.submit` answered `firstStageConfirmed: true`, for MSI before `kyc.msi.authenticate`.
 
         Args:
             not_us_tax_payer: `notUSTaxPayer` body field.
@@ -117,7 +116,7 @@ class KycResource(SyncResource):
     def get(
         self,
         *,
-        provider: KycProvider | str | None = None,
+        provider: KycProvider | str = KycProvider.SUMSUB,
         **options: Unpack[RequestOptions],
     ) -> KycVerification:
         """Get the verification questionnaire.
@@ -128,7 +127,7 @@ class KycResource(SyncResource):
         verification.
 
         Args:
-            provider: Verification provider; the web app defaults to `SUMSUB`.
+            provider: Verification provider.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -483,11 +482,11 @@ class KycMsiResource(SyncResource):
     def authenticate(
         self,
         *,
-        is_ul: bool | None = None,
-        redirect_url: str | None = None,
-        duplicate_url: str | None = None,
-        failure_url: str | None = None,
-        doc_expired_url: str | None = None,
+        redirect_url: str,
+        duplicate_url: str,
+        failure_url: str,
+        doc_expired_url: str,
+        is_ul: bool = False,
         **options: Unpack[RequestOptions],
     ) -> KycMsiRedirect:
         """Start identification through MSI.
@@ -497,11 +496,12 @@ class KycMsiResource(SyncResource):
         `docExpiredUrl` (the web app passes `?error=DUPLICATE|UNPROCESSED|DOC_EXPIRED` pages).
 
         Args:
-            is_ul: Legal entity identification; the web app always sends `false`.
-            redirect_url: `redirectUrl` query parameter.
-            duplicate_url: `duplicateUrl` query parameter.
-            failure_url: `failureUrl` query parameter.
-            doc_expired_url: `docExpiredUrl` query parameter.
+            redirect_url: Page MSI returns to after a successful identification.
+            duplicate_url: Page MSI returns to when the person is already identified for another
+                account.
+            failure_url: Page MSI returns to when the identification failed.
+            doc_expired_url: Page MSI returns to when the identity document has expired.
+            is_ul: Legal entity identification.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -812,9 +812,8 @@ class AsyncKycResource(AsyncResource):
     ) -> Any:
         """Accept the public offer.
 
-        Sent before verification when the user profile has no `offerAgreement` yet. The web app
-        retries a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the
-        client record is still being created.
+        Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
+        `kyc.submit` answered `firstStageConfirmed: true`, for MSI before `kyc.msi.authenticate`.
 
         Args:
             not_us_tax_payer: `notUSTaxPayer` body field.
@@ -843,7 +842,7 @@ class AsyncKycResource(AsyncResource):
     async def get(
         self,
         *,
-        provider: KycProvider | str | None = None,
+        provider: KycProvider | str = KycProvider.SUMSUB,
         **options: Unpack[RequestOptions],
     ) -> KycVerification:
         """Get the verification questionnaire.
@@ -854,7 +853,7 @@ class AsyncKycResource(AsyncResource):
         verification.
 
         Args:
-            provider: Verification provider; the web app defaults to `SUMSUB`.
+            provider: Verification provider.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -1209,11 +1208,11 @@ class AsyncKycMsiResource(AsyncResource):
     async def authenticate(
         self,
         *,
-        is_ul: bool | None = None,
-        redirect_url: str | None = None,
-        duplicate_url: str | None = None,
-        failure_url: str | None = None,
-        doc_expired_url: str | None = None,
+        redirect_url: str,
+        duplicate_url: str,
+        failure_url: str,
+        doc_expired_url: str,
+        is_ul: bool = False,
         **options: Unpack[RequestOptions],
     ) -> KycMsiRedirect:
         """Start identification through MSI.
@@ -1223,11 +1222,12 @@ class AsyncKycMsiResource(AsyncResource):
         `docExpiredUrl` (the web app passes `?error=DUPLICATE|UNPROCESSED|DOC_EXPIRED` pages).
 
         Args:
-            is_ul: Legal entity identification; the web app always sends `false`.
-            redirect_url: `redirectUrl` query parameter.
-            duplicate_url: `duplicateUrl` query parameter.
-            failure_url: `failureUrl` query parameter.
-            doc_expired_url: `docExpiredUrl` query parameter.
+            redirect_url: Page MSI returns to after a successful identification.
+            duplicate_url: Page MSI returns to when the person is already identified for another
+                account.
+            failure_url: Page MSI returns to when the identification failed.
+            doc_expired_url: Page MSI returns to when the identity document has expired.
+            is_ul: Legal entity identification.
             **options: Per-request options, see `RequestOptions`.
 
         Note:

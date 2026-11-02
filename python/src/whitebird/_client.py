@@ -38,7 +38,9 @@ class _Client:
         """Operation MFA token, sent as `x-mfa-token` with every request while set.
 
         Sensitive operations such as withdrawals need one. `confirm_operation` sets it, and so
-        do these operations themselves when `otp` is configured. Assign None to stop sending it.
+        do these operations themselves when Whitebird refuses them and `otp` is configured.
+        It is forgotten with the session, e.g. by `client.user.logout()`. Assign None to stop
+        sending it.
         """
         return self._engine.mfa_token
 
@@ -51,17 +53,19 @@ class Whitebird(_Client, Resources):
     """Synchronous client of the Whitebird API.
 
     Operations are grouped by resource, e.g. `client.brokerage.otc_orders.create(...)`.
-    The client logs in on the first call that needs a token and refreshes the token before it
-    expires; public endpoints work without credentials.
+    The client logs in on the first call that needs a token and refreshes the token less than
+    a minute before it expires; public endpoints work without credentials.
+    `client.user.logout()` ends the session: the client forgets its tokens and clears the
+    token store.
 
     Args:
         username: E-mail of the account, needed to log in with a password.
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
             function returning a fresh code (one that asks the user keeps the secret out of
-            the program), or `whitebird.otp.TOTP`. Asked for a code only when the account has
-            two-factor authentication enabled, and to confirm sensitive operations, see
-            `confirm_operation`.
+            the program), or `whitebird.otp.TOTP`. Asked for a code only when Whitebird asks
+            for one at login, and to confirm sensitive operations it refuses without an MFA
+            token, see `confirm_operation`.
         captcha: Solves the slider captcha that Whitebird asks of accounts without two-factor
             authentication when they log in: called with a `Captcha`, returns the slider
             position. The SDK does not solve captchas itself; without a solver such a login
@@ -71,8 +75,12 @@ class Whitebird(_Client, Resources):
         token_store: Where the session is kept, in memory by default. A `FileTokenStore` keeps
             it across runs.
         timeout: Default timeout of a request in seconds, or an `httpx.Timeout`.
-        max_retries: How many times idempotent requests are retried after network errors and
-            HTTP 429, 502, 503 or 504.
+        max_retries: How many times a failed request is sent again. Requests that only read
+            (GET, HEAD, OPTIONS) are retried after network errors, timeouts and HTTP 429, 502,
+            503 or 504; other requests only after HTTP 429 or a failure to connect, when
+            Whitebird surely did not process them.
+        language: Language of the messages Whitebird answers with, sent as `Accept-Language`
+            with every request, e.g. `"en"` or `"ru"`. By default the header is not sent.
         http_client: An `httpx.Client` to send requests with (proxies, certificates, ...). It
             is left open by `close()`.
 
@@ -117,9 +125,10 @@ class Whitebird(_Client, Resources):
         token_store: TokenStore | None = None,
         timeout: float | httpx.Timeout | None = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        language: str | None = None,
         http_client: httpx.Client | None = None,
     ) -> None:
-        config = Config.create(environment, base_urls, timeout, max_retries)
+        config = Config.create(environment, base_urls, timeout, max_retries, language)
         self._http = http_client or httpx.Client()
         self._owns_http = http_client is None
         self._auth = SyncAuthenticator(
@@ -135,12 +144,15 @@ class Whitebird(_Client, Resources):
         """Logs in with the password now rather than on the first authenticated call.
 
         Args:
-            code: One-time code; by default one is taken from `otp`.
+            code: One-time code, used if Whitebird asks for one; by default one is taken from
+                `otp`.
 
         Raises:
-            MFARequiredError: Two-factor authentication is enabled and no code is available.
-            CaptchaRequiredError: Whitebird asks for a captcha and no `captcha` solver is set.
-            AuthenticationError: The credentials or the code were rejected.
+            MFARequiredError: Whitebird asks for a one-time code and none is available.
+            CaptchaRequiredError: The account has no two-factor authentication and no
+                `captcha` solver is set, or the solver failed three times.
+            AuthenticationError: There is no account with this username, or the password or
+                the code were rejected.
         """
         self._auth.login(code)
 
@@ -148,8 +160,9 @@ class Whitebird(_Client, Resources):
         """Obtains the MFA token that sensitive operations such as withdrawals require.
 
         The token is kept in `mfa_token` and sent with the following requests. With `otp`
-        configured there is no need to call this: those operations obtain a token on their own
-        when none is set or the current one has expired.
+        configured there is no need to call this: when Whitebird refuses one of those
+        operations for MFA, the client obtains a token with a code from `otp` and sends the
+        operation once more. Operations refused at the same time share one confirmation.
 
         Args:
             operation: Kind of operation to confirm, e.g. `"WITHDRAWAL"`.
@@ -237,7 +250,8 @@ class Whitebird(_Client, Resources):
             service: Service key, e.g. `"trading"` or `"market_data"`.
             method: HTTP method.
             path: Path from the service root, with `{name}` placeholders for `path_params`.
-            path_params: Values of the path placeholders; they are URL-quoted.
+            path_params: Values of the path placeholders; they are URL-quoted, and an empty
+                value, `.` or `..` raises `ValueError`.
             params: Query parameters; list values are repeated.
             json: JSON body; models are written with their wire names.
             data: Form fields, sent form-encoded, or as text parts together with `files`.
@@ -255,6 +269,8 @@ class Whitebird(_Client, Resources):
         Returns:
             The response validated against `cast_to`; without it the decoded JSON (non-integer
             numbers as `Decimal`), the text of a non-JSON response, or None for an empty body.
+            Dates and datetimes in `params`, `data` and `json` are sent as `2024-05-01` and
+            `2024-05-01T12:30:00+0000`; a naive datetime is taken to be in UTC.
 
         Examples:
             ```python
@@ -312,9 +328,8 @@ class AsyncWhitebird(_Client, AsyncResources):
         password: Password of the account.
         otp: One-time codes for accounts with two-factor authentication: a static code, a
             function or coroutine function returning a fresh code, or
-            `whitebird.otp.TOTP`. Asked for a code only when the account has two-factor
-            authentication enabled, and to confirm sensitive operations, see
-            `confirm_operation`.
+            `whitebird.otp.TOTP`. Asked for a code only when Whitebird asks for one at login,
+            and to confirm sensitive operations, see `confirm_operation`.
         captcha: Solves the login captcha of accounts without two-factor authentication, see
             `Whitebird`: a function or a coroutine function.
         environment: `"production"`, or `"demo"` for the sandbox trading contour.
@@ -322,8 +337,8 @@ class AsyncWhitebird(_Client, AsyncResources):
         token_store: Where the session is kept, in memory by default. A `FileTokenStore` keeps
             it across runs.
         timeout: Default timeout of a request in seconds, or an `httpx.Timeout`.
-        max_retries: How many times idempotent requests are retried after network errors and
-            HTTP 429, 502, 503 or 504.
+        max_retries: How many times a failed request is sent again, see `Whitebird`.
+        language: Value of the `Accept-Language` header sent with every request.
         http_client: An `httpx.AsyncClient` to send requests with. It is left open by
             `aclose()`.
 
@@ -351,9 +366,10 @@ class AsyncWhitebird(_Client, AsyncResources):
         token_store: TokenStore | None = None,
         timeout: float | httpx.Timeout | None = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        language: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
-        config = Config.create(environment, base_urls, timeout, max_retries)
+        config = Config.create(environment, base_urls, timeout, max_retries, language)
         self._http = http_client or httpx.AsyncClient()
         self._owns_http = http_client is None
         self._auth = AsyncAuthenticator(
@@ -368,13 +384,7 @@ class AsyncWhitebird(_Client, AsyncResources):
     async def login(self, code: str | None = None) -> None:
         """Logs in with the password now rather than on the first authenticated call.
 
-        Args:
-            code: One-time code; by default one is taken from `otp`.
-
-        Raises:
-            MFARequiredError: Two-factor authentication is enabled and no code is available.
-            CaptchaRequiredError: Whitebird asks for a captcha and no `captcha` solver is set.
-            AuthenticationError: The credentials or the code were rejected.
+        See `Whitebird.login`.
         """
         await self._auth.login(code)
 

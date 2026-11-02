@@ -48,7 +48,8 @@ class SyncPager(Generic[T]):
     """Iterates over the items of a paginated listing, fetching pages lazily.
 
     Iteration starts at the page passed to the method (the first page by default) and stops
-    after the last one.
+    after the last one. Each page is fetched when the iteration reaches it; a failed fetch
+    raises, and iterating again fetches it again.
 
     Examples:
         ```python
@@ -69,10 +70,16 @@ class SyncPager(Generic[T]):
             yield from page.content
 
     def pages(self) -> Iterator[Page[T]]:
-        """Yields whole pages, with their metadata, from the starting page to the last one."""
+        """Yields whole pages, with their metadata, from the starting page to the last one.
+
+        Stops early if Whitebird answers with another page than the one requested, which
+        means the endpoint ignores the page number.
+        """
         number = self._start
         while True:
             page = self._fetch(number)
+            if page.number is not None and page.number != number:
+                return
             yield page
             if not page.has_next:
                 return
@@ -112,10 +119,15 @@ class AsyncPager(Generic[T]):
                 yield item
 
     async def pages(self) -> AsyncIterator[Page[T]]:
-        """Yields whole pages, with their metadata, from the starting page to the last one."""
+        """Yields whole pages, with their metadata, from the starting page to the last one.
+
+        Stops early if Whitebird answers with another page than the one requested.
+        """
         number = self._start
         while True:
             page = await self._fetch(number)
+            if page.number is not None and page.number != number:
+                return
             yield page
             if not page.has_next:
                 return

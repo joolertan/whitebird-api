@@ -20,7 +20,8 @@ __all__ = ["TOTP"]
 class TOTP:
     """Generates the codes of an authenticator app from its base32 secret.
 
-    Pass an instance as `otp=` to the client: it is called for a fresh code at every login.
+    Pass an instance as `otp=` to the client: it is called for a fresh code whenever Whitebird
+    asks for one, at login or to confirm an operation.
 
     Args:
         secret: Base32 secret shown when two-factor authentication was enabled (spaces and

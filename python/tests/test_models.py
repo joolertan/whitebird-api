@@ -50,6 +50,12 @@ def test_enums_are_open() -> None:
     assert Trade.model_validate({"tradeId": "t", "level": 1}).level is Level.LOW
 
 
+@pytest.mark.parametrize("value", [{"a": 1}, ["BUY"]])
+def test_enum_of_the_wrong_shape_is_a_validation_error(value: object) -> None:
+    with pytest.raises(ValidationError):
+        Trade.model_validate({"tradeId": "t", "side": value})
+
+
 def test_unknown_values_of_a_closed_enum_type_fail() -> None:
     class Strict(WhitebirdModel):
         side: Side
@@ -63,6 +69,7 @@ def test_unknown_values_of_a_closed_enum_type_fail() -> None:
     [
         "2024-05-01T12:30:00Z",
         "2024-05-01T15:30:00+03:00",
+        "2024-05-01T15:30:00+0300",
         "2024-05-01T12:30:00",
         1714566600000,
         "1714566600000",

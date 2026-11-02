@@ -42,17 +42,21 @@ with client.notifications.stream() as events:
 `AsyncWhitebird` offers the same methods as coroutines, with `async for` over listings and
 streams.
 
-- **Sessions:** the client signs in on the first call that needs it, refreshes the token before it
-  expires and keeps it in a token store (`FileTokenStore` survives restarts).
+- **Sessions:** the client signs in on the first call that needs it, refreshes the token a minute
+  before it expires and keeps it in a token store (`FileTokenStore` survives restarts);
+  `client.user.logout()` ends the session.
 - **Two-factor codes:** `otp=` takes `TOTP(secret)`, a function returning the current code (one
   that asks the user keeps the secret out of the program; coroutine functions with
-  `AsyncWhitebird`) or a fixed code.
-- **Captcha:** accounts without two-factor authentication may get a slider captcha; pass
+  `AsyncWhitebird`) or a fixed code. It is asked for a code only when Whitebird wants one.
+- **Captcha:** accounts without two-factor authentication sign in through a slider captcha; pass
   `captcha=` a function that returns the slider position.
-- **Withdrawals:** with `otp` configured the client obtains the operation MFA token on its own;
+- **Withdrawals:** when Whitebird refuses an operation for MFA and `otp` is configured, the client
+  obtains the operation MFA token and sends the operation again;
   `client.confirm_operation("WITHDRAWAL", code)` does it explicitly.
-- **Errors:** `APIError` subclasses carry `status_code`, `error_code`, `sub_status`, `message` and
-  `fields`; network failures raise `TransportError`.
+- **Errors and retries:** `APIError` subclasses carry `status_code`, `error_code`, `sub_status`,
+  `message` and `fields`; network failures raise `TransportError`. Reads are retried after
+  network errors, timeouts and HTTP 429/502/503/504, other requests only when Whitebird surely
+  did not process them (HTTP 429, connection failures).
 - **Escape hatch:** `client.request(service, method, path, ...)` calls endpoints the SDK does not
   cover yet.
 

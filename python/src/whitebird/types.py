@@ -54,7 +54,7 @@ class Captcha:
 
 
 CaptchaSolver: TypeAlias = Callable[[Captcha], int]
-"""Returns the slider position that solves a captcha."""
+"""Returns the slider position that solves a captcha, in pixels."""
 
 AsyncCaptchaSolver: TypeAlias = Callable[[Captcha], int | Awaitable[int]]
 """Captcha solver of `AsyncWhitebird`: a plain function or a coroutine function."""
@@ -68,8 +68,10 @@ class RequestOptions(TypedDict, total=False):
             None disables it.
         extra_headers: Headers to add to the request, overriding those set by the client.
         max_retries: Number of retries instead of the client default.
-        idempotent: Allows retrying a request whose method is not idempotent, e.g. a POST
-            that only reads data. GET, HEAD, PUT, DELETE and OPTIONS are always retried.
+        idempotent: Retries the request like a read, also after network errors, timeouts
+            and HTTP 502, 503 and 504, e.g. a POST that only searches. Without it only GET,
+            HEAD and OPTIONS are retried that way; other methods only after HTTP 429 or a
+            failure to connect.
     """
 
     timeout: float | httpx.Timeout | None

@@ -69,13 +69,14 @@ class ExchangeAssetsResource(SyncResource):
         self,
         *,
         destination: ExchangeDestination | str | None = None,
-        merchant_id: str | None = None,
+        merchant_id: str = "11111111-1111-1111-1111-111111111111",
         **options: Unpack[RequestOptions],
     ) -> ExchangeAssets:
         """List assets available for a destination.
 
-        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app falls
-        back to `11111111-1111-1111-1111-111111111111` when embedded without one.
+        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app always
+        sends one, `11111111-1111-1111-1111-111111111111` (Whitebird itself) unless embedded in a
+        merchant's widget.
 
         Args:
             destination: `destination` query parameter.
@@ -215,6 +216,10 @@ class ExchangeOrdersResource(SyncResource):
         `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON` (anti-fraud),
         `EXCHANGE_UNAVAILABLE`.
 
+        Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`
+        (see `user.antifraud` and `kyc.liveness`); after the check, send the same request again. If
+        the quote expired meanwhile it fails with `QUOTE_NOT_FOUND`: request a new quote.
+
         Args:
             quote_id: `quoteId` body field.
             destination: `destination` body field.
@@ -313,7 +318,7 @@ class ExchangeOrdersResource(SyncResource):
     def current(
         self,
         *,
-        destination: ExchangeDestination | str | None = None,
+        destination: ExchangeDestination | str = ExchangeDestination.EXCHANGE,
         **options: Unpack[RequestOptions],
     ) -> ExchangeOrder:
         """Get the active order.
@@ -370,13 +375,15 @@ class ExchangeOrdersResource(SyncResource):
         *,
         page: int = 0,
         size: int = 20,
-        sort: Sequence[str] | None = None,
+        sort: str = "creationDate,desc",
         limit: int = 20,
         input_assets: Sequence[str] | None = None,
         output_assets: Sequence[str] | None = None,
         input_operation_types: Sequence[ExchangeLegType | str] | None = None,
         output_operation_types: Sequence[ExchangeLegType | str] | None = None,
         statuses: Sequence[ExchangeOrderStatus | str] | None = None,
+        assets: Sequence[str] | None = None,
+        operation_types: Sequence[ExchangeLegType | str] | None = None,
         creation_date_frame: ExchangeDateFrame | None = None,
         **options: Unpack[RequestOptions],
     ) -> SyncPager[ExchangeOrder]:
@@ -385,14 +392,15 @@ class ExchangeOrdersResource(SyncResource):
         Args:
             page: Zero-based page index.
             size: Page size.
-            sort: Sort criteria in the format `property,(asc|desc)`; the web app uses
-                `creationDate,desc`.
+            sort: Sort criteria in the format `property,(asc|desc)`.
             limit: `limit` body field.
             input_assets: `inputAssets` body field.
             output_assets: `outputAssets` body field.
             input_operation_types: `inputOperationTypes` body field.
             output_operation_types: `outputOperationTypes` body field.
             statuses: `statuses` body field.
+            assets: Orders with one of these assets on either leg.
+            operation_types: Orders with one of these leg types on either leg.
             creation_date_frame: `creationDateFrame` body field.
             **options: Per-request options, see `RequestOptions`.
 
@@ -415,6 +423,8 @@ class ExchangeOrdersResource(SyncResource):
                 "inputOperationTypes": input_operation_types,
                 "outputOperationTypes": output_operation_types,
                 "statuses": statuses,
+                "assets": assets,
+                "operationTypes": operation_types,
                 "creationDateFrame": creation_date_frame,
             },
             cast_to=Page[ExchangeOrder],
@@ -440,8 +450,9 @@ class ExchangeQuotesResource(SyncResource):
         Prices a conversion between two legs. Each leg is an `INTERNAL_BALANCE` (Whitebird
         electronic wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER` (bank
         card / bank account of a payment provider). Set the amount on exactly one leg; the other one
-        is computed. The quote `id` is then passed to `exchange.orders.create`. The web app
-        re-requests the quote every 15 s while the form is open.
+        is computed. The quote `id` is then passed to `exchange.orders.create`. The quote is valid
+        until `expirationDate`; the web app requests a new one 2 s before that (`expirationDate` -
+        `creationDate` - 2 s), or every 15 s when the dates are missing.
 
         Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
         `AMOUNT_TOO_SMALL`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.
@@ -549,13 +560,14 @@ class AsyncExchangeAssetsResource(AsyncResource):
         self,
         *,
         destination: ExchangeDestination | str | None = None,
-        merchant_id: str | None = None,
+        merchant_id: str = "11111111-1111-1111-1111-111111111111",
         **options: Unpack[RequestOptions],
     ) -> ExchangeAssets:
         """List assets available for a destination.
 
-        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app falls
-        back to `11111111-1111-1111-1111-111111111111` when embedded without one.
+        Sent without a body. `merchantId` scopes the list to a merchant widget; the web app always
+        sends one, `11111111-1111-1111-1111-111111111111` (Whitebird itself) unless embedded in a
+        merchant's widget.
 
         Args:
             destination: `destination` query parameter.
@@ -695,6 +707,10 @@ class AsyncExchangeOrdersResource(AsyncResource):
         `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON` (anti-fraud),
         `EXCHANGE_UNAVAILABLE`.
 
+        Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`
+        (see `user.antifraud` and `kyc.liveness`); after the check, send the same request again. If
+        the quote expired meanwhile it fails with `QUOTE_NOT_FOUND`: request a new quote.
+
         Args:
             quote_id: `quoteId` body field.
             destination: `destination` body field.
@@ -793,7 +809,7 @@ class AsyncExchangeOrdersResource(AsyncResource):
     async def current(
         self,
         *,
-        destination: ExchangeDestination | str | None = None,
+        destination: ExchangeDestination | str = ExchangeDestination.EXCHANGE,
         **options: Unpack[RequestOptions],
     ) -> ExchangeOrder:
         """Get the active order.
@@ -850,13 +866,15 @@ class AsyncExchangeOrdersResource(AsyncResource):
         *,
         page: int = 0,
         size: int = 20,
-        sort: Sequence[str] | None = None,
+        sort: str = "creationDate,desc",
         limit: int = 20,
         input_assets: Sequence[str] | None = None,
         output_assets: Sequence[str] | None = None,
         input_operation_types: Sequence[ExchangeLegType | str] | None = None,
         output_operation_types: Sequence[ExchangeLegType | str] | None = None,
         statuses: Sequence[ExchangeOrderStatus | str] | None = None,
+        assets: Sequence[str] | None = None,
+        operation_types: Sequence[ExchangeLegType | str] | None = None,
         creation_date_frame: ExchangeDateFrame | None = None,
         **options: Unpack[RequestOptions],
     ) -> AsyncPager[ExchangeOrder]:
@@ -865,14 +883,15 @@ class AsyncExchangeOrdersResource(AsyncResource):
         Args:
             page: Zero-based page index.
             size: Page size.
-            sort: Sort criteria in the format `property,(asc|desc)`; the web app uses
-                `creationDate,desc`.
+            sort: Sort criteria in the format `property,(asc|desc)`.
             limit: `limit` body field.
             input_assets: `inputAssets` body field.
             output_assets: `outputAssets` body field.
             input_operation_types: `inputOperationTypes` body field.
             output_operation_types: `outputOperationTypes` body field.
             statuses: `statuses` body field.
+            assets: Orders with one of these assets on either leg.
+            operation_types: Orders with one of these leg types on either leg.
             creation_date_frame: `creationDateFrame` body field.
             **options: Per-request options, see `RequestOptions`.
 
@@ -895,6 +914,8 @@ class AsyncExchangeOrdersResource(AsyncResource):
                 "inputOperationTypes": input_operation_types,
                 "outputOperationTypes": output_operation_types,
                 "statuses": statuses,
+                "assets": assets,
+                "operationTypes": operation_types,
                 "creationDateFrame": creation_date_frame,
             },
             cast_to=Page[ExchangeOrder],
@@ -920,8 +941,9 @@ class AsyncExchangeQuotesResource(AsyncResource):
         Prices a conversion between two legs. Each leg is an `INTERNAL_BALANCE` (Whitebird
         electronic wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER` (bank
         card / bank account of a payment provider). Set the amount on exactly one leg; the other one
-        is computed. The quote `id` is then passed to `exchange.orders.create`. The web app
-        re-requests the quote every 15 s while the form is open.
+        is computed. The quote `id` is then passed to `exchange.orders.create`. The quote is valid
+        until `expirationDate`; the web app requests a new one 2 s before that (`expirationDate` -
+        `creationDate` - 2 s), or every 15 s when the dates are missing.
 
         Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
         `AMOUNT_TOO_SMALL`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.

@@ -1,9 +1,20 @@
-"""OAuth password login and token refresh, renewed by a single caller at a time."""
+"""OAuth password login and token refresh, renewed by a single caller at a time.
+
+Logging in follows the sign-in form of the web application:
+
+1. Ask whether the account has two-factor authentication (`OAUTH_MFA_STATUS_PATH`). If that
+   fails, no password is sent.
+2. With two-factor authentication, send a password grant. Whitebird either answers with tokens
+   or with `{"mfaEnabled": true}`, and then a second grant carries the one-time code.
+3. Without it, the password grant carries a solved slider captcha; a rejected answer is retried
+   with a new captcha. An answer of `{"mfaEnabled": true}` leads to the code step as well.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import dataclasses
 import inspect
 import json
 import logging
@@ -16,7 +27,7 @@ from typing import Any
 
 import httpx
 
-from ._config import USER_AGENT, Config
+from ._config import Config
 from ._exceptions import (
     APIError,
     AuthenticationError,
@@ -36,9 +47,13 @@ from ._generated.services import (
 from .tokens import Tokens, TokenStore
 from .types import AsyncCaptchaSolver, AsyncCodeProvider, Captcha, CaptchaSolver
 
-REFRESH_MARGIN = 30.0
+# The web application renews the access token when less than a minute of it is left.
+REFRESH_MARGIN = 60.0
 CAPTCHA_ATTEMPTS = 3
 INVALID_CAPTCHA = "INVALID_CAPTCHA"
+NOT_FOUND = "NOT_FOUND"
+# Answers of the token endpoint that mean the refresh token is no longer valid.
+REJECTED_REFRESH = frozenset({400, 401})
 
 _MFA_REQUIRED = (
     "Two-factor authentication is enabled for this account: pass otp= to the client "
@@ -48,6 +63,14 @@ _CAPTCHA_REQUIRED = (
     "The account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: "
     "pass captcha= a solver or enable two-factor authentication"
 )
+_NOT_LOGGED_IN = (
+    "Not logged in: pass username and password to the client, or a token store that holds a session"
+)
+_SESSION_EXPIRED = (
+    "The session has expired and its refresh token was rejected: pass username and password "
+    "to the client to log in again"
+)
+_NO_ACCOUNT = "There is no Whitebird account with this username"
 
 logger = logging.getLogger("whitebird")
 
@@ -71,12 +94,12 @@ class Credentials:
             if inspect.iscoroutine(code):
                 code.close()
             raise TypeError("otp returned an awaitable: coroutine functions need AsyncWhitebird")
-        return code
+        return clean_code(code)
 
     async def acode(self) -> str | None:
         """Returns a one-time code, awaiting it if the provider is a coroutine function."""
         code = self._provide()
-        return await code if inspect.isawaitable(code) else code
+        return clean_code(await code if inspect.isawaitable(code) else code)
 
     def _provide(self) -> str | Awaitable[str] | None:
         if self.otp is None or isinstance(self.otp, str):
@@ -84,8 +107,21 @@ class Credentials:
         return self.otp()
 
 
+def clean_code(code: object) -> str | None:
+    """Trims a one-time code as the web application does; None when nothing is left."""
+    if code is None:
+        return None
+    return str(code).strip() or None
+
+
 class _Authenticator:
-    """Session state and OAuth requests shared by the sync and async authenticators."""
+    """Session state and OAuth requests shared by the sync and async authenticators.
+
+    The session is loaded from the token store on first use and reloaded before it is renewed,
+    which adopts tokens saved meanwhile by another client sharing the store. Every login and
+    refresh notes the session generation it started in, and does not store its tokens if the
+    session was ended or replaced since (see `end_session`).
+    """
 
     def __init__(
         self,
@@ -98,40 +134,121 @@ class _Authenticator:
         self._config = config
         self.credentials = credentials
         self._store = store
-        self._tokens = store.load()
+        self._tokens: Tokens | None = None
+        self._loaded = False
+        self._generation = 0
+        self.mfa_token: str | None = None
+        """Operation MFA token, sent as `x-mfa-token` while set; forgotten with the session."""
+
+    # Session state
+
+    def _session(self) -> Tokens | None:
+        if not self._loaded:
+            self._tokens = _complete(self._store.load())
+            self._loaded = True
+        return self._tokens
 
     def _valid_token(self) -> str | None:
-        tokens = self._tokens
+        tokens = self._session()
         if tokens is None or tokens.expires_within(REFRESH_MARGIN):
             return None
         return tokens.access_token
 
-    def _needs_renewal(self, rejected: str) -> bool:
-        # False when another caller renewed the session since `rejected` was handed out.
-        return self._tokens is None or self._tokens.access_token == rejected
+    def _reload(self) -> None:
+        """Adopts tokens that another client saved to the store since they were loaded."""
+        try:
+            stored = _complete(self._store.load())
+        except Exception:
+            logger.warning("Could not load the session from the token store", exc_info=True)
+            return
+        current = self._tokens
+        if stored is not None and (
+            current is None
+            or (stored.access_token, stored.refresh_token)
+            != (current.access_token, current.refresh_token)
+        ):
+            self._tokens = stored
 
-    def _refresh_request(self) -> httpx.Request | None:
-        refresh_token = self._tokens.refresh_token if self._tokens else None
-        if not refresh_token:
+    def _usable(self, rejected: str | None) -> Tokens | None:
+        """Returns the current tokens if they need no renewal: not rejected, not expiring."""
+        tokens = self._tokens
+        if tokens is None or tokens.access_token == rejected:
             return None
-        return self._token_request({"grant_type": "refresh_token", "refresh_token": refresh_token})
+        if not tokens.expires_within(REFRESH_MARGIN):
+            return tokens
+        if not self.credentials.can_login and not _can_refresh(tokens):
+            # Nothing to renew it with: use it until it actually expires.
+            return None if tokens.expires_within(0) else tokens
+        return None
 
-    def _needs_code(self, mfa_enabled: bool | None, *, has_solver: bool) -> bool:
-        """Whether a password login sends a one-time code, given the account's 2FA status.
+    def _adopt(self, tokens: Tokens, generation: int) -> Tokens:
+        if generation == self._generation:
+            self._tokens = tokens
+            self._loaded = True
+            try:
+                self._store.save(tokens)
+            except Exception:
+                logger.warning("Could not save the session to the token store", exc_info=True)
+        return tokens
 
-        Accounts without 2FA sign in through a captcha instead, so an unknown status means 2FA
-        exactly when a code provider is configured.
+    def _forget(self) -> None:
+        self._tokens = None
+        self._loaded = True
+        self.mfa_token = None
+        try:
+            self._store.clear()
+        except Exception:
+            logger.warning("Could not clear the token store", exc_info=True)
 
-        Raises:
-            CaptchaRequiredError: The account has no 2FA and no captcha solver is configured.
+    def end_session(self) -> None:
+        """Forgets the session (after a logout); a login or refresh in flight does not keep it."""
+        self._generation += 1
+        self._forget()
+
+    @property
+    def generation(self) -> int:
+        """Changes whenever the session is ended or replaced."""
+        return self._generation
+
+    def replace_session(
+        self, response: httpx.Response, generation: int, new_password: str | None = None
+    ) -> None:
+        """Stores the token pair that a call such as a password change answered with.
+
+        `generation` is the session generation when the call was sent: if the session ended or
+        was replaced meanwhile, the answer is ignored. `new_password` (the password change's
+        `newPassword`) replaces the password used for later logins.
         """
-        if mfa_enabled is False and not has_solver:
-            raise CaptchaRequiredError(_CAPTCHA_REQUIRED)
-        return self.credentials.otp is not None if mfa_enabled is None else mfa_enabled
+        body = _json_object(response)
+        if not _access_token(body):
+            logger.warning("Expected a new token pair in the response, the session is unchanged")
+            return
+        if generation != self._generation:
+            return
+        self._generation += 1
+        self._adopt(_tokens(body, self._tokens), self._generation)
+        if new_password and self.credentials.password is not None:
+            self.credentials = dataclasses.replace(self.credentials, password=new_password)
 
-    def _password_request(self, code: str | None, answer: str | None = None) -> httpx.Request:
-        username, password = self._username(), self.credentials.password
-        form = {"grant_type": "password", "username": username, "password": password or ""}
+    # Requests
+
+    def _require_credentials(self) -> None:
+        if not self.credentials.can_login:
+            raise AuthenticationError(_NOT_LOGGED_IN)
+
+    def _refresh_request(self, tokens: Tokens) -> httpx.Request:
+        form = {"grant_type": "refresh_token", "refresh_token": tokens.refresh_token or ""}
+        return self._token_request(form)
+
+    def _password_request(
+        self, code: str | None = None, answer: str | None = None
+    ) -> httpx.Request:
+        username = (self.credentials.username or "").lower()
+        form = {
+            "grant_type": "password",
+            "username": username,
+            "password": self.credentials.password or "",
+        }
         if code:
             form["code"] = code
         return self._token_request(form, {"captcha": answer} if answer else {})
@@ -140,8 +257,8 @@ class _Authenticator:
         return self._build_request(
             "POST",
             self._config.url(OAUTH_SERVICE, OAUTH_MFA_STATUS_PATH),
-            json={"username": self._username()},
-            headers={"User-Agent": USER_AGENT},
+            json={"username": self.credentials.username},
+            headers=self._config.headers(),
             timeout=self._config.timeout,
         )
 
@@ -150,7 +267,7 @@ class _Authenticator:
             "GET",
             self._config.url(OAUTH_SERVICE, OAUTH_CAPTCHA_PATH),
             params={"requestId": request_id},
-            headers={"User-Agent": USER_AGENT},
+            headers=self._config.headers(),
             timeout=self._config.timeout,
         )
 
@@ -162,26 +279,41 @@ class _Authenticator:
             self._config.url(OAUTH_SERVICE, OAUTH_TOKEN_PATH),
             data=form,
             headers={
+                **self._config.headers(),
                 "Authorization": f"Basic {OAUTH_BASIC}",
-                "User-Agent": USER_AGENT,
                 **(headers or {}),
             },
             timeout=self._config.timeout,
         )
 
-    def _username(self) -> str:
+    def _code_step(self, response: httpx.Response) -> bool:
+        """Tells whether a password grant answered that the one-time code is needed."""
+        body = _json_object(response)
+        return not _access_token(body) and bool(body.get("mfaEnabled"))
+
+    def _login_tokens(
+        self, response: httpx.Response, generation: int, *, code_sent: bool
+    ) -> Tokens:
+        return self._adopt(_parse_tokens(response, code_sent=code_sent), generation)
+
+    def _refreshed(self, response: httpx.Response, previous: Tokens, generation: int) -> Tokens:
+        body = _json_object(response)
+        if not _access_token(body):
+            raise _without_token(response, body)
+        return self._adopt(_tokens(body, previous), generation)
+
+    def _rejected_refresh(self, error: APIError) -> None:
+        """Forgets a session whose refresh token was rejected; raises if no login is possible."""
+        logger.info("The refresh token was rejected")
+        self._forget()
         if not self.credentials.can_login:
             raise AuthenticationError(
-                "Not logged in: pass username and password to the client, "
-                "or a token store that holds a session"
-            )
-        return (self.credentials.username or "").lower()
-
-    def _accept(self, response: httpx.Response, *, code_sent: bool) -> Tokens:
-        tokens = _parse_tokens(response, code_sent=code_sent)
-        self._tokens = tokens
-        self._store.save(tokens)
-        return tokens
+                _SESSION_EXPIRED,
+                status_code=error.status_code,
+                error_code=error.error_code,
+                body=error.body,
+                response=error.response,
+            ) from error
 
 
 class SyncAuthenticator(_Authenticator):
@@ -205,63 +337,73 @@ class SyncAuthenticator(_Authenticator):
         token = self._valid_token()
         if token is None:
             with self._lock:
-                token = self._valid_token() or self._renew().access_token
+                token = self._valid_token() or self._renew(None).access_token
         return token
 
     def refresh(self, rejected: str) -> None:
         """Renews the session after `rejected` got a 401, unless another call already did."""
         with self._lock:
-            if self._needs_renewal(rejected):
-                self._renew()
+            self._renew(rejected)
 
     def login(self, code: str | None = None) -> None:
         """Logs in with the password, even if a session exists."""
         with self._lock:
-            self._login(code)
+            self._login(clean_code(code), self._generation)
 
-    def _renew(self) -> Tokens:
-        request = self._refresh_request()
-        if request is not None:
+    def _renew(self, rejected: str | None) -> Tokens:
+        generation = self._generation
+        self._reload()
+        tokens = self._usable(rejected)
+        if tokens is not None:
+            return tokens
+        current = self._tokens
+        if current is not None and _can_refresh(current):
             try:
-                return self._accept(self._send(request), code_sent=False)
-            except AuthenticationError:
-                if not self.credentials.can_login:
+                response = self._send(self._refresh_request(current), login=True)
+            except APIError as error:
+                if error.status_code not in REJECTED_REFRESH:
                     raise
-                logger.info("Refresh token rejected, logging in again")
-        return self._login(None)
+                self._rejected_refresh(error)
+            else:
+                return self._refreshed(response, current, generation)
+        return self._login(None, generation)
 
-    def _login(self, code: str | None) -> Tokens:
-        if code is None and self._needs_code(
-            self._mfa_status(), has_solver=self._captcha is not None
-        ):
-            code = self.credentials.code()
-            if code is None:
-                raise MFARequiredError(_MFA_REQUIRED)
-        solver = self._captcha if code is None else None
+    def _login(self, code: str | None, generation: int) -> Tokens:
+        self._require_credentials()
+        if self._mfa_status():
+            response = self._send(self._password_request(), login=True)
+        elif self._captcha is None:
+            raise CaptchaRequiredError(_CAPTCHA_REQUIRED)
+        else:
+            response = self._captcha_login(self._captcha)
+        if not self._code_step(response):
+            return self._login_tokens(response, generation, code_sent=False)
+        code = code or self.credentials.code()
+        if code is None:
+            raise MFARequiredError(_MFA_REQUIRED)
+        response = self._send(self._password_request(code), login=True)
+        return self._login_tokens(response, generation, code_sent=True)
+
+    def _captcha_login(self, solver: CaptchaSolver) -> httpx.Response:
         attempt = 1
         while True:
-            answer = self._solve_captcha(solver) if solver else None
-            request = self._password_request(code, answer)
+            request_id = str(uuid.uuid4())
+            captcha = _parse_captcha(request_id, self._send(self._captcha_request(request_id)))
+            answer = _captcha_answer(captcha, solver(captcha))
             try:
-                response = self._send(request, login=True)
+                return self._send(self._password_request(None, answer), login=True)
             except CaptchaRequiredError as error:
-                if not _retry_captcha(error, answer, attempt):
+                if not _retry_captcha(error, attempt):
                     raise
-            else:
-                return self._accept(response, code_sent=code is not None)
             attempt += 1
 
-    def _solve_captcha(self, solver: CaptchaSolver) -> str:
-        request_id = str(uuid.uuid4())
-        captcha = _parse_captcha(request_id, self._send(self._captcha_request(request_id)))
-        return _captcha_answer(captcha, solver(captcha))
-
-    def _mfa_status(self) -> bool | None:
-        """Asks whether the account has 2FA enabled; `None` if the check fails."""
+    def _mfa_status(self) -> bool:
+        """Asks whether the account has two-factor authentication enabled."""
         try:
-            return _mfa_enabled(self._send(self._mfa_check_request()))
-        except APIError:
-            return None
+            response = self._send(self._mfa_check_request())
+        except APIError as error:
+            raise _status_error(error) from error
+        return _mfa_enabled(response)
 
     def _send(self, request: httpx.Request, *, login: bool = False) -> httpx.Response:
         try:
@@ -294,66 +436,77 @@ class AsyncAuthenticator(_Authenticator):
         token = self._valid_token()
         if token is None:
             async with self._lock:
-                token = self._valid_token() or (await self._renew()).access_token
+                token = self._valid_token() or (await self._renew(None)).access_token
         return token
 
     async def refresh(self, rejected: str) -> None:
         """Renews the session after `rejected` got a 401, unless another task already did."""
         async with self._lock:
-            if self._needs_renewal(rejected):
-                await self._renew()
+            await self._renew(rejected)
 
     async def login(self, code: str | None = None) -> None:
         """Logs in with the password, even if a session exists."""
         async with self._lock:
-            await self._login(code)
+            await self._login(clean_code(code), self._generation)
 
-    async def _renew(self) -> Tokens:
-        request = self._refresh_request()
-        if request is not None:
+    async def _renew(self, rejected: str | None) -> Tokens:
+        generation = self._generation
+        self._reload()
+        tokens = self._usable(rejected)
+        if tokens is not None:
+            return tokens
+        current = self._tokens
+        if current is not None and _can_refresh(current):
             try:
-                return self._accept(await self._send(request), code_sent=False)
-            except AuthenticationError:
-                if not self.credentials.can_login:
+                response = await self._send(self._refresh_request(current), login=True)
+            except APIError as error:
+                if error.status_code not in REJECTED_REFRESH:
                     raise
-                logger.info("Refresh token rejected, logging in again")
-        return await self._login(None)
+                self._rejected_refresh(error)
+            else:
+                return self._refreshed(response, current, generation)
+        return await self._login(None, generation)
 
-    async def _login(self, code: str | None) -> Tokens:
-        if code is None and self._needs_code(
-            await self._mfa_status(), has_solver=self._captcha is not None
-        ):
-            code = await self.credentials.acode()
-            if code is None:
-                raise MFARequiredError(_MFA_REQUIRED)
-        solver = self._captcha if code is None else None
+    async def _login(self, code: str | None, generation: int) -> Tokens:
+        self._require_credentials()
+        if await self._mfa_status():
+            response = await self._send(self._password_request(), login=True)
+        elif self._captcha is None:
+            raise CaptchaRequiredError(_CAPTCHA_REQUIRED)
+        else:
+            response = await self._captcha_login(self._captcha)
+        if not self._code_step(response):
+            return self._login_tokens(response, generation, code_sent=False)
+        code = code or await self.credentials.acode()
+        if code is None:
+            raise MFARequiredError(_MFA_REQUIRED)
+        response = await self._send(self._password_request(code), login=True)
+        return self._login_tokens(response, generation, code_sent=True)
+
+    async def _captcha_login(self, solver: AsyncCaptchaSolver) -> httpx.Response:
         attempt = 1
         while True:
-            answer = await self._solve_captcha(solver) if solver else None
-            request = self._password_request(code, answer)
+            request_id = str(uuid.uuid4())
+            response = await self._send(self._captcha_request(request_id))
+            captcha = _parse_captcha(request_id, response)
+            position = solver(captcha)
+            if inspect.isawaitable(position):
+                position = await position
+            answer = _captcha_answer(captcha, position)
             try:
-                response = await self._send(request, login=True)
+                return await self._send(self._password_request(None, answer), login=True)
             except CaptchaRequiredError as error:
-                if not _retry_captcha(error, answer, attempt):
+                if not _retry_captcha(error, attempt):
                     raise
-            else:
-                return self._accept(response, code_sent=code is not None)
             attempt += 1
 
-    async def _solve_captcha(self, solver: AsyncCaptchaSolver) -> str:
-        request_id = str(uuid.uuid4())
-        captcha = _parse_captcha(request_id, await self._send(self._captcha_request(request_id)))
-        position = solver(captcha)
-        if inspect.isawaitable(position):
-            position = await position
-        return _captcha_answer(captcha, position)
-
-    async def _mfa_status(self) -> bool | None:
-        """Asks whether the account has 2FA enabled; `None` if the check fails."""
+    async def _mfa_status(self) -> bool:
+        """Asks whether the account has two-factor authentication enabled."""
         try:
-            return _mfa_enabled(await self._send(self._mfa_check_request()))
-        except APIError:
-            return None
+            response = await self._send(self._mfa_check_request())
+        except APIError as error:
+            raise _status_error(error) from error
+        return _mfa_enabled(response)
 
     async def _send(self, request: httpx.Request, *, login: bool = False) -> httpx.Response:
         try:
@@ -365,16 +518,26 @@ class AsyncAuthenticator(_Authenticator):
         return response
 
 
+def _status_error(error: APIError) -> APIError:
+    """The error to raise when the two-factor status check fails: no password is sent then."""
+    unknown = error.status_code == 404 or (
+        isinstance(error.body, dict) and error.body.get("status") == NOT_FOUND
+    )
+    if not unknown:
+        return error
+    return AuthenticationError(
+        _NO_ACCOUNT,
+        status_code=error.status_code,
+        error_code=error.error_code,
+        body=error.body,
+        response=error.response,
+    )
+
+
 def _parse_tokens(response: httpx.Response, *, code_sent: bool) -> Tokens:
     body = _json_object(response)
-    access_token = body.get("access_token")
-    if isinstance(access_token, str) and access_token:
-        refresh_token = body.get("refresh_token")
-        return Tokens(
-            access_token=access_token,
-            refresh_token=refresh_token if isinstance(refresh_token, str) else None,
-            expires_at=_expiry(access_token, body.get("expires_in")),
-        )
+    if _access_token(body):
+        return _tokens(body)
     details: dict[str, Any] = {
         "status_code": response.status_code,
         "body": body,
@@ -384,7 +547,34 @@ def _parse_tokens(response: httpx.Response, *, code_sent: bool) -> Tokens:
         if code_sent:
             raise AuthenticationError("The one-time code was rejected", **details)
         raise MFARequiredError(_MFA_REQUIRED, **details)
-    raise AuthenticationError("The token endpoint answered without an access token", **details)
+    raise _without_token(response, body)
+
+
+def _without_token(response: httpx.Response, body: dict[str, Any]) -> AuthenticationError:
+    return AuthenticationError(
+        "The token endpoint answered without an access token",
+        status_code=response.status_code,
+        body=body,
+        response=response,
+    )
+
+
+def _access_token(body: dict[str, Any]) -> str | None:
+    token = body.get("access_token")
+    return token if isinstance(token, str) and token else None
+
+
+def _tokens(body: dict[str, Any], previous: Tokens | None = None) -> Tokens:
+    """Reads a token pair; a missing refresh token keeps the previous one."""
+    access_token = _access_token(body) or ""
+    refresh_token = body.get("refresh_token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        refresh_token = previous.refresh_token if previous else None
+    return Tokens(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=_expiry(access_token, body.get("expires_in")),
+    )
 
 
 def _parse_captcha(request_id: str, response: httpx.Response) -> Captcha:
@@ -411,22 +601,28 @@ def _image(value: object) -> bytes:
     return base64.b64decode(value.rpartition("base64,")[2])
 
 
-def _captcha_answer(captcha: Captcha, position: int) -> str:
-    answer = {"sliderPosition": position, "requestId": captcha.request_id}
+def _captcha_answer(captcha: Captcha, position: object) -> str:
+    try:
+        pixels = round(float(position))  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError) as error:
+        raise TypeError(
+            f"the captcha solver must return the slider position in pixels, got {position!r}"
+        ) from error
+    # The web application sends the value of its range input: an integer as a string.
+    answer = {"sliderPosition": str(pixels), "requestId": captcha.request_id}
     return base64.b64encode(json.dumps(answer, separators=(",", ":")).encode()).decode()
 
 
-def _retry_captcha(error: CaptchaRequiredError, answer: str | None, attempt: int) -> bool:
+def _retry_captcha(error: CaptchaRequiredError, attempt: int) -> bool:
     status = captcha_status(error.body) or ""
-    if answer and attempt < CAPTCHA_ATTEMPTS and status.upper() == INVALID_CAPTCHA:
+    if attempt < CAPTCHA_ATTEMPTS and status.upper() == INVALID_CAPTCHA:
         logger.info("Captcha answer rejected, solving a new captcha")
         return True
     return False
 
 
-def _mfa_enabled(response: httpx.Response) -> bool | None:
-    enabled = _json_object(response).get("mfaEnabled")
-    return enabled if isinstance(enabled, bool) else None
+def _mfa_enabled(response: httpx.Response) -> bool:
+    return bool(_json_object(response).get("mfaEnabled"))
 
 
 def _json_object(response: httpx.Response) -> dict[str, Any]:
@@ -437,13 +633,38 @@ def _json_object(response: httpx.Response) -> dict[str, Any]:
     return body if isinstance(body, dict) else {}
 
 
-def _expiry(access_token: str, expires_in: object) -> float | None:
+def _can_refresh(tokens: Tokens) -> bool:
+    """Whether the session has a refresh token that has not expired yet."""
+    if not tokens.refresh_token:
+        return False
+    expiry = jwt_expiry(tokens.refresh_token)
+    return expiry is None or expiry > time.time()
+
+
+def _complete(tokens: Tokens | None) -> Tokens | None:
+    """Fills in the expiry of tokens that lack one from the `exp` claim of the access token."""
+    if tokens is None or tokens.expires_at is not None:
+        return tokens
+    return dataclasses.replace(tokens, expires_at=jwt_expiry(tokens.access_token))
+
+
+def jwt_expiry(token: str) -> float | None:
+    """Reads the `exp` claim of a JWT, without verifying it; None if it is not a JWT."""
     try:
-        payload = access_token.split(".")[1]
+        payload = token.split(".")[1]
         claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
-        return float(claims["exp"])
+        expiry = claims["exp"]
     except (IndexError, KeyError, TypeError, ValueError):
-        pass
+        return None
+    if isinstance(expiry, bool) or not isinstance(expiry, int | float):
+        return None
+    return float(expiry)
+
+
+def _expiry(access_token: str, expires_in: object) -> float | None:
+    expiry = jwt_expiry(access_token)
+    if expiry is not None:
+        return expiry
     if isinstance(expires_in, int | float) and not isinstance(expires_in, bool):
         return time.time() + expires_in
     return None

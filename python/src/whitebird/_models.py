@@ -49,9 +49,14 @@ class _OpenEnum:
         cls, source: type[Any], handler: GetCoreSchemaHandler
     ) -> CoreSchema:
         members: dict[object, object] = getattr(cls, "_value2member_map_", {})
-        return core_schema.no_info_before_validator_function(
-            lambda value: members.get(value, value), handler(source)
-        )
+
+        def to_member(value: object) -> object:
+            try:
+                return members.get(value, value)
+            except TypeError:  # unhashable, e.g. an object where a value is expected
+                return value
+
+        return core_schema.no_info_before_validator_function(to_member, handler(source))
 
 
 class StrEnum(_OpenEnum, enum.StrEnum):
@@ -91,7 +96,7 @@ def _to_date(value: object) -> object:
 
 
 DateTime = Annotated[datetime, BeforeValidator(_from_epoch_millis), AfterValidator(_assume_utc)]
-"""A timestamp: RFC 3339, naive ISO 8601 (read as UTC) or epoch milliseconds."""
+"""A timestamp: RFC 3339, ISO 8601 with a `+HHMM` offset or none (UTC), or epoch milliseconds."""
 
 Date = Annotated[date, BeforeValidator(_to_date)]
 """A calendar date: ISO 8601 date, the date part of a timestamp, or epoch milliseconds."""

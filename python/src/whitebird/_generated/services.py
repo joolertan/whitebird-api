@@ -8,8 +8,12 @@ Environment = Literal["production", "demo"]
 
 SERVICE_URLS: Final[dict[str, dict[str, str]]] = {
     "accounting": {"production": "https://accounting-service.whitebird.io"},
+    "accounting_spot": {
+        "production": "https://api.whitebird.io",
+        "demo": "https://api-demo.whitebird.io",
+    },
     "alfa": {"production": "https://alfa-service.whitebird.io"},
-    "api": {"production": "https://api.whitebird.io", "demo": "https://api-demo.whitebird.io"},
+    "api": {"production": "https://api.whitebird.io"},
     "assist": {"production": "https://assist-service.whitebird.io"},
     "auth": {"production": "https://authorization-server.whitebird.io"},
     "bepaid": {"production": "https://bepaid-service.whitebird.io"},

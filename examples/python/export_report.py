@@ -23,7 +23,7 @@ def main() -> None:
         end=end.strftime(DATE_FORMAT),
     )
     with connect() as client:
-        statement = client.reports.download_exchange(completion_date_frame=period, type="PDF")
+        statement = client.reports.download_exchange(completion_date_frame=period)
         args.output.write_bytes(statement)
         print(f"Saved {len(statement)} bytes to {args.output}")
 

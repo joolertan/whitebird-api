@@ -17,7 +17,8 @@ def main() -> None:
     args = parser.parse_args()
 
     with connect() as client:
-        orders = client.exchange.orders.history(size=20, sort=["creationDate,desc"])
+        # Newest first: the default sort is "creationDate,desc".
+        orders = client.exchange.orders.history(size=20)
         for order in itertools.islice(orders, args.count):
             print(
                 f"#{order.number} {order.creation_date} {order.status}: "

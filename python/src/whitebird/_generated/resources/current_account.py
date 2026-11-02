@@ -9,11 +9,7 @@ from typing import Any
 
 from typing_extensions import Unpack
 
-from whitebird._generated.models import (
-    CurrentAccountDateFrame,
-    CurrentAccountFiatOpType,
-    CurrentAccountSystemAccount,
-)
+from whitebird._generated.models import CurrentAccountFiatOpType, CurrentAccountSystemAccount
 from whitebird._resource import AsyncResource, SyncResource
 from whitebird.types import RequestOptions
 
@@ -68,10 +64,7 @@ class CurrentAccountInvoicesResource(SyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> bytes:
         """Download the invoice of an exchange order.
@@ -81,10 +74,7 @@ class CurrentAccountInvoicesResource(SyncResource):
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -99,12 +89,7 @@ class CurrentAccountInvoicesResource(SyncResource):
             "POST",
             "/api/v1/currentAccount/order/{invoiceId}/invoice",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             cast_to=bytes,
             options=options,
         )
@@ -113,10 +98,7 @@ class CurrentAccountInvoicesResource(SyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> None:
         """Email the invoice of an exchange order.
@@ -125,10 +107,7 @@ class CurrentAccountInvoicesResource(SyncResource):
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -140,12 +119,7 @@ class CurrentAccountInvoicesResource(SyncResource):
             "POST",
             "/api/v1/currentAccount/order/{invoiceId}/email/invoice",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             options=options,
         )
 
@@ -153,10 +127,7 @@ class CurrentAccountInvoicesResource(SyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> bytes:
         """Download the invoice of a wallet deposit.
@@ -166,10 +137,7 @@ class CurrentAccountInvoicesResource(SyncResource):
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -184,12 +152,7 @@ class CurrentAccountInvoicesResource(SyncResource):
             "POST",
             "/api/v1/currentAccount/order/deposit/invoice/{invoiceId}",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             cast_to=bytes,
             options=options,
         )
@@ -198,20 +161,14 @@ class CurrentAccountInvoicesResource(SyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> None:
         """Email the invoice of a wallet deposit.
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -223,12 +180,7 @@ class CurrentAccountInvoicesResource(SyncResource):
             "POST",
             "/api/v1/currentAccount/order/deposit/email/invoice/{invoiceId}",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             options=options,
         )
 
@@ -352,10 +304,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> bytes:
         """Download the invoice of an exchange order.
@@ -365,10 +314,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -383,12 +329,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
             "POST",
             "/api/v1/currentAccount/order/{invoiceId}/invoice",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             cast_to=bytes,
             options=options,
         )
@@ -397,10 +338,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> None:
         """Email the invoice of an exchange order.
@@ -409,10 +347,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -424,12 +359,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
             "POST",
             "/api/v1/currentAccount/order/{invoiceId}/email/invoice",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             options=options,
         )
 
@@ -437,10 +367,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> bytes:
         """Download the invoice of a wallet deposit.
@@ -450,10 +377,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -468,12 +392,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
             "POST",
             "/api/v1/currentAccount/order/deposit/invoice/{invoiceId}",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             cast_to=bytes,
             options=options,
         )
@@ -482,20 +401,14 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
         self,
         invoice_id: str,
         *,
-        limit: int | None = None,
-        completion_date_frame: CurrentAccountDateFrame | None = None,
         type: str | None = None,
-        format: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> None:
         """Email the invoice of a wallet deposit.
 
         Args:
             invoice_id: `invoiceId` path parameter.
-            limit: `limit` body field.
-            completion_date_frame: `completionDateFrame` body field.
-            type: `type` body field.
-            format: `format` body field.
+            type: Document type; its code path could send it, but never does for invoices.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -507,12 +420,7 @@ class AsyncCurrentAccountInvoicesResource(AsyncResource):
             "POST",
             "/api/v1/currentAccount/order/deposit/email/invoice/{invoiceId}",
             path_params={"invoiceId": invoice_id},
-            json={
-                "limit": limit,
-                "completionDateFrame": completion_date_frame,
-                "type": type,
-                "format": format,
-            },
+            json={"type": type},
             options=options,
         )
 

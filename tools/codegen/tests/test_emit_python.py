@@ -35,6 +35,7 @@ from whitebird.models import (
     OrderStatus,
     Priority,
     Product,
+    ProfileUploadAvatarRequestCaption,
     ProfileUploadAvatarRequestCrop,
     Ticker,
 )
@@ -57,14 +58,51 @@ def test_query_pagination_on_a_public_endpoint(respx_mock: respx.MockRouter) -> 
 
     route = respx_mock.get(f"{SHOP}/api/v1/products").mock(side_effect=respond)
 
-    products = list(client().products.list(size=1, category=Category.GAMES, tags=["a", "b"]))
+    products = list(
+        client().products.list(size=1, category=Category.GAMES, tags=["a", "b"], labels=["x"])
+    )
 
     assert [p.id for p in products] == [0, 1]
     assert products[0].category is Category.GAMES
     assert products[0].price == Decimal("0.1")
     request = route.calls.last.request
-    assert request.url.query == b"page=1&size=1&category=GAMES&tags=a&tags=b"
+    assert request.url.query == (
+        b"page=1&size=1&category=GAMES&tags=a&tags=b&labels%5B%5D=x&sort=name%2Casc"
+    )
     assert "authorization" not in request.headers
+
+
+def test_page_response_without_page_parameter(respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.post(f"{SHOP}/api/v1/products/featured").respond(
+        json={"content": [{"id": 1, "name": "n"}], "totalElements": 9, "number": 0}
+    )
+
+    page = client().products.featured()
+
+    assert [p.id for p in page.content] == [1]
+    assert route.call_count == 1
+    assert route.calls.last.request.url.query == b""
+
+
+def test_session_effects(respx_mock: respx.MockRouter) -> None:
+    fresh = "header.eyJleHAiOiA0MTAyNDQ0ODAwfQ.signature"
+    respx_mock.put(f"{SHOP}/api/v1/session/password").respond(
+        json={"access_token": fresh, "refresh_token": "refresh-2"}
+    )
+    logout = respx_mock.post(f"{SHOP}/api/v1/session/logout").respond(200)
+    store = MemoryTokenStore(Tokens("token", "refresh-1"))
+    shop = Whitebird(token_store=store)
+    shop.mfa_token = "mfa"
+
+    pair = shop.session.change_password(old_password="a", new_password="b")
+
+    assert pair.access_token == fresh
+    saved = store.load()
+    assert saved is not None and (saved.access_token, saved.refresh_token) == (fresh, "refresh-2")
+    shop.session.logout()
+    assert logout.calls.last.request.headers["authorization"] == f"Bearer {fresh}"
+    assert store.load() is None
+    assert shop.mfa_token is None
 
 
 def test_body_pagination(respx_mock: respx.MockRouter) -> None:
@@ -91,7 +129,12 @@ def test_json_body_and_header(respx_mock: respx.MockRouter) -> None:
 
     assert order.status == "X"
     request = route.calls.last.request
-    assert json.loads(request.content) == {"productId": 1, "quantity": 2, "priority": 2}
+    assert json.loads(request.content) == {
+        "productId": 1,
+        "quantity": 2,
+        "priority": 2,
+        "channel": "web",
+    }
     assert request.headers["x-request-id"] == "r"
     assert request.headers["authorization"] == "Bearer token"
 
@@ -106,7 +149,10 @@ def test_empty_body_is_sent_as_an_object(respx_mock: respx.MockRouter) -> None:
 
 def test_mfa_operation_obtains_a_token(respx_mock: respx.MockRouter) -> None:
     confirm = respx_mock.post(f"{AUTH}/api/v1/mfa/token").respond(json={"mfaToken": "mfa"})
-    route = respx_mock.post(f"{SHOP}/api/v1/orders/o%201/withdraw").respond(200)
+    refused = httpx.Response(403, json={"message": "Operation denied, requires mfa checking"})
+    route = respx_mock.post(f"{SHOP}/api/v1/orders/o%201/withdraw").mock(
+        side_effect=[refused, httpx.Response(200)]
+    )
     shop = Whitebird(token_store=MemoryTokenStore(Tokens("token")), otp="123456")
 
     assert shop.orders.withdraw("o 1", address="addr") is None
@@ -135,10 +181,13 @@ def test_binary_text_map_and_envelope(respx_mock: respx.MockRouter) -> None:
 
     assert shop.orders.documents.receipt("o", format="PDF") == b"%PDF"
     crop = ProfileUploadAvatarRequestCrop(size=2)
-    assert shop.profile.upload_avatar(file=("a.png", b"img", "image/png"), crop=crop) == "ok"
+    caption = ProfileUploadAvatarRequestCaption(text="hi")
+    file = ("a.png", b"img", "image/png")
+    assert shop.profile.upload_avatar(file=file, crop=crop, caption=caption) == "ok"
     content = upload.calls.last.request.content
     assert b'filename="a.png"' in content
     assert b'name="crop"\\r\\nContent-Type: application/json\\r\\n\\r\\n{"size":2}' in content
+    assert b'name="caption"\\r\\n\\r\\n{"text":"hi"}' in content
     assert shop.balances.get() == {"BTC": Decimal("0.000000000000000001")}
     assert shop.tickers.list() == [Ticker(symbol="BTCUSDT", last_price="1")]
 
@@ -230,6 +279,7 @@ def test_files_are_owned_and_marked(files: dict[str, str]) -> None:
         "resources/orders.py",
         "resources/products.py",
         "resources/profile.py",
+        "resources/session.py",
         "resources/tickers.py",
     }
     for path, content in files.items():
@@ -252,9 +302,16 @@ def test_generated_code_reads_like_the_spec(files: dict[str, str]) -> None:
     products = files[f"{emitter.PACKAGE}/resources/products.py"]
     assert "    ) -> SyncPager[Product]:" in products
     assert "@deprecated(" in products
+    assert '        sort: str = "name,asc",\n' in products
+    assert '"labels[]": labels,' in products
+    assert "    ) -> Page[Product]:" in products
     profile = files[f"{emitter.PACKAGE}/resources/profile.py"]
-    assert 'files={"file": file, "crop": crop},' in profile
-    assert 'content_types={"crop": "application/json"},' in profile
+    assert 'files={"file": file, "crop": crop, "caption": caption},' in profile
+    assert 'content_types={"crop": "application/json", "caption": "text/plain"},' in profile
+    session = files[f"{emitter.PACKAGE}/resources/session.py"]
+    assert '            session="end",\n' in session
+    assert '            session="replace",\n' in session
+    assert '    channel: str | None = "web"\n' in models
     assert "            json={},\n" in files[f"{emitter.PACKAGE}/resources/cart.py"]
     assert 'mfa_operation="WITHDRAWAL",' in files[f"{emitter.PACKAGE}/resources/orders.py"]
     services = files[f"{emitter.PACKAGE}/services.py"]

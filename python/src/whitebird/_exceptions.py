@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -33,6 +34,13 @@ _VERIFICATIONS: dict[str, Literal["sms", "liveness"]] = {
 }
 # Machine codes, unlike the reason phrases ("Bad Request") Spring puts in `error`.
 _MACHINE_CODE = re.compile(r"[a-z_]+|[A-Z_]+")
+# How Whitebird refuses an operation that needs an operation MFA token, in `message` or `status`.
+_MFA_REFUSAL = "requires mfa checking"
+# Messages of the token endpoint that are not about the credentials (sign-in form of the web app).
+_USER_BLOCKED = "Username is blocked"
+_TOO_MANY_REQUESTS = "Too many requests"
+# Longest text body kept as the message of an error.
+_MAX_TEXT = 500
 
 
 class WhitebirdError(Exception):
@@ -115,8 +123,8 @@ class MFARequiredError(AuthenticationError):
 class CaptchaRequiredError(AuthenticationError):
     """Logging in needs a solved captcha.
 
-    Raised when the token endpoint asks for a captcha and the client has no `captcha` solver,
-    or when the answers of the solver were rejected three times.
+    Raised when an account without two-factor authentication logs in and the client has no
+    `captcha` solver, or when the answers of the solver were rejected three times.
     """
 
 
@@ -162,8 +170,9 @@ def error_from_response(response: httpx.Response, *, login: bool = False) -> API
 
     Args:
         response: The error response.
-        login: The response answers a token request, where a rejection that mentions a captcha
-            means `CaptchaRequiredError`.
+        login: The response answers a password or refresh grant of the token endpoint: a
+            rejection that mentions a captcha means `CaptchaRequiredError`, and other HTTP 400
+            and 401 answers mean the credentials or the code were wrong.
     """
     body = _decode(response)
     details: dict[str, Any] = {
@@ -174,27 +183,33 @@ def error_from_response(response: httpx.Response, *, login: bool = False) -> API
     message = response.reason_phrase or f"HTTP {response.status_code}"
     error_code: str | None = None
     if isinstance(body, dict):
-        code = body.get("code")
-        details["code"] = code if isinstance(code, int) else None
+        code = body.get("code", body.get("retCode"))
+        details["code"] = code if isinstance(code, int) and not isinstance(code, bool) else None
         details["fields"] = body.get("fields") if isinstance(body.get("fields"), list) else None
         sub_status = body.get("subStatus")
         details["sub_status"] = sub_status if isinstance(sub_status, str) else None
         error_code = _error_code(body)
-        message = str(body.get("message") or body.get("error_description") or message)
+        text = body.get("message") or body.get("retMsg") or body.get("error_description")
+        status = body.get("status")
+        if not text and isinstance(status, str) and " " in status:
+            text = status  # a sentence rather than a code, e.g. the MFA refusal
+        message = str(text or message)
     elif isinstance(body, str) and body.strip():
-        message = body.strip()
+        message = _truncate(body.strip())
     details["error_code"] = error_code
 
     if login and captcha_status(body):
         return CaptchaRequiredError(message, **details)
     if error_code in _VERIFICATIONS:
         return VerificationRequiredError(message, kind=_VERIFICATIONS[error_code], **details)
-    if error_code == "MFA_CHECKING_REQUIRED" or "requires mfa checking" in message.lower():
+    if _MFA_REFUSAL in f"{message}\n{error_code or ''}".lower():
         return MFARequiredError(message, **details)
+    if response.status_code == 429 or (login and message == _TOO_MANY_REQUESTS):
+        return RateLimitError(message, retry_after=retry_after(response), **details)
     if error_code == "invalid_grant":
         return AuthenticationError(message, **details)
-    if response.status_code == 429:
-        return RateLimitError(message, retry_after=retry_after(response), **details)
+    if login and response.status_code in (400, 401) and message != _USER_BLOCKED:
+        return AuthenticationError(message, **details)
     if response.status_code >= 500:
         return ServerError(message, **details)
     return _BY_STATUS.get(response.status_code, APIError)(message, **details)
@@ -206,12 +221,14 @@ def retry_after(response: httpx.Response) -> float | None:
     if not value:
         return None
     try:
-        return max(float(value), 0.0)
+        seconds = float(value)
     except ValueError:
         pass
+    else:
+        return max(seconds, 0.0) if math.isfinite(seconds) else None
     try:
         when = parsedate_to_datetime(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, IndexError, OverflowError):
         return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)
@@ -227,6 +244,10 @@ def captcha_status(body: object) -> str | None:
         if isinstance(value, str) and "CAPTCHA" in value.upper():
             return value
     return None
+
+
+def _truncate(text: str) -> str:
+    return text if len(text) <= _MAX_TEXT else text[:_MAX_TEXT] + "…"
 
 
 def _decode(response: httpx.Response) -> Any:

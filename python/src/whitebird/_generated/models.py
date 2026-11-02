@@ -41,7 +41,6 @@ __all__ = [
     "AuthMfaOperation",
     "AuthMfaStatus",
     "AuthMfaStatusRequest",
-    "AuthMfaToken",
     "AuthMfaTokenRequest",
     "AuthWebGlData",
     "BalanceAccountType",
@@ -69,8 +68,9 @@ __all__ = [
     "BalanceOrderResponseDirection",
     "BalanceOrderStatus",
     "BalancePaymentDetails",
-    "BalanceRejectRequest",
-    "BalanceRejectRequestOperationType",
+    "BalanceRejectCryptoRequest",
+    "BalanceRejectFiatRequest",
+    "BalanceRejectOperationType",
     "CarusellBank",
     "Client",
     "ClientCryptoWithdrawalTokenRequest",
@@ -84,7 +84,6 @@ __all__ = [
     "CryptoDepositRequest",
     "CryptoWithdrawalCalculation",
     "CryptoWithdrawalRequest",
-    "CurrentAccountDateFrame",
     "CurrentAccountFiatOpType",
     "CurrentAccountReportRequest",
     "CurrentAccountSystemAccount",
@@ -223,6 +222,8 @@ __all__ = [
     "MerchantClientCounts",
     "MerchantClientStatus",
     "MerchantCurrencyPair",
+    "MerchantOrder",
+    "MerchantOrderFilter",
     "MerchantPair",
     "MerchantReportFileType",
     "MerchantReportRequest",
@@ -503,8 +504,12 @@ class BalanceOrderStatus(StrEnum):
     PENDING = "PENDING"
 
 
-class BalanceRejectRequestOperationType(StrEnum):
-    """Same as the path segment (`crypto` or `fiat`)."""
+class BalanceRejectOperationType(StrEnum):
+    """Balance reject operation type.
+
+    Values of `BalanceRejectCryptoRequest.operation_type` and
+    `BalanceRejectFiatRequest.operation_type`.
+    """
 
     CRYPTO = "crypto"
     FIAT = "fiat"
@@ -576,7 +581,10 @@ class ExchangeAssetCategory(StrEnum):
 
     CRYPTO = "CRYPTO"
     STABLECOIN = "STABLECOIN"
+    GOLD = "GOLD"
+    ETF = "ETF"
     STOCK = "STOCK"
+    EARN = "EARN"
     FIAT = "FIAT"
 
 
@@ -622,8 +630,8 @@ class ExchangeLegType(StrEnum):
 class ExchangeOrderStatus(StrEnum):
     """Exchange order status.
 
-    Values of `ExchangeOrder.status`, `ExchangeOrderHistoryFilter.statuses` and
-    `MerchantReportRequest.statuses`.
+    Values of `ExchangeOrder.status`, `ExchangeOrderHistoryFilter.statuses`, `MerchantOrder.status`
+    and 2 more.
     """
 
     NEW = "NEW"
@@ -1358,8 +1366,8 @@ class AccountingAccount(WhitebirdModel):
 class AccountingAccountRequest(WhitebirdModel):
     """Accounting account request.
 
-    Request body of `client.accounting.accounts.get()` and
-    `client.accounting.accounts.get_enhanced()`.
+    Request body of `client.accounting.accounts.get_enhanced()` and
+    `client.accounting.accounts.get()`.
     """
 
     type: AccountingAccountType | str
@@ -1702,14 +1710,7 @@ class AuthMfaStatusRequest(WhitebirdModel):
     """Request body of `client.auth.mfa_status()`."""
 
     username: str
-    """Account email."""
-
-
-class AuthMfaToken(WhitebirdModel):
-    """Returned by `client.auth.create_mfa_token()`."""
-
-    mfa_token: str | None = None
-    """Inferred from the web application; may be missing."""
+    """Account email as the user typed it."""
 
 
 class AuthMfaTokenRequest(WhitebirdModel):
@@ -1752,6 +1753,15 @@ class BalanceCalculation(WhitebirdModel):
     """Inferred from the web application; may be missing."""
 
     withdrawal_amount: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    gross_amount: Decimal | None = None
+    """Amount debited; the web app shows it as the withdrawal amount.
+
+    Inferred from the web application; may be missing.
+    """
+
+    creation_date: DateTime | None = None
     """Inferred from the web application; may be missing."""
 
     expiration_date: DateTime | None = None
@@ -2009,7 +2019,9 @@ class BalanceOperationFilter(WhitebirdModel):
     """Request body of `client.balance.operations.list()`."""
 
     limit: int | None = 20
-    transaction_types: list[BalanceOperationType | str] | None = None
+    transaction_types: list[BalanceOperationType | str]
+    """Operation types to list; pass all three for no filter."""
+
     statuses: list[BalanceOperationStatus | str] | None = None
     currencies: list[str] | None = None
     from_: Date | None = None
@@ -2080,16 +2092,20 @@ class BalancePaymentDetails(WhitebirdModel):
     """Inferred from the web application; may be missing."""
 
 
-class BalanceRejectRequest(WhitebirdModel):
-    """Balance reject request.
-
-    Request body of `client.balance.operations.reject_crypto()` and
-    `client.balance.operations.reject_fiat()`.
-    """
+class BalanceRejectCryptoRequest(WhitebirdModel):
+    """Request body of `client.balance.operations.reject_crypto()`."""
 
     transaction_id: str
-    operation_type: BalanceRejectRequestOperationType | str | None = None
-    """Same as the path segment (`crypto` or `fiat`)."""
+    operation_type: BalanceRejectOperationType | str | None = BalanceRejectOperationType.CRYPTO
+    """Same as the path segment."""
+
+
+class BalanceRejectFiatRequest(WhitebirdModel):
+    """Request body of `client.balance.operations.reject_fiat()`."""
+
+    transaction_id: str
+    operation_type: BalanceRejectOperationType | str | None = BalanceRejectOperationType.FIAT
+    """Same as the path segment."""
 
 
 class CarusellBank(WhitebirdModel):
@@ -2214,24 +2230,11 @@ class CryptoWithdrawalRequest(WhitebirdModel):
     amount: Decimal
 
 
-class CurrentAccountDateFrame(WhitebirdModel):
-    """Used in `CurrentAccountReportRequest.completion_date_frame`."""
-
-    start: str | None = None
-    end: str | None = None
-
-
 class CurrentAccountReportRequest(WhitebirdModel):
-    """Shared document-request body.
+    """The web app always sends `{}` for invoices."""
 
-    The web app sends `{}` for invoices; the fields exist for statements served by the same code
-    path.
-    """
-
-    limit: int | None = None
-    completion_date_frame: CurrentAccountDateFrame | None = None
     type: str | None = None
-    format: str | None = None
+    """Document type; its code path could send it, but never does for invoices."""
 
 
 class CurrentAccountSystemAccount(WhitebirdModel):
@@ -2319,7 +2322,7 @@ class ExchangeFiatAsset(WhitebirdModel):
 
 
 class ExchangeLeg(WhitebirdModel):
-    """Used in `ExchangeOrder.input`, `ExchangeOrder.output`, `ExchangeQuote.input` and 1 more."""
+    """Used in `ExchangeOrder.input`, `ExchangeOrder.output`, `ExchangeQuote.input` and 3 more."""
 
     type: ExchangeLegType | str | None = None
     """Inferred from the web application; may be missing."""
@@ -2526,7 +2529,7 @@ class ExchangeOrder(WhitebirdModel):
 
 
 class ExchangeOrderConditions(WhitebirdModel):
-    """Used in `ExchangeOrder.conditions`."""
+    """Used in `ExchangeOrder.conditions` and `MerchantOrder.conditions`."""
 
     from_asset: str | None = None
     """Inferred from the web application; may be missing."""
@@ -2565,6 +2568,12 @@ class ExchangeOrderHistoryFilter(WhitebirdModel):
     input_operation_types: list[ExchangeLegType | str] | None = None
     output_operation_types: list[ExchangeLegType | str] | None = None
     statuses: list[ExchangeOrderStatus | str] | None = None
+    assets: list[str] | None = None
+    """Orders with one of these assets on either leg."""
+
+    operation_types: list[ExchangeLegType | str] | None = None
+    """Orders with one of these leg types on either leg."""
+
     creation_date_frame: ExchangeDateFrame | None = None
 
 
@@ -2713,8 +2722,16 @@ class FiatDepositRequest(WhitebirdModel):
 
     subaccount_id: str
     fiat_provider_type: ProviderType | str
+    """The web app sends `CA` (current account)."""
+
     internal_token: str | None = None
+    """Settlement account to deposit from, the `id` of an account from
+    `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
+    """
+
     asset_code: str
+    """The web app sends `RUB`."""
+
     amount: Decimal
 
 
@@ -2723,16 +2740,22 @@ class FiatWithdrawalRequest(WhitebirdModel):
 
     subaccount_id: str
     fiat_provider_type: ProviderType | str
+    """The web app sends `CA` (current account)."""
+
     payment_token: str | None = None
+    """Bank account to withdraw to, the `id` of a method from `brokerage.payments.methods`."""
+
     asset_code: str | None = None
+    """The web app sends `RUB`."""
+
     amount: Decimal
 
 
 class IcoAccountTransferRequest(WhitebirdModel):
     """Request body of `client.ico.operations.transfer()`."""
 
-    client_id: str | None = None
-    """Client ID of the user."""
+    client_id: str
+    """The client's `identity` from `client.get`."""
 
     currency_from: str
     account_type_from: IcoAccountType | str
@@ -4095,10 +4118,11 @@ class KycVerification(WhitebirdModel):
 class KycVerificationRequest(WhitebirdModel):
     """Kyc verification request.
 
-    The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (from geo, default
-    `BY`), `countryFlag: false`, `residencePermitInBelarusPresent: true`,
-    `exchangeInPersonalInterests: true`, `notUSTaxpayer: true`, `userConfirmed: false`,
-    `firstStageConfirmed: true`, `secondStageConfirmed: false` and `emailVerified: true`.
+    The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (the questionnaire's
+    own value, else the code of the country reported by `auth.geo`, else `BY`), `countryFlag:
+    false`, `residencePermitInBelarusPresent: true`, `exchangeInPersonalInterests: true`,
+    `notUSTaxpayer: true`, `userConfirmed: false`, `firstStageConfirmed: true`,
+    `secondStageConfirmed: false` and `emailVerified: true`.
     """
 
     provider: KycProvider | str | None = None
@@ -4283,6 +4307,61 @@ class MerchantCurrencyPair(WhitebirdModel):
 
     to_currency: str | None = None
     """Inferred from the web application; may be missing."""
+
+
+class MerchantOrder(WhitebirdModel):
+    """Exchange order of a merchant's client."""
+
+    id: str | None = None
+    """Inferred from the web application; may be missing."""
+
+    number: int | None = None
+    """Application number shown to the client. Inferred from the web application; may be missing."""
+
+    status: ExchangeOrderStatus | str | None = None
+    """Inferred from the web application; may be missing."""
+
+    input: ExchangeLeg | None = None
+    """Inferred from the web application; may be missing."""
+
+    output: ExchangeLeg | None = None
+    """Inferred from the web application; may be missing."""
+
+    conditions: ExchangeOrderConditions | None = None
+    """Inferred from the web application; may be missing."""
+
+    exchange_rate_value: Decimal | None = None
+    """Inferred from the web application; may be missing."""
+
+    post_form: ExchangePostForm | None = None
+    """Inferred from the web application; may be missing."""
+
+    recalculation_reason: str | None = None
+    """Why the terms were recalculated, e.g.
+
+    `WRONG_AMOUNT` (a different amount was received). Inferred from the web application; may be
+    missing.
+    """
+
+    creation_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    completion_date: DateTime | None = None
+    """Inferred from the web application; may be missing."""
+
+    client_id: str | None = None
+    """The client who placed the order. Inferred from the web application; may be missing."""
+
+
+class MerchantOrderFilter(WhitebirdModel):
+    """Request body of `client.merchant.orders.history()`."""
+
+    limit: int | None = 20
+    creation_date_frame: ExchangeDateFrame | None = None
+    statuses: list[ExchangeOrderStatus | str] | None = None
+    assets: list[str] | None = None
+    client_id: str | None = None
+    """Only the orders of this client."""
 
 
 class MerchantPair(WhitebirdModel):
@@ -4698,10 +4777,16 @@ class PaymentCommissionPair(WhitebirdModel):
     """
 
     buy: str | None = None
-    """Percent, decimal comma. Inferred from the web application; may be missing."""
+    """Percent as a decimal string, e.g.
+
+    `1.5`. Inferred from the web application; may be missing.
+    """
 
     sell: str | None = None
-    """Percent, decimal comma. Inferred from the web application; may be missing."""
+    """Percent as a decimal string, e.g.
+
+    `1.5`. Inferred from the web application; may be missing.
+    """
 
 
 class PaymentCommissionsRequest(WhitebirdModel):
@@ -4959,13 +5044,12 @@ class ReportBalanceRequest(WhitebirdModel):
 
     limit: int | None = 20
     completion_date_frame: ReportDateFrame | None = None
+    transaction_types: list[ReportOperationType | str]
+    """Operation types to include; pass all three for no filter."""
+
     type: str | None = None
-    """Document type (`PDF`, `XLSX`)."""
+    """Document type (`PDF`, `XLSX`); the web app does not choose one for this statement."""
 
-    format: str | None = None
-    """Document format (`PDF`)."""
-
-    transaction_types: list[ReportOperationType | str] | None = None
     statuses: list[str] | None = None
     currencies: list[str] | None = None
     from_: Date | None = None
@@ -4987,16 +5071,11 @@ class ReportRequest(WhitebirdModel):
     """Filter of a statement.
 
     All fields are optional; the web app sends `limit` and `completionDateFrame` for exchange
-    statements and nothing for invoices.
+    statements.
     """
 
     limit: int | None = 20
     completion_date_frame: ReportDateFrame | None = None
-    type: str | None = None
-    """Document type (`PDF`, `XLSX`)."""
-
-    format: str | None = None
-    """Document format (`PDF`)."""
 
 
 class StatusbankCardDetails(WhitebirdModel):
@@ -5278,7 +5357,10 @@ class TradingExecution(WhitebirdModel):
     """Fill of an order; also pushed on the `execution` WebSocket topic."""
 
     id: str | None = None
-    """Execution id. Inferred from the web application; may be missing."""
+    """Execution id; the main web app treats it as the id of the order.
+
+    Inferred from the web application; may be missing.
+    """
 
     order_id: str | None = None
     """Inferred from the web application; may be missing."""
@@ -5475,8 +5557,11 @@ class TradingOrderCreateRequest(WhitebirdModel):
     price: str | None = None
     """Limit price; leave out for market orders."""
 
-    time_in_force: TradingTimeInForce | str | None = None
-    """The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders."""
+    time_in_force: TradingTimeInForce | str | None = TradingTimeInForce.GTC
+    """`PostOnly` for maker-only limit orders.
+
+    The web terminal sends `GTC` also for market orders.
+    """
 
     order_link_id: str | None = None
     """Client order id."""

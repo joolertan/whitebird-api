@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 __all__ = ["FileTokenStore", "MemoryTokenStore", "TokenStore", "Tokens"]
 
@@ -39,7 +41,12 @@ class Tokens:
 
 
 class TokenStore(Protocol):
-    """Keeps the current `Tokens`. Implement it to share sessions across processes."""
+    """Keeps the current `Tokens`. Implement it to share sessions across processes.
+
+    The client loads the tokens on its first authenticated call and again before renewing
+    them, so that a session renewed by another process is picked up. An exception raised by
+    `load` fails that call; one raised by `save` or `clear` is logged and ignored.
+    """
 
     def load(self) -> Tokens | None:
         """Returns the stored tokens, or None if there are none."""
@@ -93,27 +100,48 @@ class FileTokenStore:
         self.path = Path(path).expanduser()
 
     def load(self) -> Tokens | None:
-        """Returns the stored tokens, or None if the file is missing or unreadable."""
+        """Returns the stored tokens, or None if the file is missing, unreadable or invalid."""
         try:
             data = json.loads(self.path.read_text())
-            return Tokens(
-                access_token=data["access_token"],
-                refresh_token=data.get("refresh_token"),
-                expires_at=data.get("expires_at"),
-            )
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError):
             return None
+        return _tokens_from(data)
 
     def save(self, tokens: Tokens) -> None:
         """Atomically replaces the file with `tokens`, with 0600 permissions."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(f".{self.path.name}.tmp")
-        temporary.unlink(missing_ok=True)
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "w") as file:
-            json.dump(asdict(tokens), file)
-        os.replace(temporary, self.path)
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent
+        )
+        try:
+            with os.fdopen(descriptor, "w") as file:
+                json.dump(asdict(tokens), file)
+                file.flush()
+                os.fsync(file.fileno())
+            os.replace(temporary, self.path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary)
+            raise
 
     def clear(self) -> None:
         """Deletes the file."""
         self.path.unlink(missing_ok=True)
+
+
+def _tokens_from(data: Any) -> Tokens | None:
+    """Reads tokens written by `FileTokenStore.save`; None if a field has the wrong type."""
+    if not isinstance(data, dict):
+        return None
+    access_token = data.get("access_token")
+    refresh_token = data.get("refresh_token")
+    expires_at = data.get("expires_at")
+    if not isinstance(access_token, str) or not access_token:
+        return None
+    if refresh_token is not None and not isinstance(refresh_token, str):
+        return None
+    if expires_at is not None and (
+        isinstance(expires_at, bool) or not isinstance(expires_at, int | float)
+    ):
+        return None
+    return Tokens(access_token, refresh_token, None if expires_at is None else float(expires_at))

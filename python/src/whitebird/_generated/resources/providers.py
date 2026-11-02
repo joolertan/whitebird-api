@@ -254,8 +254,9 @@ class ProvidersAlfaCryptoCardResource(SyncResource):
 
         Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set, the
         user identifies through MSI (the Belarusian interbank identification system) by opening
-        `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check in its own UI
-        and then calls `client_info` to get the bank's application page.
+        `redirectUrl` in a browser. Otherwise the web app runs a SumSub liveness check (WebSDK with
+        a token from `kyc.sumsub.token` with `levelType=LIVENESS`) and then calls `client_info` to
+        get the bank's application page.
 
         Args:
             **options: Per-request options, see `RequestOptions`.
@@ -325,7 +326,8 @@ class ProvidersAssistResource(SyncResource):
 
         The user enters the card details and passes 3-D Secure on the Assist page, then the browser
         is sent back to `returnUrl`. The web app passes
-        `https://whitebird.io/account/payments?card_bind=success`.
+        `https://whitebird.io/account/payments?card_bind=success`. Assist appends `billnumber` to
+        it, and reaching that page does not prove the card was bound: check `payments.methods.list`.
 
         Args:
             return_url: Where Assist sends the browser after the binding.
@@ -357,8 +359,8 @@ class ProvidersAssistResource(SyncResource):
     ) -> Any:
         """Get an Assist card binding URL.
 
-        Older variant of `card_bind_form`. The current web app only references it from unused legacy
-        code and never reads the response; it presumably returns a URL of the Assist binding page to
+        Older variant of `card_bind_form`. The current web app only builds this request in unused
+        legacy code and never sends it; it presumably returns a URL of the Assist binding page to
         open in a browser, which sends the user back to `returnUrl`.
 
         Args:
@@ -421,9 +423,10 @@ class ProvidersBepaidResource(SyncResource):
     ) -> Any:
         """Get a bePaid card binding URL.
 
-        Legacy: the current web app never reads the response. Like the other binding endpoints it
-        presumably returns the URL of the bePaid page where the user enters the card details and
-        passes 3-D Secure in a browser before being sent back to `returnUrl`.
+        Legacy: the current web app only builds this request in unused code and never sends it. Like
+        the other binding endpoints it presumably returns the URL of the bePaid page where the user
+        enters the card details and passes 3-D Secure in a browser before being sent back to
+        `returnUrl`.
 
         Args:
             return_url: Where bePaid sends the browser after the binding.
@@ -582,13 +585,12 @@ class ProvidersMtsResource(SyncResource):
         self,
         **options: Unpack[RequestOptions],
     ) -> Any:
-        """Get the order number of a pending MTS deposit.
+        """Get the number of a pending MTS deposit.
 
         Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
-        (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the cashier or
-        enters in the transfer form. This endpoint returns the number of the client's pending
-        deposit. The response shape is unknown: the web app declares the call but never reads the
-        result.
+        (`MTS_MULTITRANSFER`) are matched by a number that the client gives to the cashier or enters
+        in the transfer form. The web app declares this call (as a phone number code of the pending
+        deposit) but never sends it, so the meaning and shape of the answer are unknown.
 
         Args:
             **options: Per-request options, see `RequestOptions`.
@@ -629,9 +631,11 @@ class ProvidersMtsQrResource(SyncResource):
         2. For a static QR code (`payments[0].qrType == "static"`) the payer chooses the amount
            and gets the amount to pay from `commission`; otherwise the amount is
            `payments[0].settlementAmount`.
-        3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
-           (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or by
-           selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+        3. Pay through the exchange API: from a RUB balance, first
+           `balance.withdrawals.calculate_fiat` with `fiatProviderType: MTS_QR`,
+           `paymentToken: qrTicketId`, `commissionType: ADD` and the amount, then
+           `balance.withdrawals.create_fiat` with the same fields plus `accountType`; or by selling
+           crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
            token: qrTicketId}`.
 
         Args:
@@ -1091,8 +1095,9 @@ class AsyncProvidersAlfaCryptoCardResource(AsyncResource):
 
         Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set, the
         user identifies through MSI (the Belarusian interbank identification system) by opening
-        `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check in its own UI
-        and then calls `client_info` to get the bank's application page.
+        `redirectUrl` in a browser. Otherwise the web app runs a SumSub liveness check (WebSDK with
+        a token from `kyc.sumsub.token` with `levelType=LIVENESS`) and then calls `client_info` to
+        get the bank's application page.
 
         Args:
             **options: Per-request options, see `RequestOptions`.
@@ -1162,7 +1167,8 @@ class AsyncProvidersAssistResource(AsyncResource):
 
         The user enters the card details and passes 3-D Secure on the Assist page, then the browser
         is sent back to `returnUrl`. The web app passes
-        `https://whitebird.io/account/payments?card_bind=success`.
+        `https://whitebird.io/account/payments?card_bind=success`. Assist appends `billnumber` to
+        it, and reaching that page does not prove the card was bound: check `payments.methods.list`.
 
         Args:
             return_url: Where Assist sends the browser after the binding.
@@ -1194,8 +1200,8 @@ class AsyncProvidersAssistResource(AsyncResource):
     ) -> Any:
         """Get an Assist card binding URL.
 
-        Older variant of `card_bind_form`. The current web app only references it from unused legacy
-        code and never reads the response; it presumably returns a URL of the Assist binding page to
+        Older variant of `card_bind_form`. The current web app only builds this request in unused
+        legacy code and never sends it; it presumably returns a URL of the Assist binding page to
         open in a browser, which sends the user back to `returnUrl`.
 
         Args:
@@ -1258,9 +1264,10 @@ class AsyncProvidersBepaidResource(AsyncResource):
     ) -> Any:
         """Get a bePaid card binding URL.
 
-        Legacy: the current web app never reads the response. Like the other binding endpoints it
-        presumably returns the URL of the bePaid page where the user enters the card details and
-        passes 3-D Secure in a browser before being sent back to `returnUrl`.
+        Legacy: the current web app only builds this request in unused code and never sends it. Like
+        the other binding endpoints it presumably returns the URL of the bePaid page where the user
+        enters the card details and passes 3-D Secure in a browser before being sent back to
+        `returnUrl`.
 
         Args:
             return_url: Where bePaid sends the browser after the binding.
@@ -1419,13 +1426,12 @@ class AsyncProvidersMtsResource(AsyncResource):
         self,
         **options: Unpack[RequestOptions],
     ) -> Any:
-        """Get the order number of a pending MTS deposit.
+        """Get the number of a pending MTS deposit.
 
         Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
-        (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the cashier or
-        enters in the transfer form. This endpoint returns the number of the client's pending
-        deposit. The response shape is unknown: the web app declares the call but never reads the
-        result.
+        (`MTS_MULTITRANSFER`) are matched by a number that the client gives to the cashier or enters
+        in the transfer form. The web app declares this call (as a phone number code of the pending
+        deposit) but never sends it, so the meaning and shape of the answer are unknown.
 
         Args:
             **options: Per-request options, see `RequestOptions`.
@@ -1466,9 +1472,11 @@ class AsyncProvidersMtsQrResource(AsyncResource):
         2. For a static QR code (`payments[0].qrType == "static"`) the payer chooses the amount
            and gets the amount to pay from `commission`; otherwise the amount is
            `payments[0].settlementAmount`.
-        3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
-           (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or by
-           selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+        3. Pay through the exchange API: from a RUB balance, first
+           `balance.withdrawals.calculate_fiat` with `fiatProviderType: MTS_QR`,
+           `paymentToken: qrTicketId`, `commissionType: ADD` and the amount, then
+           `balance.withdrawals.create_fiat` with the same fields plus `accountType`; or by selling
+           crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
            token: qrTicketId}`.
 
         Args:

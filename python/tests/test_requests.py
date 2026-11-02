@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -67,12 +68,64 @@ def test_retries_are_limited(client: Whitebird, respx_mock: respx.MockRouter) ->
     assert route.call_count == 3
 
 
-def test_post_is_not_retried(client: Whitebird, respx_mock: respx.MockRouter) -> None:
-    route = respx_mock.post(f"{API}/items").respond(503)
+@pytest.mark.parametrize("method", ["POST", "PUT", "DELETE", "PATCH"])
+def test_writes_are_not_retried_after_server_errors(
+    client: Whitebird, respx_mock: respx.MockRouter, method: str
+) -> None:
+    route = respx_mock.request(method, f"{API}/items").respond(503)
 
     with pytest.raises(ServerError):
+        client.request("api", method, "/items", json={})
+    assert route.call_count == 1
+
+
+@pytest.mark.parametrize("side_effect", [httpx.ReadTimeout("slow"), httpx.ReadError("reset")])
+def test_writes_are_not_retried_once_sent(
+    client: Whitebird, respx_mock: respx.MockRouter, side_effect: Exception
+) -> None:
+    route = respx_mock.post(f"{API}/items").mock(side_effect=side_effect)
+
+    with pytest.raises(TransportError):
         client.request("api", "POST", "/items", json={})
     assert route.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        httpx.ConnectError("refused"),
+        httpx.ConnectTimeout("no route"),
+        httpx.Response(429, headers={"Retry-After": "1"}),
+    ],
+    ids=["connect error", "connect timeout", "429"],
+)
+def test_writes_are_retried_when_surely_not_processed(
+    client: Whitebird, respx_mock: respx.MockRouter, first: httpx.Response | Exception
+) -> None:
+    route = respx_mock.post(f"{API}/items").mock(side_effect=[first, httpx.Response(200, json=1)])
+
+    assert client.request("api", "POST", "/items", json={}) == 1
+    assert route.call_count == 2
+
+
+def test_retry_delays_are_bounded(
+    client: Whitebird, respx_mock: respx.MockRouter, delays: list[float]
+) -> None:
+    from whitebird import _http
+
+    assert all(0 < _http.backoff(attempt, 0.5, 8.0) <= 8.0 for attempt in (0, 30, 1100, 10**9))
+    values = ["inf", "nan", "1e400", "-5", "Wed, 21 Oct 2015 07:28:00 GMT", "soon", "99999999"]
+    respx_mock.get(f"{API}/items").mock(
+        side_effect=[httpx.Response(429, headers={"Retry-After": value}) for value in values]
+        + [httpx.Response(200, json=[])]
+    )
+
+    client.request("api", "GET", "/items", max_retries=len(values))
+
+    assert len(delays) == len(values)
+    assert all(0 <= delay <= _http.MAX_RETRY_DELAY for delay in delays)
+    assert delays[3] == 0.0
+    assert delays[-1] == _http.MAX_RETRY_DELAY
 
 
 def test_post_marked_idempotent_is_retried(client: Whitebird, respx_mock: respx.MockRouter) -> None:
@@ -196,16 +249,34 @@ def test_verification_required(
     "body",
     [
         {"code": 403, "status": "FORBIDDEN", "message": "Operation denied, requires mfa checking"},
-        {"code": 400, "status": "MFA_CHECKING_REQUIRED", "message": "MFA"},
+        {"code": 403, "status": "Operation denied, requires mfa checking"},
     ],
+    ids=["message", "status"],
 )
 def test_operation_mfa_required(
     client: Whitebird, respx_mock: respx.MockRouter, body: dict[str, object]
 ) -> None:
-    respx_mock.post(f"{API}/withdraw").respond(body["code"], json=body)  # type: ignore[arg-type]
+    respx_mock.post(f"{API}/withdraw").respond(403, json=body)
 
-    with pytest.raises(MFARequiredError):
+    with pytest.raises(MFARequiredError, match="requires mfa checking"):
         client.request("api", "POST", "/withdraw")
+
+
+def test_retcode_error_body(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    respx_mock.get(f"{API}/items").respond(400, json={"retCode": 10001, "retMsg": "params error"})
+
+    with pytest.raises(BadRequestError) as raised:
+        client.request("api", "GET", "/items")
+    assert (raised.value.code, raised.value.message) == (10001, "params error")
+
+
+def test_long_text_error_is_truncated(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    respx_mock.get(f"{API}/items").respond(502, text="<html>" + "x" * 2000)
+
+    with pytest.raises(ServerError) as raised:
+        client.request("api", "GET", "/items", max_retries=0)
+    assert raised.value.message.startswith("<html>xxx")
+    assert len(raised.value.message) <= 501
 
 
 def test_error_with_text_body(client: Whitebird, respx_mock: respx.MockRouter) -> None:
@@ -237,6 +308,24 @@ def test_retcode_envelope_is_unwrapped(client: Whitebird, respx_mock: respx.Mock
     )
 
     assert items == [Item(item_id="a", price=Decimal("0.1"))]
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"retCode": 200, "retMsg": "OK", "result": [1]}, [1]),
+        ({"retCode": "0", "result": None}, None),
+        ({"code": 0, "message": "OK", "result": [2]}, [2]),
+        ({"retCode": 0, "list": [3]}, {"retCode": 0, "list": [3]}),
+        ([4], [4]),
+    ],
+)
+def test_retcode_success(
+    client: Whitebird, respx_mock: respx.MockRouter, body: object, expected: object
+) -> None:
+    respx_mock.get(f"{API}/tickers").respond(json=body)
+
+    assert client.request("api", "GET", "/tickers", envelope="retcode") == expected
 
 
 def test_retcode_error_on_http_200(client: Whitebird, respx_mock: respx.MockRouter) -> None:
@@ -278,6 +367,23 @@ def test_request_escape_hatch(client: Whitebird, respx_mock: respx.MockRouter) -
     assert request.headers["x-extra"] == "e"
     assert "x-skip" not in request.headers
     assert request.headers["user-agent"] == USER_AGENT
+
+
+def test_text_bodies_of_string_responses(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    json_type = {"content-type": "application/json"}
+    respx_mock.get(f"{API}/raw").respond(content=b"APPROVED", headers=json_type)
+    respx_mock.get(f"{API}/digits").respond(content=b"00123", headers=json_type)
+    respx_mock.get(f"{API}/number").respond(content=b"123", headers=json_type)
+    respx_mock.get(f"{API}/quoted").respond(json="ok")
+    respx_mock.get(f"{API}/model").respond(content=b"oops", headers=json_type)
+
+    assert client.request("api", "GET", "/raw", cast_to=str) == "APPROVED"
+    assert client.request("api", "GET", "/raw") == "APPROVED"
+    assert client.request("api", "GET", "/digits", cast_to=str) == "00123"
+    assert client.request("api", "GET", "/number", cast_to=str) == "123"
+    assert client.request("api", "GET", "/quoted", cast_to=str) == "ok"
+    with pytest.raises(APIError, match="not valid JSON"):
+        client.request("api", "GET", "/model", cast_to=Item)
 
 
 def test_request_decodes_by_content(client: Whitebird, respx_mock: respx.MockRouter) -> None:
@@ -331,6 +437,92 @@ def test_multipart_parts(client: Whitebird, respx_mock: respx.MockRouter) -> Non
         ("note", None, None, b"n"),
         ("count", None, None, b"2"),
     ]
+
+
+def test_text_plain_parts(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.post(f"{API}/support").respond(204)
+
+    client._engine.request(
+        "api",
+        "POST",
+        "/support",
+        files={"request": Item(item_id="i"), "note": {"a": 1}, "files": [b"one"]},
+        content_types={"request": "text/plain", "note": "text/plain; charset=utf-8"},
+    )
+
+    assert multipart(route.calls.last.request) == [
+        ("request", None, None, b'{"itemId":"i"}'),
+        ("note", None, None, b'{"a":1}'),
+        ("files", "application/octet-stream", "upload", b"one"),
+    ]
+
+
+def test_model_defaults_are_sent(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    class Order(WhitebirdModel):
+        product_id: int
+        channel: str = "web"
+        note: str | None = None
+
+    route = respx_mock.post(f"{API}/orders").respond(204)
+
+    client.request("api", "POST", "/orders", json=Order(product_id=1))
+    client.request("api", "POST", "/orders", json=Order(product_id=1, channel="app", note=None))
+
+    assert [call.request.content for call in route.calls] == [
+        b'{"productId":1,"channel":"web"}',
+        b'{"productId":1,"channel":"app","note":null}',
+    ]
+
+
+def test_dates_are_sent_like_the_web_app(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.post(f"{API}/report").respond(204)
+    moscow = timezone(timedelta(hours=3))
+
+    client.request(
+        "api",
+        "POST",
+        "/report",
+        params={"from": datetime(2024, 5, 1, 9, 30, 15, 999999), "day": date(2024, 5, 1)},
+        json={"to": datetime(2024, 5, 31, 23, 59, 59, tzinfo=moscow), "day": date(2024, 5, 2)},
+    )
+
+    request = route.calls.last.request
+    assert request.url.params["from"] == "2024-05-01T09:30:15+0000"
+    assert request.url.params["day"] == "2024-05-01"
+    assert request.content == b'{"to":"2024-05-31T23:59:59+0300","day":"2024-05-02"}'
+
+
+@pytest.mark.parametrize("value", ["", ".", ".."])
+def test_path_parameters_cannot_change_the_path(
+    client: Whitebird, respx_mock: respx.MockRouter, value: str
+) -> None:
+    route = respx_mock.route()
+
+    with pytest.raises(ValueError, match="path parameter"):
+        client.request("api", "GET", "/accounts/{id}/items", path_params={"id": value})
+    assert not route.called
+
+
+def test_path_parameters_are_quoted(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.get(url__regex=r".*").respond(json={})
+
+    client.request("api", "GET", "/accounts/{id}", path_params={"id": "../a\\b/c?"})
+
+    assert route.calls.last.request.url.raw_path == b"/accounts/..%2Fa%5Cb%2Fc%3F"
+
+
+def test_language_is_sent_with_every_request(respx_mock: respx.MockRouter) -> None:
+    from tests.support import MFA_URL, TOKEN_URL, tokens
+
+    respx_mock.post(MFA_URL).respond(json={"mfaEnabled": True})
+    token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
+    route = respx_mock.get(f"{API}/items").respond(json=[])
+
+    with Whitebird("me@example.com", "secret", language="ru", base_urls=BASE_URLS) as client:
+        client.request("api", "GET", "/items")
+
+    assert token.calls.last.request.headers["accept-language"] == "ru"
+    assert route.calls.last.request.headers["accept-language"] == "ru"
 
 
 def test_form_body(client: Whitebird, respx_mock: respx.MockRouter) -> None:

@@ -143,7 +143,7 @@ class IcoBuybacksResource(SyncResource):
         Asks the issuer to buy back `value` tokens under the emission's offer; only possible during
         the request window (`buybackRequestDateFrom`..`buybackRequestDateTo` of the obligation).
         Pass `buybackId` to change the amount of an existing application. Not enough tokens answers
-        `INSUFFICIENT_FUNDS`.
+        an error whose `message` is `Insufficient funds`.
 
         Args:
             emission_id: `emissionId` body field.
@@ -189,6 +189,7 @@ class IcoBuybacksResource(SyncResource):
             "DELETE",
             "/api/v1/ico/offer/buyback/{buybackId}",
             path_params={"buybackId": buyback_id},
+            json={},
             options=options,
         )
 
@@ -742,7 +743,7 @@ class IcoEmissionsResource(SyncResource):
         `STRUBS`/`RUBS`) are available to the client. Answers a map from asset to availability.
 
         Args:
-            assets: Assets to check.
+            assets: Assets to check; sent as repeated `assets[]` parameters like the web app does.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -756,7 +757,7 @@ class IcoEmissionsResource(SyncResource):
             "ico",
             "GET",
             "/api/v1/ico/emission/stable-coin/available",
-            params={"assets": assets},
+            params={"assets[]": assets},
             cast_to=dict[str, bool],
             options=options,
         )
@@ -859,7 +860,7 @@ class IcoIssuersResource(SyncResource):
     def names(
         self,
         **options: Unpack[RequestOptions],
-    ) -> SyncPager[IcoIssuerName]:
+    ) -> Page[IcoIssuerName]:
         """List issuer names.
 
         Issuers available as filter options in the operation history. The web app sends `{}`.
@@ -872,9 +873,9 @@ class IcoIssuersResource(SyncResource):
             the Whitebird web application; fields may be missing.
 
         Returns:
-            A pager over the `IcoIssuerName` items of every page.
+            The response as `Page[IcoIssuerName]`.
         """
-        return self._engine.paginate(
+        return self._engine.request(
             "ico",
             "POST",
             "/api/v1/ico/statistic/issuer/names",
@@ -1162,7 +1163,9 @@ class IcoObligationsResource(SyncResource):
     ) -> IcoRate:
         """Get the conversion rate for a token purchase.
 
-        Rate used when the paying account currency differs from the emission currency.
+        Conversion rate between the paying account currency and the emission currency. The web app
+        asks for it whenever a paying account is chosen, also when both currencies are the same, and
+        only displays it; the rate is not sent with the purchase.
 
         Args:
             from_asset: `fromAsset` body field.
@@ -1332,27 +1335,27 @@ class IcoOperationsResource(SyncResource):
     def transfer(
         self,
         *,
+        client_id: str,
         currency_from: str,
         account_type_from: IcoAccountType | str,
         currency_to: str,
         account_type_to: IcoAccountType | str,
         amount: Decimal | float,
-        client_id: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Transfer funds from an ICO account to an e-account.
 
         Moves money from an ICO account (`ICO_BALANCE`) to the e-account (`USER_BALANCE`) in the
         same currency. Not enough money answers an error whose message contains `Insufficient
-        funds`.
+        funds`. The web app treats an empty answer as success.
 
         Args:
+            client_id: The client's `identity` from `client.get`.
             currency_from: `currencyFrom` body field.
             account_type_from: `ICO_BALANCE`.
             currency_to: `currencyTo` body field.
             account_type_to: `USER_BALANCE`.
             amount: `amount` body field.
-            client_id: Client ID of the user.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -1744,7 +1747,7 @@ class AsyncIcoBuybacksResource(AsyncResource):
         Asks the issuer to buy back `value` tokens under the emission's offer; only possible during
         the request window (`buybackRequestDateFrom`..`buybackRequestDateTo` of the obligation).
         Pass `buybackId` to change the amount of an existing application. Not enough tokens answers
-        `INSUFFICIENT_FUNDS`.
+        an error whose `message` is `Insufficient funds`.
 
         Args:
             emission_id: `emissionId` body field.
@@ -1790,6 +1793,7 @@ class AsyncIcoBuybacksResource(AsyncResource):
             "DELETE",
             "/api/v1/ico/offer/buyback/{buybackId}",
             path_params={"buybackId": buyback_id},
+            json={},
             options=options,
         )
 
@@ -2343,7 +2347,7 @@ class AsyncIcoEmissionsResource(AsyncResource):
         `STRUBS`/`RUBS`) are available to the client. Answers a map from asset to availability.
 
         Args:
-            assets: Assets to check.
+            assets: Assets to check; sent as repeated `assets[]` parameters like the web app does.
             **options: Per-request options, see `RequestOptions`.
 
         Note:
@@ -2357,7 +2361,7 @@ class AsyncIcoEmissionsResource(AsyncResource):
             "ico",
             "GET",
             "/api/v1/ico/emission/stable-coin/available",
-            params={"assets": assets},
+            params={"assets[]": assets},
             cast_to=dict[str, bool],
             options=options,
         )
@@ -2457,10 +2461,10 @@ class AsyncIcoIssuersResource(AsyncResource):
             options=options,
         )
 
-    def names(
+    async def names(
         self,
         **options: Unpack[RequestOptions],
-    ) -> AsyncPager[IcoIssuerName]:
+    ) -> Page[IcoIssuerName]:
         """List issuer names.
 
         Issuers available as filter options in the operation history. The web app sends `{}`.
@@ -2473,9 +2477,9 @@ class AsyncIcoIssuersResource(AsyncResource):
             the Whitebird web application; fields may be missing.
 
         Returns:
-            A pager over the `IcoIssuerName` items of every page.
+            The response as `Page[IcoIssuerName]`.
         """
-        return self._engine.paginate(
+        return await self._engine.request(
             "ico",
             "POST",
             "/api/v1/ico/statistic/issuer/names",
@@ -2763,7 +2767,9 @@ class AsyncIcoObligationsResource(AsyncResource):
     ) -> IcoRate:
         """Get the conversion rate for a token purchase.
 
-        Rate used when the paying account currency differs from the emission currency.
+        Conversion rate between the paying account currency and the emission currency. The web app
+        asks for it whenever a paying account is chosen, also when both currencies are the same, and
+        only displays it; the rate is not sent with the purchase.
 
         Args:
             from_asset: `fromAsset` body field.
@@ -2933,27 +2939,27 @@ class AsyncIcoOperationsResource(AsyncResource):
     async def transfer(
         self,
         *,
+        client_id: str,
         currency_from: str,
         account_type_from: IcoAccountType | str,
         currency_to: str,
         account_type_to: IcoAccountType | str,
         amount: Decimal | float,
-        client_id: str | None = None,
         **options: Unpack[RequestOptions],
     ) -> Any:
         """Transfer funds from an ICO account to an e-account.
 
         Moves money from an ICO account (`ICO_BALANCE`) to the e-account (`USER_BALANCE`) in the
         same currency. Not enough money answers an error whose message contains `Insufficient
-        funds`.
+        funds`. The web app treats an empty answer as success.
 
         Args:
+            client_id: The client's `identity` from `client.get`.
             currency_from: `currencyFrom` body field.
             account_type_from: `ICO_BALANCE`.
             currency_to: `currencyTo` body field.
             account_type_to: `USER_BALANCE`.
             amount: `amount` body field.
-            client_id: Client ID of the user.
             **options: Per-request options, see `RequestOptions`.
 
         Note:

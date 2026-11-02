@@ -6,7 +6,7 @@ import pytest
 import respx
 
 from tests.support import API
-from whitebird import AsyncPager, AsyncWhitebird, Page, SyncPager, Whitebird
+from whitebird import APIError, AsyncPager, AsyncWhitebird, Page, SyncPager, Whitebird
 from whitebird.models import WhitebirdModel
 
 
@@ -113,6 +113,32 @@ def test_page_number_is_filled_in(client: Whitebird, respx_mock: respx.MockRoute
     assert not page.has_next
 
 
+def test_stops_when_the_page_number_is_ignored(
+    client: Whitebird, respx_mock: respx.MockRouter
+) -> None:
+    route = respx_mock.get(f"{API}/orders").respond(
+        json={**spring_page(0, 2, 10), "number": 0, "last": False}
+    )
+
+    assert [order.order_id for order in pager(client, size=2)] == [0, 1]
+    assert requested_pages(route) == [0, 1]
+
+
+def test_failed_page_is_fetched_again(client: Whitebird, respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.get(f"{API}/orders").mock(
+        side_effect=[
+            httpx.Response(400, json={"message": "Bad"}),
+            httpx.Response(200, json=spring_page(0, 2, 2, number=0, totalPages=1)),
+        ]
+    )
+    orders = pager(client, size=2)
+
+    with pytest.raises(APIError):
+        list(orders)
+    assert [order.order_id for order in orders] == [0, 1]
+    assert route.call_count == 2
+
+
 def test_pagination_in_body(client: Whitebird, respx_mock: respx.MockRouter) -> None:
     route = respx_mock.post(f"{API}/orders/search").mock(
         side_effect=serve(total=3, size=2, totalPages=2)
@@ -139,6 +165,14 @@ async def test_async_iteration(async_client: AsyncWhitebird, respx_mock: respx.M
 
     assert [order.order_id async for order in async_pager(async_client, size=2)] == [0, 1, 2, 3, 4]
     assert requested_pages(route) == [0, 1, 2]
+
+
+async def test_async_stops_when_the_page_number_is_ignored(
+    async_client: AsyncWhitebird, respx_mock: respx.MockRouter
+) -> None:
+    respx_mock.get(f"{API}/orders").respond(json={**spring_page(0, 2, 10), "number": 0})
+
+    assert [order.order_id async for order in async_pager(async_client, size=2)] == [0, 1]
 
 
 async def test_async_early_stop_pages_and_single_page(
