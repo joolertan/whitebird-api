@@ -68,7 +68,8 @@ export class PaymentsCardsResource extends APIResource {
       {
         service: 'exchange',
         method: 'PUT',
-        path: `/api/v1/client/payment/${encodeURIComponent(cardId)}/provider/${encodeURIComponent(providerType)}`,
+        path: '/api/v1/client/payment/{cardId}/provider/{providerType}',
+        pathParams: { cardId, providerType },
         body: params,
       },
       options,

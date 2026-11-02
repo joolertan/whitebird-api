@@ -47,15 +47,20 @@ export class KycResource extends APIResource {
   /**
    * Accept the public offer
    *
-   * Sent before verification when the user profile has no `offerAgreement` yet. The web app retries
-   * a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the client record is
-   * still being created.
+   * Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
+   * `kyc.submit` answered `firstStageConfirmed: true`, for MSI before `kyc.msi.authenticate`.
    *
    * `POST /api/v2/kyc/client/agreed-offer`
    */
   agreeOffer(params: KycOfferAgreement, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/kyc/client/agreed-offer', body: params },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/kyc/client/agreed-offer',
+        body: params,
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -73,7 +78,13 @@ export class KycResource extends APIResource {
    */
   get(params: KycGetParams = {}, options?: RequestOptions): Promise<KycVerification> {
     return this._client.call(
-      { service: 'kyc', method: 'GET', path: '/api/v1/kyc', query: params },
+      {
+        service: 'kyc',
+        method: 'GET',
+        path: '/api/v1/kyc',
+        query: params,
+        defaults: { query: { provider: 'SUMSUB' } },
+      },
       options,
     );
   }
@@ -139,7 +150,12 @@ export class KycActualizationResource extends APIResource {
    */
   confirm(options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/actualization/client/confirm-relevance' },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/actualization/client/confirm-relevance',
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -177,7 +193,13 @@ export class KycCryptoTestResource extends APIResource {
    */
   submit(params: KycCryptoTestResult, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/kyc/client/crypto-test', body: params },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/kyc/client/crypto-test',
+        body: params,
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -273,11 +295,17 @@ export class KycMsiResource extends APIResource {
    * @experimental
    */
   authenticate(
-    params: KycMsiAuthenticateParams = {},
+    params: KycMsiAuthenticateParams,
     options?: RequestOptions,
   ): Promise<KycMsiRedirect> {
     return this._client.call(
-      { service: 'api', method: 'GET', path: '/api/v2/kyc/msi/authenticate', query: params },
+      {
+        service: 'api',
+        method: 'GET',
+        path: '/api/v2/kyc/msi/authenticate',
+        query: params,
+        defaults: { query: { isUl: false } },
+      },
       options,
     );
   }
@@ -309,7 +337,7 @@ export class KycPersonalDataResource extends APIResource {
    */
   confirm(options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'kyc', method: 'POST', path: '/api/v1/kyc/client/confirm' },
+      { service: 'kyc', method: 'POST', path: '/api/v1/kyc/client/confirm', responseType: 'auto' },
       options,
     );
   }
@@ -334,6 +362,7 @@ export class KycProfileClosureResource extends APIResource {
         method: 'POST',
         path: '/api/v1/kyc/profile-closure/confirm',
         body: params,
+        responseType: 'auto',
         auth: false,
       },
       options,
@@ -364,6 +393,7 @@ export class KycQualificationResource extends APIResource {
         body: params,
         bodyType: 'multipart',
         partTypes: { request: 'application/json' },
+        responseType: 'auto',
       },
       options,
     );
@@ -400,7 +430,13 @@ export class KycSdkResource extends APIResource {
    */
   link(params: KycSdkLinkParams, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'api', method: 'GET', path: '/api/v2/kyc/sdk/link', query: params },
+      {
+        service: 'api',
+        method: 'GET',
+        path: '/api/v2/kyc/sdk/link',
+        query: params,
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -428,18 +464,28 @@ export class KycSumsubResource extends APIResource {
 
 /** Parameters of {@link KycResource.get}. */
 export interface KycGetParams {
-  /** Verification provider; the web app defaults to `SUMSUB`. */
-  provider?: KycProvider;
+  /**
+   * Verification provider.
+   * @defaultValue `'SUMSUB'`, sent when not set
+   */
+  provider?: KycProvider | undefined;
 }
 
 /** Parameters of {@link KycMsiResource.authenticate}. */
 export interface KycMsiAuthenticateParams {
-  /** Legal entity identification; the web app always sends `false`. */
-  isUl?: boolean;
-  redirectUrl?: string;
-  duplicateUrl?: string;
-  failureUrl?: string;
-  docExpiredUrl?: string;
+  /**
+   * Legal entity identification.
+   * @defaultValue `false`, sent when not set
+   */
+  isUl?: boolean | undefined;
+  /** Page MSI returns to after a successful identification. */
+  redirectUrl: string;
+  /** Page MSI returns to when the person is already identified for another account. */
+  duplicateUrl: string;
+  /** Page MSI returns to when the identification failed. */
+  failureUrl: string;
+  /** Page MSI returns to when the identity document has expired. */
+  docExpiredUrl: string;
 }
 
 /** Parameters of {@link KycSdkResource.link}. */

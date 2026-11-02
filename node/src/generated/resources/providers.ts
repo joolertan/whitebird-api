@@ -90,7 +90,9 @@ export class ProvidersAlfaResource extends APIResource {
       {
         service: 'alfa',
         method: 'POST',
-        path: `/api/v1/customer/card/unbind/${encodeURIComponent(cardId)}`,
+        path: '/api/v1/customer/card/unbind/{cardId}',
+        pathParams: { cardId },
+        responseType: 'auto',
       },
       options,
     );
@@ -166,8 +168,9 @@ export class ProvidersAlfaCryptoCardResource extends APIResource {
    *
    * Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set,
    * the user identifies through MSI (the Belarusian interbank identification system) by
-   * opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check in
-   * its own UI and then calls `client_info` to get the bank's application page.
+   * opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub liveness check
+   * (WebSDK with a token from `kyc.sumsub.token` with `levelType=LIVENESS`) and then calls
+   * `client_info` to get the bank's application page.
    *
    * `POST /api/v1/release/partner/init`
    *
@@ -213,7 +216,9 @@ export class ProvidersAssistResource extends APIResource {
    *
    * The user enters the card details and passes 3-D Secure on the Assist page, then the
    * browser is sent back to `returnUrl`. The web app passes
-   * `https://whitebird.io/account/payments?card_bind=success`.
+   * `https://whitebird.io/account/payments?card_bind=success`. Assist appends `billnumber` to
+   * it, and reaching that page does not prove the card was bound: check
+   * `payments.methods.list`.
    *
    * `GET /api/v1/card/bind/post-form`
    *
@@ -224,7 +229,13 @@ export class ProvidersAssistResource extends APIResource {
     options?: RequestOptions,
   ): Promise<AssistCardBindForm> {
     return this._client.call(
-      { service: 'assist', method: 'GET', path: '/api/v1/card/bind/post-form', query: params },
+      {
+        service: 'assist',
+        method: 'GET',
+        path: '/api/v1/card/bind/post-form',
+        query: params,
+        defaults: { query: { type: 'CLIENT' } },
+      },
       options,
     );
   }
@@ -232,9 +243,9 @@ export class ProvidersAssistResource extends APIResource {
   /**
    * Get an Assist card binding URL
    *
-   * Older variant of `card_bind_form`. The current web app only references it from unused
-   * legacy code and never reads the response; it presumably returns a URL of the Assist
-   * binding page to open in a browser, which sends the user back to `returnUrl`.
+   * Older variant of `card_bind_form`. The current web app only builds this request in unused
+   * legacy code and never sends it; it presumably returns a URL of the Assist binding page to
+   * open in a browser, which sends the user back to `returnUrl`.
    *
    * `GET /api/v1/card/bind/url`
    *
@@ -245,7 +256,14 @@ export class ProvidersAssistResource extends APIResource {
     options?: RequestOptions,
   ): Promise<unknown> {
     return this._client.call(
-      { service: 'assist', method: 'GET', path: '/api/v1/card/bind/url', query: params },
+      {
+        service: 'assist',
+        method: 'GET',
+        path: '/api/v1/card/bind/url',
+        query: params,
+        responseType: 'auto',
+        defaults: { query: { type: 'CLIENT' } },
+      },
       options,
     );
   }
@@ -265,7 +283,9 @@ export class ProvidersAssistResource extends APIResource {
       {
         service: 'assist',
         method: 'POST',
-        path: `/api/v1/card/unbind/${encodeURIComponent(cardId)}`,
+        path: '/api/v1/card/unbind/{cardId}',
+        pathParams: { cardId },
+        responseType: 'auto',
       },
       options,
     );
@@ -277,9 +297,10 @@ export class ProvidersBepaidResource extends APIResource {
   /**
    * Get a bePaid card binding URL
    *
-   * Legacy: the current web app never reads the response. Like the other binding endpoints it
-   * presumably returns the URL of the bePaid page where the user enters the card details and
-   * passes 3-D Secure in a browser before being sent back to `returnUrl`.
+   * Legacy: the current web app only builds this request in unused code and never sends it.
+   * Like the other binding endpoints it presumably returns the URL of the bePaid page where
+   * the user enters the card details and passes 3-D Secure in a browser before being sent back
+   * to `returnUrl`.
    *
    * `GET /api/v1/card/bind/url`
    *
@@ -290,7 +311,13 @@ export class ProvidersBepaidResource extends APIResource {
     options?: RequestOptions,
   ): Promise<unknown> {
     return this._client.call(
-      { service: 'bepaid', method: 'GET', path: '/api/v1/card/bind/url', query: params },
+      {
+        service: 'bepaid',
+        method: 'GET',
+        path: '/api/v1/card/bind/url',
+        query: params,
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -338,7 +365,14 @@ export class ProvidersMtsResource extends APIResource {
   bindCard(params: ProvidersMtsBindCardParams, options?: RequestOptions): Promise<unknown> {
     const { token, ...body } = params;
     return this._client.call(
-      { service: 'mts', method: 'POST', path: '/api/v1/card/bind', query: { token }, body },
+      {
+        service: 'mts',
+        method: 'POST',
+        path: '/api/v1/card/bind',
+        query: { token },
+        body,
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -355,7 +389,13 @@ export class ProvidersMtsResource extends APIResource {
    */
   unbindCard(cardId: string, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'mts', method: 'POST', path: `/api/v1/card/unbind/${encodeURIComponent(cardId)}` },
+      {
+        service: 'mts',
+        method: 'POST',
+        path: '/api/v1/card/unbind/{cardId}',
+        pathParams: { cardId },
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -378,13 +418,12 @@ export class ProvidersMtsResource extends APIResource {
   }
 
   /**
-   * Get the order number of a pending MTS deposit
+   * Get the number of a pending MTS deposit
    *
    * Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
-   * (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the cashier
-   * or enters in the transfer form. This endpoint returns the number of the client's pending
-   * deposit. The response shape is unknown: the web app declares the call but never reads
-   * the result.
+   * (`MTS_MULTITRANSFER`) are matched by a number that the client gives to the cashier or
+   * enters in the transfer form. The web app declares this call (as a phone number code of the
+   * pending deposit) but never sends it, so the meaning and shape of the answer are unknown.
    *
    * `GET /api/v1/operations/deposit/pending-number`
    *
@@ -392,7 +431,12 @@ export class ProvidersMtsResource extends APIResource {
    */
   pendingDepositNumber(options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'mts', method: 'GET', path: '/api/v1/operations/deposit/pending-number' },
+      {
+        service: 'mts',
+        method: 'GET',
+        path: '/api/v1/operations/deposit/pending-number',
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -413,9 +457,11 @@ export class ProvidersMtsQrResource extends APIResource {
    * 2. For a static QR code (`payments[0].qrType == "static"`) the payer chooses the amount
    *    and gets the amount to pay from `commission`; otherwise the amount is
    *    `payments[0].settlementAmount`.
-   * 3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
-   *    (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or by
-   *    selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+   * 3. Pay through the exchange API: from a RUB balance, first
+   *    `balance.withdrawals.calculate_fiat` with `fiatProviderType: MTS_QR`,
+   *    `paymentToken: qrTicketId`, `commissionType: ADD` and the amount, then
+   *    `balance.withdrawals.create_fiat` with the same fields plus `accountType`; or by selling
+   *    crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
    *    token: qrTicketId}`.
    *
    * `POST /api/v1/qr/info`
@@ -424,7 +470,13 @@ export class ProvidersMtsQrResource extends APIResource {
    */
   info(params: MtsQrInfoRequest, options?: RequestOptions): Promise<MtsQrInfo> {
     return this._client.call(
-      { service: 'mts', method: 'POST', path: '/api/v1/qr/info', body: params },
+      {
+        service: 'mts',
+        method: 'POST',
+        path: '/api/v1/qr/info',
+        body: params,
+        responseShape: 'MtsQrInfo',
+      },
       options,
     );
   }
@@ -441,7 +493,14 @@ export class ProvidersMtsQrResource extends APIResource {
    */
   commission(params: MtsQrCommissionRequest, options?: RequestOptions): Promise<MtsQrCommission> {
     return this._client.call(
-      { service: 'mts', method: 'POST', path: '/api/v1/qr/payment/commission', body: params },
+      {
+        service: 'mts',
+        method: 'POST',
+        path: '/api/v1/qr/payment/commission',
+        body: params,
+        bodyShape: 'MtsQrCommissionRequest',
+        responseShape: 'MtsQrCommission',
+      },
       options,
     );
   }
@@ -514,7 +573,8 @@ export class ProvidersStatusbankResource extends APIResource {
       {
         service: 'statusbank',
         method: 'GET',
-        path: `/api/v1/statusbank/card/${encodeURIComponent(cardId)}`,
+        path: '/api/v1/statusbank/card/{cardId}',
+        pathParams: { cardId },
       },
       options,
     );
@@ -568,7 +628,14 @@ export class ProvidersVtbCortiMilliResource extends APIResource {
    */
   rate(params: VtbCortiMilliRateRequest, options?: RequestOptions): Promise<VtbCortiMilliRate> {
     return this._client.call(
-      { service: 'vtb', method: 'POST', path: '/api/v1/corti-milli/rate', body: params },
+      {
+        service: 'vtb',
+        method: 'POST',
+        path: '/api/v1/corti-milli/rate',
+        body: params,
+        defaults: { body: { serviceType: 'EXCHANGE' } },
+        responseShape: 'VtbCortiMilliRate',
+      },
       options,
     );
   }
@@ -582,16 +649,22 @@ export interface ProvidersAlfaPaymentParams {
 
 /** Parameters of {@link ProvidersAssistResource.cardBindForm}. */
 export interface ProvidersAssistCardBindFormParams {
-  /** Binding owner type; the web app always sends `CLIENT`. */
-  type?: AssistCardBindType;
+  /**
+   * Binding owner type; the web app always sends `CLIENT`.
+   * @defaultValue `'CLIENT'`, sent when not set
+   */
+  type?: AssistCardBindType | undefined;
   /** Where Assist sends the browser after the binding. */
   returnUrl: string;
 }
 
 /** Parameters of {@link ProvidersAssistResource.cardBindUrl}. */
 export interface ProvidersAssistCardBindUrlParams {
-  /** Binding owner type; the web app always sends `CLIENT`. */
-  type?: AssistCardBindType;
+  /**
+   * Binding owner type; the web app always sends `CLIENT`.
+   * @defaultValue `'CLIENT'`, sent when not set
+   */
+  type?: AssistCardBindType | undefined;
   /** Where Assist sends the browser after the binding. */
   returnUrl: string;
 }
@@ -609,5 +682,5 @@ export interface ProvidersMtsBindCardParams extends MtsCardBindRequest {
    * standalone card form uses it when opened from the mobile apps (`?token=...&returnUrl=...`); not
    * needed with bearer authentication.
    */
-  token?: string;
+  token?: string | undefined;
 }

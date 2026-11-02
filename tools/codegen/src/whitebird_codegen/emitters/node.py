@@ -7,6 +7,7 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import jinja2
 
@@ -123,26 +124,45 @@ SCALARS = {
     "date": "string",
     "integer": "number",
     "number": "number",
-    "decimal": "number",
+    # Decimals are strings with the exact digits; requests also take numbers.
+    "decimal": "string",
     "boolean": "boolean",
     "binary": "Blob",
     "any": "unknown",
 }
+# Wider types accepted where values are sent rather than received.
+INPUT_SCALARS = {
+    "decimal": "string | number",
+    "datetime": "string | Date",
+    "binary": "Blob | Uint8Array",
+}
 RESPONSE_TYPES = {"text": "string", "binary": "Uint8Array", "empty": "void"}
+DECIMAL_SHAPE = "'#'"
 
 
 def emit(ir: IR) -> dict[str, str]:
     env = environment("node", doc=_doc_block, quote=_quote, key=_key)
-    tops = [_ResourceView.of(ir.root.children[name]) for name in sorted(ir.root.children)]
+    context = _Context.of(ir)
+    tops = [_ResourceView.of(ir.root.children[name], context) for name in sorted(ir.root.children)]
     _check_names(ir, tops)
     files = {
         "index.ts": env.get_template("index.ts.j2").render(resources=tops),
-        "models.ts": _models(env, ir),
+        "models.ts": _models(env, ir, context),
         "services.ts": env.get_template("services.ts.j2").render(
             environments=ir.environments,
             services=[_service_view(service, ir.environments) for service in ir.services.values()],
             oauth=ir.oauth,
             operation_mfa=ir.operation_mfa,
+            logout=_logout(ir),
+        ),
+        "shapes.ts": env.get_template("shapes.ts.j2").render(
+            models=[
+                (name, fields)
+                for name, fields in (
+                    (model.name, _model_shape(model, context)) for model in ir.models.values()
+                )
+                if fields
+            ]
         ),
     }
     for top in tops:
@@ -153,14 +173,99 @@ def emit(ir: IR) -> dict[str, str]:
     }
 
 
-def _models(env: jinja2.Environment, ir: IR) -> str:
+@dataclass(frozen=True)
+class _Context:
+    """What the emitter needs to know about the API as a whole."""
+
+    inputs: frozenset[str]
+    """Models that are sent, as parameters or bodies; none is also received."""
+    decimals: frozenset[str]
+    """Models holding decimals, directly or in nested models."""
+
+    @classmethod
+    def of(cls, ir: IR) -> _Context:
+        sent: list[TypeRef] = []
+        for op in ir.operations:
+            sent += [p.type for p in op.params]
+            sent += [op.body.type] if op.body else []
+        return cls(inputs=frozenset(_reachable(ir, sent)), decimals=_decimal_models(ir))
+
+    def shape(self, ref: TypeRef | None) -> str | None:
+        """Renders where decimals sit in a value of type `ref`, or None when nowhere."""
+        if ref is None:
+            return None
+        if ref.kind == "decimal":
+            return DECIMAL_SHAPE
+        if ref.kind == "model":
+            return _quote(ref.name) if ref.name in self.decimals else None
+        item = self.shape(ref.item)
+        if item is None:
+            return None
+        if ref.kind in ("array", "map"):
+            return f"[{_quote(ref.kind)}, {item}]"
+        if ref.kind == "page":
+            return f"{{ content: ['array', {item}] }}"
+        return None
+
+
+def _reachable(ir: IR, refs: list[TypeRef]) -> set[str]:
+    """Returns the models used by `refs`, also through the fields of other models."""
+    seen: set[str] = set()
+    pending = list(refs)
+    while pending:
+        for part in pending.pop().walk():
+            if part.kind == "model" and part.name and part.name not in seen:
+                seen.add(part.name)
+                pending += [item.type for item in ir.models[part.name].fields]
+    return seen
+
+
+def _decimal_models(ir: IR) -> frozenset[str]:
+    holders: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for model in ir.models.values():
+            if model.name not in holders and any(
+                part.kind == "decimal" or (part.kind == "model" and part.name in holders)
+                for item in model.fields
+                for part in item.type.walk()
+            ):
+                holders.add(model.name)
+                changed = True
+    return frozenset(holders)
+
+
+def _model_shape(model: Model, context: _Context) -> str:
+    """Renders the fields of a model that hold decimals, as an object literal body."""
+    shapes = [(item.wire, context.shape(item.type)) for item in model.fields]
+    return ", ".join(f"{_key(wire)}: {shape}" for wire, shape in shapes if shape)
+
+
+def _logout(ir: IR) -> dict[str, str] | None:
+    """Finds the endpoint that ends the session and takes no parameters."""
+    candidates = [
+        op
+        for op in ir.operations
+        if op.session == "end"
+        and not op.params
+        and not (op.body and (op.body.fields or not op.body.flattened))
+    ]
+    candidates.sort(key=lambda op: (op.name != "logout", op.id))
+    if not candidates:
+        return None
+    op = candidates[0]
+    return {"service": op.service, "method": op.method, "path": op.path}
+
+
+def _models(env: jinja2.Environment, ir: IR, context: _Context) -> str:
     uses = _Uses()
     for model in ir.models.values():
         for item in model.fields:
             uses.add(item.type)
     return env.get_template("models.ts.j2").render(
         enums=[_enum_view(enum) for enum in ir.enums.values()],
-        models=[_model_view(model) for model in ir.models.values()],
+        models=[_model_view(model, model.name in context.inputs) for model in ir.models.values()],
         uses=uses,
     )
 
@@ -311,9 +416,9 @@ class _ResourceView:
     methods: list[_MethodView]
 
     @classmethod
-    def of(cls, resource: Resource) -> _ResourceView:
-        children = [cls.of(resource.children[name]) for name in sorted(resource.children)]
-        methods = [_method(op) for op in resource.operations]
+    def of(cls, resource: Resource, context: _Context) -> _ResourceView:
+        children = [cls.of(resource.children[name], context) for name in sorted(resource.children)]
+        methods = [_method(op, context) for op in resource.operations]
         names = [child.prop for child in children] + [method.name for method in methods]
         for duplicate in sorted({name for name in names if names.count(name) > 1}):
             where = ".".join(resource.path)
@@ -339,16 +444,19 @@ class _ResourceView:
         return [self, *(view for child in self.children for view in child.walk())]
 
 
-def _method(op: Operation) -> _MethodView:
+def _method(op: Operation, context: _Context) -> _MethodView:
     path_args = [_local(naming.camel(p.name)) for p in op.path_params]
-    args = [f"{name}: {_ts(p.type)}" for name, p in zip(path_args, op.path_params, strict=True)]
+    args = [
+        f"{name}: {_ts(p.type, input=True)}"
+        for name, p in zip(path_args, op.path_params, strict=True)
+    ]
     groups = _Groups(op.query_params, op.header_params, op.body)
     params = None
     if groups.query or groups.headers or groups.body_fields or groups.raw_body:
         params = _params_view(op, groups)
         args.append(_params_arg(params, groups))
     args.append(f"options?: {'StreamOptions' if op.response.kind == 'sse' else 'RequestOptions'}")
-    prelude, request = _request(op, groups)
+    prelude, request = _request(op, groups, context)
     if op.pagination and op.pagination.location == "body":
         request.append("pageIn: 'body'")
     call, returns = _returns(op)
@@ -376,6 +484,17 @@ def _returns(op: Operation) -> tuple[str, str]:
     return "call", f"Promise<{RESPONSE_TYPES.get(op.response.kind, payload)}>"
 
 
+def _response_type(op: Operation) -> str | None:
+    """How the core decodes the response, when not as typed JSON."""
+    if op.response.kind in RESPONSE_TYPES:
+        return op.response.kind
+    kind = op.response.type.kind if op.response.type else "any"
+    if op.response.kind == "json" and not op.pagination:
+        # Untyped and string responses also come as bare text; that is never an error.
+        return {"any": "auto", "string": "string"}.get(kind)
+    return None
+
+
 def _method_uses(op: Operation) -> _Uses:
     sse = op.response.kind == "sse"
     uses = _Uses(paginator=op.pagination is not None, stream=sse, options=not sse)
@@ -391,7 +510,7 @@ def _params_arg(params: _ParamsView | None, groups: _Groups) -> str:
         return f"params: {params.name}" + ("" if groups.required else " = {}")
     # The body model itself is the params type. The body is sent even when no field is set.
     assert groups.body
-    model = _ts(groups.body.type)
+    model = _ts(groups.body.type, input=True)
     if groups.required:
         return f"params: {model}"
     if any(f.required for f in groups.body.fields):
@@ -406,15 +525,21 @@ def _params_view(op: Operation, groups: _Groups) -> _ParamsView | None:
         return None
     extends = None
     if body and groups.body_fields:
-        extends = _ts(body.type)
+        extends = _ts(body.type, input=True)
         if not body.required and any(f.required for f in body.fields):
             extends = f"Partial<{extends}>"
     members = [
-        _Member(_key(p.wire), _ts(p.type), not p.required, _text(p.description))
+        _Member(
+            _key(_member_name(p)),
+            _input_type(_ts(p.type, input=True), optional=not p.required),
+            not p.required,
+            [*_text(p.description), *_default_doc(p.type, p.default)],
+        )
         for p in [*groups.query, *groups.headers]
     ]
     if body and groups.raw_body:
-        members.append(_Member("body", _ts(body.type), not body.required, ["Request body."]))
+        body_type = _input_type(_ts(body.type, input=True), optional=not body.required)
+        members.append(_Member("body", body_type, not body.required, ["Request body."]))
     return _ParamsView(
         name=naming.pascal(op.id) + "Params",
         extends=extends,
@@ -425,17 +550,21 @@ def _params_view(op: Operation, groups: _Groups) -> _ParamsView | None:
     )
 
 
-def _request(op: Operation, groups: _Groups) -> tuple[str | None, list[str]]:
+def _request(op: Operation, groups: _Groups, context: _Context) -> tuple[str | None, list[str]]:
     """Returns the statement splitting `params` by location, and the request descriptor."""
     rest = groups.rest
-    picked: dict[str, list[tuple[str, str]]] = {
-        location: [(p.wire, _local(naming.camel(p.name))) for p in members]
-        for location, members in (("query", groups.query), ("headers", groups.headers))
-        if location != rest
-    }
+    # Members picked out of `params` by name: (member, wire name, local variable).
+    picked: dict[str, list[tuple[str, str, str]]] = {}
+    for location, members in (("query", groups.query), ("headers", groups.headers)):
+        # The rest object is sent as it is, except members whose wire name differs.
+        chosen = [p for p in members if location != rest or _member_name(p) != p.wire]
+        if chosen:
+            picked[location] = [
+                (_member_name(p), p.wire, _local(naming.camel(p.name))) for p in chosen
+            ]
     if groups.raw_body:
-        picked["body"] = [("body", "body")]
-    bindings = [_binding(wire, local) for pairs in picked.values() for wire, local in pairs]
+        picked["body"] = [("body", "body", "body")]
+    bindings = [_binding(member, local) for pairs in picked.values() for member, _, local in pairs]
     # A lone raw body reads better as `params.body` than as a destructuring.
     prelude = None
     if bindings and (rest or not groups.raw_body or len(bindings) > 1):
@@ -446,18 +575,24 @@ def _request(op: Operation, groups: _Groups) -> tuple[str | None, list[str]]:
     request = [
         f"service: {_quote(op.service)}",
         f"method: {_quote(op.method)}",
-        f"path: {_path(op)}",
+        f"path: {_quote(op.path)}",
     ]
+    path_params = _path_params(op)
+    if path_params:
+        request.append(f"pathParams: {path_params}")
     for location in ("query", "headers", "body"):
+        sent = ", ".join(_binding(wire, local) for _, wire, local in picked.get(location, []))
         if location == rest:
-            request.append(location if prelude else f"{location}: params")
+            if sent:
+                request.append(f"{location}: {{ ...{location}, {sent} }}")
+            else:
+                request.append(location if prelude else f"{location}: params")
         elif location == "body" and groups.raw_body:
             request.append("body" if prelude else "body: params.body")
         elif location == "body" and groups.empty_body:
             request.append("body: {}")
-        elif picked.get(location):
-            pairs = ", ".join(_binding(wire, local) for wire, local in picked[location])
-            request.append(f"{location}: {{ {pairs} }}")
+        elif sent:
+            request.append(f"{location}: {{ {sent} }}")
     if op.body and op.body.kind != "json":
         request.append(f"bodyType: {_quote(op.body.kind)}")
     part_types = (
@@ -466,30 +601,83 @@ def _request(op: Operation, groups: _Groups) -> tuple[str | None, list[str]]:
     if part_types:
         pairs = ", ".join(f"{_key(wire)}: {_quote(media)}" for wire, media in part_types)
         request.append(f"partTypes: {{ {pairs} }}")
-    if op.response.kind in RESPONSE_TYPES:
-        request.append(f"responseType: {_quote(op.response.kind)}")
+    response_type = _response_type(op)
+    if response_type:
+        request.append(f"responseType: {_quote(response_type)}")
     if op.auth == "none":
         request.append("auth: false")
     if op.envelope:
         request.append(f"envelope: {_quote(op.envelope)}")
     if op.mfa_operation:
         request.append(f"mfa: {_quote(op.mfa_operation)}")
+    defaults = _defaults(groups)
+    if defaults:
+        request.append(f"defaults: {{ {defaults} }}")
+    body_shape = context.shape(op.body.type) if op.body else None
+    if body_shape:
+        request.append(f"bodyShape: {body_shape}")
+    decoded = op.response.kind in ("json", "sse")
+    response_shape = context.shape(op.response.type) if decoded else None
+    if response_shape:
+        request.append(f"responseShape: {response_shape}")
+    if op.session:
+        request.append(f"session: {_quote(op.session)}")
     return prelude, request
+
+
+def _defaults(groups: _Groups) -> str:
+    """Renders the values sent for parameters and body fields the caller leaves unset."""
+    locations = {
+        "query": [(p.wire, p.default) for p in groups.query],
+        "headers": [(p.wire, p.default) for p in groups.headers],
+        "body": [(f.wire, f.default) for f in groups.body_fields],
+    }
+    rendered = []
+    for location, pairs in locations.items():
+        values = [f"{_key(wire)}: {_literal(value)}" for wire, value in pairs if _literal(value)]
+        if values:
+            rendered.append(f"{location}: {{ {', '.join(values)} }}")
+    return ", ".join(rendered)
+
+
+def _literal(value: Any) -> str | None:
+    """Renders a scalar spec default as a TypeScript literal; None for other values."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int | float):
+        return json.dumps(value)
+    return _quote(value) if isinstance(value, str) else None
+
+
+def _default_doc(ref: TypeRef, value: Any) -> list[str]:
+    literal = _literal(value)
+    if literal is None:
+        return []
+    if isinstance(value, str):
+        literal = "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+    return [f"@defaultValue `{literal}`, sent when not set"]
+
+
+def _input_type(ts: str, optional: bool) -> str:
+    """Lets an optional input also take `undefined`, for `exactOptionalPropertyTypes`."""
+    return f"{ts} | undefined" if optional else ts
+
+
+def _member_name(param: Param) -> str:
+    """Name of a parameter in the params object: `assets[]` is sent for `assets`."""
+    return param.wire.removesuffix("[]") or param.wire
 
 
 def _binding(wire: str, local: str) -> str:
     return local if wire == local else f"{_key(wire)}: {local}"
 
 
-def _path(op: Operation) -> str:
+def _path_params(op: Operation) -> str | None:
+    """Renders the values of the `{name}` placeholders of the path."""
     if not op.path_params:
-        return _quote(op.path)
-    names = {p.wire: _local(naming.camel(p.name)) for p in op.path_params}
-    escaped = op.path.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
-    substituted = re.sub(
-        r"{([^}]+)}", lambda m: f"${{encodeURIComponent({names[m.group(1)]})}}", escaped
-    )
-    return f"`{substituted}`"
+        return None
+    pairs = [_binding(p.wire, _local(naming.camel(p.name))) for p in op.path_params]
+    return f"{{ {', '.join(pairs)} }}"
 
 
 def _method_doc(op: Operation, path_args: list[str]) -> list[str]:
@@ -501,11 +689,16 @@ def _method_doc(op: Operation, path_args: list[str]) -> list[str]:
     elif op.mfa_operation:
         lines += [
             "",
-            f"Needs an operation MFA token for `{op.mfa_operation}`: the client gets one with the "
-            "configured `otp`, or call {@link Whitebird.confirmOperation} first.",
+            f"Needs an operation MFA token for `{op.mfa_operation}`: when the API asks for it, the "
+            "client gets one with a code from the configured `otp` and sends the request again. "
+            "Without `otp`, call {@link Whitebird.confirmOperation} first.",
         ]
     elif op.auth == "mfa":
         lines += ["", "Needs an operation MFA token: set {@link Whitebird.mfaToken} first."]
+    if op.session == "end":
+        lines += ["", "Ends the session: the client forgets its tokens afterwards, also on errors."]
+    elif op.session == "replace":
+        lines += ["", "The client keeps the returned tokens as its new session."]
     tags = [
         f"@param {name} - {' '.join(_text(p.description))}"
         for name, p in zip(path_args, op.path_params, strict=True)
@@ -523,8 +716,8 @@ def _method_doc(op: Operation, path_args: list[str]) -> list[str]:
         )
     if op.auth == "mfa":
         tags.append(
-            "@throws {@link MFARequiredError} if the operation MFA token is missing and no `otp` "
-            "is configured."
+            "@throws {@link MFARequiredError} if the API asks for an operation MFA token and no "
+            "`otp` is configured."
         )
     if op.status == "experimental":
         tags.append("@experimental")
@@ -550,39 +743,39 @@ def _enum_view(enum: Enum) -> dict[str, object]:
     }
 
 
-def _model_view(model: Model) -> dict[str, object]:
-    return {
-        "name": model.name,
-        "doc": _text(model.description),
-        "fields": [
-            _Member(
-                key=_key(item.wire),
-                type=_ts(item.type) + (" | null" if item.nullable else ""),
-                optional=not item.required,
-                doc=_field_doc(item),
-            )
-            for item in model.fields
-        ],
-    }
+def _model_view(model: Model, input: bool) -> dict[str, object]:
+    """Renders a model; models that are sent take wider types and explicit `undefined`."""
+    fields = []
+    for item in model.fields:
+        ts = _ts(item.type, input=input) + (" | null" if item.nullable else "")
+        if input:
+            ts = _input_type(ts, optional=not item.required)
+        fields.append(_Member(_key(item.wire), ts, not item.required, _field_doc(item, input)))
+    return {"name": model.name, "doc": _text(model.description), "fields": fields}
 
 
-def _field_doc(item: Field) -> list[str]:
+def _field_doc(item: Field, input: bool) -> list[str]:
     lines = _text(item.description)
     if item.inferred:
         lines.append("Inferred from the web application, not observed in API responses.")
+    if input:
+        lines += _default_doc(item.type, item.default)
     if item.deprecated:
         lines.append("@deprecated")
     return lines
 
 
-def _ts(ref: TypeRef) -> str:
+def _ts(ref: TypeRef, input: bool = False) -> str:
+    """Renders a type; `input` widens the types of values that are sent."""
+    if input and ref.kind in INPUT_SCALARS:
+        return INPUT_SCALARS[ref.kind]
     if ref.kind in SCALARS:
         return SCALARS[ref.kind]
     if ref.kind in ("model", "enum"):
         assert ref.name
         return ref.name
     assert ref.item
-    item = _ts(ref.item)
+    item = _ts(ref.item, input)
     if ref.kind == "array":
         return f"({item})[]" if " " in item else f"{item}[]"
     if ref.kind == "map":
@@ -657,7 +850,7 @@ def _check_names(ir: IR, tops: list[_ResourceView]) -> None:
             raise ValueError(f"{owner} and {owners[name]} both export {name}; rename one of them")
         owners[name] = owner
 
-    for name in ("Environment", "ServiceName", "SERVICE_URLS", "OAUTH", "OPERATION_MFA"):
+    for name in ("Environment", "ServiceName", "SERVICE_URLS", "OAUTH", "OPERATION_MFA", "LOGOUT"):
         claim(name, "the services module")
     for name in [*ir.models, *ir.enums]:
         claim(name, f"schema {name}")

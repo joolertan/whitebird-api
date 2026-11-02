@@ -5,7 +5,7 @@ const client = createClient();
 const count = Number(process.argv[2] ?? 10);
 
 // Pages of 20 are fetched as the loop goes; leaving the loop stops fetching.
-const orders = client.exchange.orders.history({ size: 20, sort: ['creationDate,desc'] });
+const orders = client.exchange.orders.history({ size: 20, sort: 'creationDate,desc' });
 let printed = 0;
 for await (const order of orders) {
   const { input, output } = order;

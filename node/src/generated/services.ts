@@ -6,6 +6,7 @@ export type Environment = 'production' | 'demo';
 /** Key of a Whitebird backend service. */
 export type ServiceName =
   | 'accounting'
+  | 'accounting_spot'
   | 'alfa'
   | 'api'
   | 'assist'
@@ -39,6 +40,11 @@ export const SERVICE_URLS: Record<ServiceName, Record<Environment, string>> = {
     production: 'https://accounting-service.whitebird.io',
     demo: 'https://accounting-service.whitebird.io',
   },
+  /** Spot accounting */
+  accounting_spot: {
+    production: 'https://api.whitebird.io',
+    demo: 'https://api-demo.whitebird.io',
+  },
   /** Alfa-Bank payments */
   alfa: {
     production: 'https://alfa-service.whitebird.io',
@@ -47,7 +53,7 @@ export const SERVICE_URLS: Record<ServiceName, Record<Environment, string>> = {
   /** API gateway */
   api: {
     production: 'https://api.whitebird.io',
-    demo: 'https://api-demo.whitebird.io',
+    demo: 'https://api.whitebird.io',
   },
   /** Assist payments */
   assist: {
@@ -180,3 +186,10 @@ export const OPERATION_MFA = {
   service: 'api',
   tokenPath: '/api/v2/auth/mfa/merchant/client/token',
 } as const;
+
+/** Endpoint that ends the session on the server; {@link Whitebird.logout} calls it. */
+export const LOGOUT: { service: ServiceName; method: string; path: string } | undefined = {
+  service: 'auth',
+  method: 'POST',
+  path: '/api/v1/user/logout',
+};

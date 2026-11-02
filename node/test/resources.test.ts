@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import packageJson from '../package.json' with { type: 'json' };
 import { APIError, VERSION, WhitebirdError } from '../src/index.js';
+import { JsonCodec } from '../src/json.js';
 import { client, MockApi } from './helpers.js';
 
 const BROKERAGE = 'https://brokerage-service.whitebird.io';
@@ -15,7 +16,7 @@ describe('generated methods', () => {
       fromAmount: 100,
       toAsset: 'BTC',
       exchangeRatePair: 'BTC/USDT',
-      exchangeRateValue: 100_000,
+      exchangeRateValue: '100000',
     };
 
     await expect(client(api).brokerage.otcOrders.create(params)).resolves.toEqual(order);
@@ -25,7 +26,138 @@ describe('generated methods', () => {
     expect(request?.headers.get('content-type')).toBe('application/json');
     expect(request?.headers.get('accept')).toBe('application/json');
     expect(request?.headers.get('user-agent')).toBe(`whitebird-api-node/${VERSION}`);
-    expect(await request?.json()).toEqual(params);
+    expect(await request?.json()).toEqual({ ...params, exchangeRateValue: 100_000 });
+  });
+
+  it('keeps every digit of decimals, both ways', async () => {
+    const route = 'POST /api/v1/brokerage/otc-order';
+    const api = new MockApi({
+      [route]: () =>
+        new Response(
+          '{"uuid":"otc-1","fromAmount":0.123456789012345678,"toAmount":12345678.123456789,' +
+            '"exchangeRateValue":1.10,"extra":{"big":12345678.123456789}}',
+          { headers: { 'content-type': 'application/json' } },
+        ),
+    });
+
+    const order = await client(api).brokerage.otcOrders.create({
+      subaccountId: 'sub-1',
+      fromAsset: 'USDT',
+      fromAmount: '0.30000000000000000001',
+      toAsset: 'BTC',
+      exchangeRatePair: 'BTC/USDT',
+      exchangeRateValue: 0.5,
+    });
+
+    expect(order).toMatchObject({
+      fromAmount: '0.123456789012345678',
+      toAmount: '12345678.123456789',
+      exchangeRateValue: '1.10',
+      extra: { big: 12345678.12345679 },
+    });
+    const sent = await api.calls(route)[0]?.text();
+    expect(sent).toContain('"fromAmount":0.30000000000000000001');
+    expect(sent).toContain('"exchangeRateValue":0.5');
+  });
+
+  it('reads decimals in maps as strings', async () => {
+    const api = new MockApi({
+      'GET /api/v1/brokerage/broker/balances': () =>
+        new Response('{"BTC":1,"ETH":0.123456789012345678}'),
+    });
+    await expect(client(api).brokerage.balances()).resolves.toEqual({
+      BTC: '1',
+      ETH: '0.123456789012345678',
+    });
+  });
+
+  it('rejects decimal strings that are not numbers', async () => {
+    const api = new MockApi();
+    const create = client(api).brokerage.otcOrders.create({
+      subaccountId: 'sub-1',
+      fromAsset: 'USDT',
+      fromAmount: '1,5',
+      toAsset: 'BTC',
+      exchangeRatePair: 'BTC/USDT',
+      exchangeRateValue: 1,
+    });
+    await expect(create).rejects.toThrow(/fromAmount must be a decimal number/);
+  });
+
+  it('sends the spec defaults of parameters the caller leaves unset', async () => {
+    const route = 'GET /api/v1/orders/history/page';
+    const api = new MockApi({ [route]: () => Response.json({ content: [], last: true }) });
+
+    await client(api).trading.orders.list({ sortDir: 'ASC', sortBy: undefined });
+
+    const query = new URL(api.calls(route)[0]?.url ?? '').searchParams;
+    expect(Object.fromEntries(query)).toEqual({
+      page: '0',
+      size: '30',
+      sortBy: 'exchangeTime',
+      sortDir: 'ASC',
+    });
+  });
+
+  it('sends the spec defaults of body fields the caller leaves unset', async () => {
+    const route = 'POST /api/v2/exchange/client/balance/crypto/reject';
+    const api = new MockApi({ [route]: () => new Response('') });
+
+    await client(api).balance.operations.rejectCrypto({ transactionId: 'tx-1' });
+
+    expect(await api.calls(route)[0]?.json()).toEqual({
+      transactionId: 'tx-1',
+      operationType: 'crypto',
+    });
+  });
+
+  it('returns the text of untyped responses that are not JSON', async () => {
+    const route = 'POST /api/v2/exchange/client/balance/crypto/reject';
+    const api = new MockApi({
+      [route]: () => new Response('9f0c-uuid', { headers: { 'content-type': 'application/json' } }),
+    });
+    await expect(
+      client(api).balance.operations.rejectCrypto({ transactionId: 'tx-1' }),
+    ).resolves.toBe('9f0c-uuid');
+  });
+
+  it('sends bracketed query names as the web app does', async () => {
+    const route = 'GET /api/v1/ico/emission/stable-coin/available';
+    const api = new MockApi({ [route]: () => Response.json({ AED: true }) });
+
+    await client(api).ico.emissions.stableCoinAvailability({ assets: ['AED', 'RUBS'] });
+
+    const query = new URL(api.calls(route)[0]?.url ?? '').searchParams;
+    expect(query.getAll('assets[]')).toEqual(['AED', 'RUBS']);
+    expect(query.has('assets')).toBe(false);
+  });
+
+  it('rejects path parameters that would change the path', async () => {
+    const api = new MockApi();
+    for (const value of ['', '.', '..']) {
+      await expect(client(api).brokerage.cryptoAddresses.delete(value)).rejects.toBeInstanceOf(
+        WhitebirdError,
+      );
+    }
+    expect(api.requests).toHaveLength(0);
+  });
+
+  it('sends dates as the web app formats them', async () => {
+    const api = new MockApi({ 'POST /dates': () => new Response(null) });
+    const at = new Date(Date.UTC(2026, 0, 2, 3, 4, 5, 678));
+
+    await client(api).request('brokerage', 'POST', '/dates', {
+      query: { from: at },
+      body: { from: at, nested: [{ at }] },
+      responseType: 'empty',
+    });
+
+    const [request] = api.calls('POST /dates');
+    expect(new URL(request?.url ?? '').searchParams.get('from')).toBe('2026-01-02T03:04:05+0000');
+    expect(await request?.json()).toEqual({
+      from: '2026-01-02T03:04:05+0000',
+      nested: [{ at: '2026-01-02T03:04:05+0000' }],
+    });
   });
 
   it('splits params into query and body', async () => {
@@ -99,6 +231,25 @@ describe('generated methods', () => {
     ]);
   });
 
+  it('sends JSON parts declared as text as plain text fields', async () => {
+    const route = 'POST /api/v1/support';
+    const api = new MockApi({ [route]: () => Response.json({ id: 's-1' }) });
+
+    await client(api).support.send({
+      recaptcha: 'token',
+      request: { name: 'Me', email: 'me@example.com', topic: 'other', message: 'Hello' },
+      files: [new Uint8Array([1, 2, 3])],
+    });
+
+    const data = (await api.calls(route)[0]?.formData()) as FormData;
+    const request = data.get('request');
+    expect(typeof request).toBe('string');
+    expect(JSON.parse(request as string)).toMatchObject({ email: 'me@example.com' });
+    const file = data.get('files') as File;
+    expect(file).toBeInstanceOf(File);
+    expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
   it('repeats array query parameters', async () => {
     const api = new MockApi({
       'GET /api/v1/brokerage/subaccount/page': () => Response.json({ content: [], last: true }),
@@ -111,6 +262,33 @@ describe('generated methods', () => {
       'customId,asc',
       'email',
     ]);
+  });
+});
+
+describe('JsonCodec', () => {
+  const codec = new JsonCodec({
+    Order: { total: '#', lines: ['array', 'Line'] },
+    Line: { price: '#' },
+  });
+
+  it('reads decimals at the places of the shape', () => {
+    const text = '{"total":1e-7,"lines":[{"price":2.50,"qty":3}],"other":0.1}';
+    expect(codec.parse(text, 'Order')).toEqual({
+      total: '1e-7',
+      lines: [{ price: '2.50', qty: 3 }],
+      other: 0.1,
+    });
+    expect(codec.parse('[1, 2.0]', ['array', '#'])).toEqual(['1', '2.0']);
+    expect(codec.parse('{"__proto__":{"total":1}}', 'Order')).toEqual(
+      JSON.parse('{"__proto__":{"total":1}}'),
+    );
+  });
+
+  it('writes decimal strings as numbers with their digits', () => {
+    expect(
+      codec.stringify({ total: '-0.000000000000000000001', lines: [{ price: 7 }] }, 'Order'),
+    ).toBe('{"total":-0.000000000000000000001,"lines":[{"price":7}]}');
+    expect(() => codec.stringify({ total: '1.' }, 'Order')).toThrow(TypeError);
   });
 });
 
@@ -128,6 +306,21 @@ describe('base URLs', () => {
       'https://trading-demo-service.whitebird.io',
       BROKERAGE,
     ]);
+  });
+
+  it('uses the demo accounting host only for the spot balance', async () => {
+    const api = new MockApi({
+      'POST /api/v2/accounting/client/account/enhanced': () => Response.json([]),
+      'POST /api/v2/auth/mfa/merchant/client/token': () => Response.json({ mfaToken: 'm' }),
+    });
+    const demo = client(api, { environment: 'demo' });
+
+    await demo.accounting.accounts.getEnhanced({ type: 'USER_BALANCE' });
+    await demo.confirmOperation('WITHDRAWAL', '123456');
+
+    const hosts = api.requests.map((r) => `${new URL(r.url).host}${new URL(r.url).pathname}`);
+    expect(hosts).toContain('api-demo.whitebird.io/api/v2/accounting/client/account/enhanced');
+    expect(hosts).toContain('api.whitebird.io/api/v2/auth/mfa/merchant/client/token');
   });
 
   it('can be overridden per service, also for services the SDK does not know', async () => {
@@ -205,6 +398,31 @@ describe('request()', () => {
     );
   });
 
+  it('sends FormData, URLSearchParams, streams and bytes as they are', async () => {
+    const api = new MockApi({
+      'POST /raw': async (request) =>
+        new Response(`${request.headers.get('content-type')}|${await request.text()}`),
+    });
+    const whitebird = client(api);
+    const send = (body: unknown, bodyType?: 'json' | 'form' | 'multipart') =>
+      whitebird.request<string>('brokerage', 'POST', '/raw', { body, bodyType });
+
+    const form = new FormData();
+    form.append('a', '1');
+    expect(await send(form, 'multipart')).toMatch(/^multipart\/form-data.*name="a"\r\n\r\n1/s);
+    expect(await send(new URLSearchParams({ a: '1' }))).toBe(
+      'application/x-www-form-urlencoded;charset=UTF-8|a=1',
+    );
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('streamed'));
+        controller.close();
+      },
+    });
+    expect(await send(stream)).toBe('null|streamed');
+    expect(await send(new TextEncoder().encode('bytes'))).toBe('null|bytes');
+  });
+
   it('sends one part per file, and other objects as JSON parts', async () => {
     const api = new MockApi({ 'POST /upload': () => new Response(null) });
 
@@ -247,6 +465,26 @@ describe('retCode envelope', () => {
       'GET /tickers': () => Response.json({ retCode: 0, retMsg: 'OK', result: [ticker] }),
     });
     await expect(get(api)).resolves.toEqual([ticker]);
+  });
+
+  it('accepts retCode 200 and a missing retCode as success', async () => {
+    for (const body of [
+      { retCode: 200, result: [ticker] },
+      { retCode: '0', retMsg: 'OK', result: [ticker] },
+      { result: [ticker] },
+    ]) {
+      const api = new MockApi({ 'GET /tickers': () => Response.json(body) });
+      await expect(get(api)).resolves.toEqual([ticker]);
+    }
+    const bare = new MockApi({ 'GET /tickers': () => Response.json({ ok: true }) });
+    await expect(get(bare)).resolves.toEqual({ ok: true });
+  });
+
+  it('takes the message of a failed envelope from retMsg or message', async () => {
+    const api = new MockApi({
+      'GET /tickers': () => Response.json({ code: 10002, message: 'Invalid category' }),
+    });
+    await expect(get(api)).rejects.toMatchObject({ code: 10002, message: 'Invalid category' });
   });
 
   it('raises APIError for a non-zero retCode on HTTP 200', async () => {

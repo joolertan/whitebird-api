@@ -54,9 +54,14 @@ export class BrokerageResource extends APIResource {
    *
    * `GET /api/v1/brokerage/broker/balances`
    */
-  balances(options?: RequestOptions): Promise<Record<string, number>> {
+  balances(options?: RequestOptions): Promise<Record<string, string>> {
     return this._client.call(
-      { service: 'brokerage', method: 'GET', path: '/api/v1/brokerage/broker/balances' },
+      {
+        service: 'brokerage',
+        method: 'GET',
+        path: '/api/v1/brokerage/broker/balances',
+        responseShape: ['map', '#'],
+      },
       options,
     );
   }
@@ -81,6 +86,8 @@ export class BrokerageBalanceOrdersResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/balance-order/crypto/deposit',
         body: params,
+        bodyShape: 'CryptoDepositRequest',
+        responseShape: 'BalanceOrderResponse',
       },
       options,
     );
@@ -109,7 +116,9 @@ export class BrokerageBalanceOrdersResource extends APIResource {
   /**
    * Create Crypto Withdrawal
    *
-   * Create a crypto withdrawal balance order
+   * Create a crypto withdrawal balance order. The order stays `AWAITING_CLIENT_CONFIRMATION`
+   * until the client confirms it with the token emailed to them (`confirm_crypto_withdrawal`);
+   * it then moves to `AWAITING_ADMIN_CONFIRMATION`.
    *
    * `POST /api/v1/brokerage/balance-order/crypto/withdrawal`
    */
@@ -123,6 +132,8 @@ export class BrokerageBalanceOrdersResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/balance-order/crypto/withdrawal',
         body: params,
+        bodyShape: 'CryptoWithdrawalRequest',
+        responseShape: 'BalanceOrderResponse',
       },
       options,
     );
@@ -134,6 +145,8 @@ export class BrokerageBalanceOrdersResource extends APIResource {
    * Client confirmation step for crypto withdrawal by token (public)
    *
    * `POST /api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client`
+   *
+   * Works without logging in.
    */
   confirmCryptoWithdrawal(
     params: ClientCryptoWithdrawalTokenRequest,
@@ -145,6 +158,8 @@ export class BrokerageBalanceOrdersResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client',
         body: params,
+        auth: false,
+        responseShape: 'BalanceOrderResponse',
       },
       options,
     );
@@ -167,6 +182,8 @@ export class BrokerageBalanceOrdersResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/balance-order/fiat/deposit',
         body: params,
+        bodyShape: 'FiatDepositRequest',
+        responseShape: 'BalanceOrderResponse',
       },
       options,
     );
@@ -189,6 +206,8 @@ export class BrokerageBalanceOrdersResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/balance-order/fiat/withdrawal',
         body: params,
+        bodyShape: 'FiatWithdrawalRequest',
+        responseShape: 'BalanceOrderResponse',
       },
       options,
     );
@@ -216,6 +235,9 @@ export class BrokerageBalanceOrdersResource extends APIResource {
         path: '/api/v1/brokerage/balance-order/page',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0, size: 20 } },
+        bodyShape: 'BalanceOrderFilterRequest',
+        responseShape: { content: ['array', 'BalanceOrderResponse'] },
       },
       options,
     );
@@ -241,7 +263,9 @@ export class BrokerageCryptoAddressesResource extends APIResource {
   /**
    * Add Crypto Address
    *
-   * Add a crypto address for the current subaccount
+   * Add a crypto address for the current subaccount. Errors: 403 when the account has no
+   * two-factor authentication (the web app asks to enable it), 400 `INVALID_ADDRESS` or
+   * `MAX_NUMBER_REACHED`.
    *
    * `POST /api/v1/brokerage/crypto-address`
    */
@@ -269,7 +293,8 @@ export class BrokerageCryptoAddressesResource extends APIResource {
       {
         service: 'brokerage',
         method: 'DELETE',
-        path: `/api/v1/brokerage/crypto-address/${encodeURIComponent(addressId)}`,
+        path: '/api/v1/brokerage/crypto-address/{addressId}',
+        pathParams: { addressId },
         responseType: 'empty',
       },
       options,
@@ -291,7 +316,8 @@ export class BrokerageCryptoAddressesResource extends APIResource {
       {
         service: 'brokerage',
         method: 'GET',
-        path: `/api/v1/brokerage/crypto-address/${encodeURIComponent(subaccountId)}/list`,
+        path: '/api/v1/brokerage/crypto-address/{subaccountId}/list',
+        pathParams: { subaccountId },
       },
       options,
     );
@@ -322,6 +348,8 @@ export class BrokerageOrdersResource extends APIResource {
         path: '/api/v1/brokerage/orders/current/page',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0, size: 20 } },
+        responseShape: { content: ['array', 'OrderUnifiedResponse'] },
       },
       options,
     );
@@ -364,7 +392,14 @@ export class BrokerageOtcOrdersResource extends APIResource {
    */
   create(params: OtcOrderRequest, options?: RequestOptions): Promise<OtcOrderResponse> {
     return this._client.call(
-      { service: 'brokerage', method: 'POST', path: '/api/v1/brokerage/otc-order', body: params },
+      {
+        service: 'brokerage',
+        method: 'POST',
+        path: '/api/v1/brokerage/otc-order',
+        body: params,
+        bodyShape: 'OtcOrderRequest',
+        responseShape: 'OtcOrderResponse',
+      },
       options,
     );
   }
@@ -386,6 +421,8 @@ export class BrokerageOtcOrdersResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/otc-order/calculate',
         body: params,
+        bodyShape: 'OtcOrderCalculateRequest',
+        responseShape: 'OtcOrderCalculateResponse',
       },
       options,
     );
@@ -433,6 +470,9 @@ export class BrokerageOtcOrdersResource extends APIResource {
         path: '/api/v1/brokerage/otc-order/page',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0, size: 20 } },
+        bodyShape: 'OtcOrderFilterRequest',
+        responseShape: { content: ['array', 'OtcOrderResponse'] },
       },
       options,
     );
@@ -456,7 +496,8 @@ export class BrokeragePaymentsResource extends APIResource {
       {
         service: 'brokerage',
         method: 'POST',
-        path: `/api/v1/brokerage/payment/invoice/${encodeURIComponent(balanceOrderId)}/download-token`,
+        path: '/api/v1/brokerage/payment/invoice/{balanceOrderId}/download-token',
+        pathParams: { balanceOrderId },
       },
       options,
     );
@@ -482,7 +523,9 @@ export class BrokerageSubaccountsResource extends APIResource {
   /**
    * Add Subaccount (Individual)
    *
-   * Add an Individual subaccount for current broker
+   * Add an Individual subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+   * taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+   * in `fields[]`.
    *
    * `POST /api/v1/brokerage/subaccount/add/individual`
    */
@@ -496,6 +539,7 @@ export class BrokerageSubaccountsResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/subaccount/add/individual',
         body: params,
+        responseShape: 'SubaccountResponse',
       },
       options,
     );
@@ -504,7 +548,10 @@ export class BrokerageSubaccountsResource extends APIResource {
   /**
    * Add Subaccount (Individual Entrepreneur)
    *
-   * Add an Individual Entrepreneur subaccount for current broker
+   * Add an Individual Entrepreneur subaccount for current broker. Errors: status `USER_EXISTS` (the
+   * email is
+   * taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+   * in `fields[]`.
    *
    * `POST /api/v1/brokerage/subaccount/add/individual-entrepreneur`
    */
@@ -518,6 +565,7 @@ export class BrokerageSubaccountsResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/subaccount/add/individual-entrepreneur',
         body: params,
+        responseShape: 'SubaccountResponse',
       },
       options,
     );
@@ -526,7 +574,9 @@ export class BrokerageSubaccountsResource extends APIResource {
   /**
    * Add Subaccount (Organization)
    *
-   * Add an Organization subaccount for current broker
+   * Add an Organization subaccount for current broker. Errors: status `USER_EXISTS` (the email is
+   * taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field errors
+   * in `fields[]`.
    *
    * `POST /api/v1/brokerage/subaccount/add/organization`
    */
@@ -540,6 +590,7 @@ export class BrokerageSubaccountsResource extends APIResource {
         method: 'POST',
         path: '/api/v1/brokerage/subaccount/add/organization',
         body: params,
+        responseShape: 'SubaccountResponse',
       },
       options,
     );
@@ -554,7 +605,12 @@ export class BrokerageSubaccountsResource extends APIResource {
    */
   me(options?: RequestOptions): Promise<SubaccountResponse> {
     return this._client.call(
-      { service: 'brokerage', method: 'GET', path: '/api/v1/brokerage/subaccount/me' },
+      {
+        service: 'brokerage',
+        method: 'GET',
+        path: '/api/v1/brokerage/subaccount/me',
+        responseShape: 'SubaccountResponse',
+      },
       options,
     );
   }
@@ -579,6 +635,8 @@ export class BrokerageSubaccountsResource extends APIResource {
         method: 'GET',
         path: '/api/v1/brokerage/subaccount/page',
         query: params,
+        defaults: { query: { page: 0, size: 20 } },
+        responseShape: { content: ['array', 'SubaccountResponse'] },
       },
       options,
     );
@@ -596,7 +654,9 @@ export class BrokerageSubaccountsResource extends APIResource {
       {
         service: 'brokerage',
         method: 'GET',
-        path: `/api/v1/brokerage/subaccount/${encodeURIComponent(id)}`,
+        path: '/api/v1/brokerage/subaccount/{id}',
+        pathParams: { id },
+        responseShape: 'SubaccountResponse',
       },
       options,
     );
@@ -614,7 +674,8 @@ export class BrokerageSubaccountsResource extends APIResource {
       {
         service: 'brokerage',
         method: 'GET',
-        path: `/api/v1/brokerage/subaccount/${encodeURIComponent(id)}/details`,
+        path: '/api/v1/brokerage/subaccount/{id}/details',
+        pathParams: { id },
       },
       options,
     );
@@ -623,22 +684,34 @@ export class BrokerageSubaccountsResource extends APIResource {
 
 /** Parameters of {@link BrokerageBalanceOrdersResource.list}. */
 export interface BrokerageBalanceOrdersListParams extends BalanceOrderFilterRequest {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
   /** Sort criteria in the format `property,(asc|desc)`. */
-  sort?: string[];
+  sort?: string[] | undefined;
 }
 
 /** Parameters of {@link BrokerageOrdersResource.list}. */
 export interface BrokerageOrdersListParams extends OrderUnifiedFilterRequest {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
   /** Sort criteria in the format `property,(asc|desc)`. */
-  sort?: string[];
+  sort?: string[] | undefined;
 }
 
 /** Parameters of {@link BrokerageOrdersResource.downloadReport}. */
@@ -648,20 +721,32 @@ export interface BrokerageOrdersDownloadReportParams extends OrderUnifiedFilterR
 
 /** Parameters of {@link BrokerageOtcOrdersResource.list}. */
 export interface BrokerageOtcOrdersListParams extends OtcOrderFilterRequest {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
   /** Sort criteria in the format `property,(asc|desc)`. */
-  sort?: string[];
+  sort?: string[] | undefined;
 }
 
 /** Parameters of {@link BrokerageSubaccountsResource.list}. */
 export interface BrokerageSubaccountsListParams {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
   /** Sort criteria in the format `property,(asc|desc)`. */
-  sort?: string[];
+  sort?: string[] | undefined;
 }

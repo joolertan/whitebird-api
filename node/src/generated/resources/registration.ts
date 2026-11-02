@@ -201,6 +201,7 @@ export class RegistrationResource extends APIResource {
         method: 'POST',
         path: '/api/v1/registration/complete',
         body: params,
+        responseType: 'auto',
         auth: false,
       },
       options,
@@ -236,15 +237,15 @@ export class RegistrationResource extends APIResource {
 /** Parameters of {@link RegistrationResource.initiate}. */
 export interface RegistrationInitiateParams extends RegistrationInitiateRequest {
   /** Slider captcha solution: base64 of `{"sliderPosition": int, "requestId": uuid}`. */
-  captcha?: string;
+  captcha?: string | undefined;
   /** Google reCAPTCHA v3 token. */
-  recaptcha?: string;
+  recaptcha?: string | undefined;
 }
 
 /** Parameters of {@link RegistrationResource.initiateSdk}. */
 export interface RegistrationInitiateSdkParams extends RegistrationSdkInitiateRequest {
   /** Slider captcha solution: base64 of `{"sliderPosition": int, "requestId": uuid}`. */
-  captcha?: string;
+  captcha?: string | undefined;
   /** Google reCAPTCHA v3 token. */
-  recaptcha?: string;
+  recaptcha?: string | undefined;
 }

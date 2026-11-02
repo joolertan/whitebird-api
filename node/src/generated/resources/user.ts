@@ -47,11 +47,22 @@ export class UserResource extends APIResource {
   /**
    * Sign out and revoke the current tokens
    *
+   * The client forgets its session (tokens, operation MFA token and the token store) after the
+   * call, also when the call fails, as the web app does.
+   *
    * `POST /api/v1/user/logout`
+   *
+   * Ends the session: the client forgets its tokens afterwards, also on errors.
    */
   logout(options?: RequestOptions): Promise<void> {
     return this._client.call(
-      { service: 'auth', method: 'POST', path: '/api/v1/user/logout', responseType: 'empty' },
+      {
+        service: 'auth',
+        method: 'POST',
+        path: '/api/v1/user/logout',
+        responseType: 'empty',
+        session: 'end',
+      },
       options,
     );
   }
@@ -153,7 +164,7 @@ export class UserEmailResource extends APIResource {
   /**
    * Confirm the new email address with the emailed code
    *
-   * The web app signs the user out after a successful change.
+   * The web app signs the user out after a successful change; sign in again with the new address.
    *
    * `POST /api/v1/user/email/change/verify`
    *
@@ -188,6 +199,7 @@ export class UserEmailResource extends APIResource {
         method: 'POST',
         path: '/api/v1/user/code/verify',
         body: params,
+        responseType: 'auto',
         auth: false,
       },
       options,
@@ -241,11 +253,15 @@ export class UserPasswordResource extends APIResource {
   /**
    * Change the password and get new tokens
    *
-   * The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS` (wrong
-   * old password), `BAD_REQUEST` with `fields[].fieldName = newPassword` and message
-   * `INVALID_PASSWORD` (weak new password), `INVALID_CODE` (2FA code missing or wrong).
+   * The previous tokens stop working; the client stores the returned pair as its session and
+   * uses `newPassword` for later sign-ins. Errors:
+   * `BAD_CREDENTIALS` (wrong old password), `BAD_REQUEST` with
+   * `fields[].fieldName = newPassword` and message `INVALID_PASSWORD` (weak new password),
+   * `INVALID_CODE` (2FA code missing or wrong).
    *
    * `POST /api/v1/user/password/change-and-reauthorize`
+   *
+   * The client keeps the returned tokens as its new session.
    *
    * @experimental
    */
@@ -256,6 +272,7 @@ export class UserPasswordResource extends APIResource {
         method: 'POST',
         path: '/api/v1/user/password/change-and-reauthorize',
         body: params,
+        session: 'replace',
       },
       options,
     );
@@ -379,6 +396,7 @@ export class UserPhoneResource extends APIResource {
         path: '/api/v1/user/phone/phone-number-changed/send-code',
         headers: { recaptcha },
         body,
+        responseType: 'auto',
       },
       options,
     );
@@ -461,8 +479,11 @@ export interface UserPasswordSendResetLinkParams {
 
 /** Parameters of {@link UserPhoneResource.change}. */
 export interface UserPhoneChangeParams extends UserPhoneChangeRequest {
-  /** Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`). */
-  recaptcha?: string;
+  /**
+   * Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`, or `SETTINGS_CHANGE_PHONE_MFA`
+   * when repeating the call with `mfaSecret`).
+   */
+  recaptcha?: string | undefined;
 }
 
 /** Parameters of {@link UserPhoneResource.sendChangeCode}. */
@@ -470,5 +491,5 @@ export interface UserPhoneSendChangeCodeParams extends UserPhoneChangeRequest {
   /**
    * Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE` or `SETTINGS_CHANGE_PHONE_MFA`).
    */
-  recaptcha?: string;
+  recaptcha?: string | undefined;
 }

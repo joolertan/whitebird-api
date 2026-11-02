@@ -22,7 +22,12 @@ export class ReferralResource extends APIResource {
    */
   withdraw(options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/exchange/referrer/reward/create' },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/exchange/referrer/reward/create',
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -55,7 +60,12 @@ export class ReferralResource extends APIResource {
    */
   join(options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'exchange', method: 'POST', path: '/api/v1/referrer/generate' },
+      {
+        service: 'exchange',
+        method: 'POST',
+        path: '/api/v1/referrer/generate',
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -98,6 +108,8 @@ export class ReferralTransactionsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/accounting/referrer/transactions',
         body: params,
+        defaults: { body: { page: 0, size: 20 } },
+        responseShape: { content: ['array', 'ReferralTransaction'] },
         pageIn: 'body',
       },
       options,

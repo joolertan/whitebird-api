@@ -46,6 +46,13 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "otp": [
+        "./dist/otp.d.ts"
+      ]
+    }
+  },
   "files": [
     "dist"
   ],

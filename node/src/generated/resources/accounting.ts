@@ -22,6 +22,34 @@ export class AccountingResource extends APIResource {
 /** Endpoints under `client.accounting.accounts`. */
 export class AccountingAccountsResource extends APIResource {
   /**
+   * Get balances with USD valuation
+   *
+   * Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for
+   * the wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
+   * `amount` is the reserved amount). In the demo environment this reads the demo trading
+   * balances.
+   *
+   * `POST /api/v2/accounting/client/account/enhanced`
+   *
+   * @experimental
+   */
+  getEnhanced(
+    params: AccountingAccountRequest,
+    options?: RequestOptions,
+  ): Promise<AccountingEnhancedAccount> {
+    return this._client.call(
+      {
+        service: 'accounting_spot',
+        method: 'POST',
+        path: '/api/v2/accounting/client/account/enhanced',
+        body: params,
+        responseShape: 'AccountingEnhancedAccount',
+      },
+      options,
+    );
+  }
+
+  /**
    * Get balances of a ledger account
    *
    * Balances of one account type (`USER_BALANCE` = Whitebird wallet, `REFERRER_BALANCE` =
@@ -34,32 +62,12 @@ export class AccountingAccountsResource extends APIResource {
    */
   get(params: AccountingAccountRequest, options?: RequestOptions): Promise<AccountingAccount> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/accounting/client/account', body: params },
-      options,
-    );
-  }
-
-  /**
-   * Get balances with USD valuation
-   *
-   * Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for
-   * the wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
-   * `amount` is the reserved amount).
-   *
-   * `POST /api/v2/accounting/client/account/enhanced`
-   *
-   * @experimental
-   */
-  getEnhanced(
-    params: AccountingAccountRequest,
-    options?: RequestOptions,
-  ): Promise<AccountingEnhancedAccount> {
-    return this._client.call(
       {
         service: 'api',
         method: 'POST',
-        path: '/api/v2/accounting/client/account/enhanced',
+        path: '/api/v2/accounting/client/account',
         body: params,
+        responseShape: 'AccountingAccount',
       },
       options,
     );
@@ -92,6 +100,8 @@ export class AccountingTransactionsResource extends APIResource {
         path: '/api/v2/accounting/client/transactions',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0, size: 20, sort: 'creationDate,desc' } },
+        responseShape: { content: ['array', 'AccountingTransaction'] },
       },
       options,
     );
@@ -151,12 +161,21 @@ export class AccountingTransactionsResource extends APIResource {
 
 /** Parameters of {@link AccountingTransactionsResource.list}. */
 export interface AccountingTransactionsListParams extends AccountingTransactionFilter {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
-  /** Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`. */
-  sort?: string[];
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
+  /**
+   * Sort criteria in the format `property,(asc|desc)`.
+   * @defaultValue `'creationDate,desc'`, sent when not set
+   */
+  sort?: string | undefined;
 }
 
 /** Parameters of {@link AccountingTransactionsResource.downloadReceipt}. */

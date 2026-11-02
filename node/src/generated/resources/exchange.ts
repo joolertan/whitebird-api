@@ -39,8 +39,9 @@ export class ExchangeAssetsResource extends APIResource {
   /**
    * List assets available for a destination
    *
-   * Sent without a body. `merchantId` scopes the list to a merchant widget; the web app falls
-   * back to `11111111-1111-1111-1111-111111111111` when embedded without one.
+   * Sent without a body. `merchantId` scopes the list to a merchant widget; the web app always
+   * sends one, `11111111-1111-1111-1111-111111111111` (Whitebird itself) unless embedded in a
+   * merchant's widget.
    *
    * `POST /api/v2/exchange/client/assets`
    *
@@ -48,7 +49,13 @@ export class ExchangeAssetsResource extends APIResource {
    */
   list(params: ExchangeAssetsListParams = {}, options?: RequestOptions): Promise<ExchangeAssets> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v2/exchange/client/assets', query: params },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/exchange/client/assets',
+        query: params,
+        defaults: { query: { merchantId: '11111111-1111-1111-1111-111111111111' } },
+      },
       options,
     );
   }
@@ -89,7 +96,13 @@ export class ExchangeLimitsResource extends APIResource {
    */
   get(params: ExchangeLimitsRequest, options?: RequestOptions): Promise<ExchangeLimits> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v3/exchange/client/limit', body: params },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v3/exchange/client/limit',
+        body: params,
+        responseShape: 'ExchangeLimits',
+      },
       options,
     );
   }
@@ -117,13 +130,23 @@ export class ExchangeOrdersResource extends APIResource {
    * `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON` (anti-fraud),
    * `EXCHANGE_UNAVAILABLE`.
    *
+   * Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`
+   * (see `user.antifraud` and `kyc.liveness`); after the check, send the same request again. If
+   * the quote expired meanwhile it fails with `QUOTE_NOT_FOUND`: request a new quote.
+   *
    * `POST /api/v3/exchange/client/order`
    *
    * @experimental
    */
   create(params: ExchangeOrderRequest, options?: RequestOptions): Promise<ExchangeOrder> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v3/exchange/client/order', body: params },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v3/exchange/client/order',
+        body: params,
+        responseShape: 'ExchangeOrder',
+      },
       options,
     );
   }
@@ -140,7 +163,9 @@ export class ExchangeOrdersResource extends APIResource {
       {
         service: 'api',
         method: 'GET',
-        path: `/api/v3/exchange/client/order/${encodeURIComponent(orderId)}`,
+        path: '/api/v3/exchange/client/order/{orderId}',
+        pathParams: { orderId },
+        responseShape: 'ExchangeOrder',
       },
       options,
     );
@@ -162,8 +187,10 @@ export class ExchangeOrdersResource extends APIResource {
       {
         service: 'api',
         method: 'POST',
-        path: `/api/v3/exchange/client/order/${encodeURIComponent(orderId)}/reject`,
+        path: '/api/v3/exchange/client/order/{orderId}/reject',
+        pathParams: { orderId },
         body: params,
+        responseType: 'auto',
       },
       options,
     );
@@ -188,6 +215,8 @@ export class ExchangeOrdersResource extends APIResource {
         method: 'GET',
         path: '/api/v3/exchange/client/order/current',
         query: params,
+        defaults: { query: { destination: 'EXCHANGE' } },
+        responseShape: 'ExchangeOrder',
       },
       options,
     );
@@ -202,7 +231,12 @@ export class ExchangeOrdersResource extends APIResource {
    */
   currentAll(options?: RequestOptions): Promise<ExchangeOrder[]> {
     return this._client.call(
-      { service: 'api', method: 'GET', path: '/api/v3/exchange/client/order/current/all' },
+      {
+        service: 'api',
+        method: 'GET',
+        path: '/api/v3/exchange/client/order/current/all',
+        responseShape: ['array', 'ExchangeOrder'],
+      },
       options,
     );
   }
@@ -228,6 +262,8 @@ export class ExchangeOrdersResource extends APIResource {
         path: '/api/v3/exchange/client/order/history',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0, size: 20, sort: 'creationDate,desc' }, body: { limit: 20 } },
+        responseShape: { content: ['array', 'ExchangeOrder'] },
       },
       options,
     );
@@ -243,7 +279,8 @@ export class ExchangeQuotesResource extends APIResource {
    * electronic wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER`
    * (bank card / bank account of a payment provider). Set the amount on exactly one leg; the
    * other one is computed. The quote `id` is then passed to `exchange.orders.create`.
-   * The web app re-requests the quote every 15 s while the form is open.
+   * The quote is valid until `expirationDate`; the web app requests a new one 2 s before that
+   * (`expirationDate` - `creationDate` - 2 s), or every 15 s when the dates are missing.
    *
    * Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
    * `AMOUNT_TOO_SMALL`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.
@@ -254,7 +291,14 @@ export class ExchangeQuotesResource extends APIResource {
    */
   create(params: ExchangeQuoteRequest, options?: RequestOptions): Promise<ExchangeQuote> {
     return this._client.call(
-      { service: 'api', method: 'POST', path: '/api/v3/exchange/client/quote', body: params },
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v3/exchange/client/quote',
+        body: params,
+        bodyShape: 'ExchangeQuoteRequest',
+        responseShape: 'ExchangeQuote',
+      },
       options,
     );
   }
@@ -273,7 +317,13 @@ export class ExchangeRatesResource extends APIResource {
    */
   stats(options?: RequestOptions): Promise<ExchangeRateStat[]> {
     return this._client.call(
-      { service: 'exchange', method: 'POST', path: '/api/v1/exchange/rate/stats', body: {} },
+      {
+        service: 'exchange',
+        method: 'POST',
+        path: '/api/v1/exchange/rate/stats',
+        body: {},
+        responseShape: ['array', 'ExchangeRateStat'],
+      },
       options,
     );
   }
@@ -281,21 +331,32 @@ export class ExchangeRatesResource extends APIResource {
 
 /** Parameters of {@link ExchangeAssetsResource.list}. */
 export interface ExchangeAssetsListParams {
-  destination?: ExchangeDestination;
-  merchantId?: string;
+  destination?: ExchangeDestination | undefined;
+  /** @defaultValue `'11111111-1111-1111-1111-111111111111'`, sent when not set */
+  merchantId?: string | undefined;
 }
 
 /** Parameters of {@link ExchangeOrdersResource.current}. */
 export interface ExchangeOrdersCurrentParams {
-  destination?: ExchangeDestination;
+  /** @defaultValue `'EXCHANGE'`, sent when not set */
+  destination?: ExchangeDestination | undefined;
 }
 
 /** Parameters of {@link ExchangeOrdersResource.history}. */
 export interface ExchangeOrdersHistoryParams extends ExchangeOrderHistoryFilter {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
-  /** Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`. */
-  sort?: string[];
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
+  /**
+   * Sort criteria in the format `property,(asc|desc)`.
+   * @defaultValue `'creationDate,desc'`, sent when not set
+   */
+  sort?: string | undefined;
 }

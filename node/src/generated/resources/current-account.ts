@@ -30,7 +30,9 @@ export class CurrentAccountResource extends APIResource {
       {
         service: 'current_account',
         method: 'DELETE',
-        path: `/api/v1/currentAccount/${encodeURIComponent(accountId)}`,
+        path: '/api/v1/currentAccount/{accountId}',
+        pathParams: { accountId },
+        responseType: 'auto',
       },
       options,
     );
@@ -58,7 +60,8 @@ export class CurrentAccountInvoicesResource extends APIResource {
       {
         service: 'current_account',
         method: 'POST',
-        path: `/api/v1/currentAccount/order/${encodeURIComponent(invoiceId)}/invoice`,
+        path: '/api/v1/currentAccount/order/{invoiceId}/invoice',
+        pathParams: { invoiceId },
         body: params,
         responseType: 'binary',
       },
@@ -84,7 +87,8 @@ export class CurrentAccountInvoicesResource extends APIResource {
       {
         service: 'current_account',
         method: 'POST',
-        path: `/api/v1/currentAccount/order/${encodeURIComponent(invoiceId)}/email/invoice`,
+        path: '/api/v1/currentAccount/order/{invoiceId}/email/invoice',
+        pathParams: { invoiceId },
         body: params,
         responseType: 'empty',
       },
@@ -111,7 +115,8 @@ export class CurrentAccountInvoicesResource extends APIResource {
       {
         service: 'current_account',
         method: 'POST',
-        path: `/api/v1/currentAccount/order/deposit/invoice/${encodeURIComponent(invoiceId)}`,
+        path: '/api/v1/currentAccount/order/deposit/invoice/{invoiceId}',
+        pathParams: { invoiceId },
         body: params,
         responseType: 'binary',
       },
@@ -135,7 +140,8 @@ export class CurrentAccountInvoicesResource extends APIResource {
       {
         service: 'current_account',
         method: 'POST',
-        path: `/api/v1/currentAccount/order/deposit/email/invoice/${encodeURIComponent(invoiceId)}`,
+        path: '/api/v1/currentAccount/order/deposit/email/invoice/{invoiceId}',
+        pathParams: { invoiceId },
         body: params,
         responseType: 'empty',
       },
@@ -207,5 +213,5 @@ export interface CurrentAccountInvoicesDownloadByTokenParams {
 /** Parameters of {@link CurrentAccountSystemAccountsResource.list}. */
 export interface CurrentAccountSystemAccountsListParams {
   currency: string;
-  fiatOpType?: CurrentAccountFiatOpType;
+  fiatOpType?: CurrentAccountFiatOpType | undefined;
 }

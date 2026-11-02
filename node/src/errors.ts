@@ -10,13 +10,13 @@ export class TransportError extends WhitebirdError {
 
 /** What is known about a failed API call. */
 export interface APIErrorDetails {
-  status?: number;
-  code?: number;
-  errorCode?: string;
-  subStatus?: string;
-  fields?: unknown[];
+  status?: number | undefined;
+  code?: number | undefined;
+  errorCode?: string | undefined;
+  subStatus?: string | undefined;
+  fields?: unknown[] | undefined;
   body?: unknown;
-  headers?: Headers;
+  headers?: Headers | undefined;
 }
 
 /** The API rejected a request. */
@@ -124,6 +124,9 @@ const VERIFICATIONS: Record<string, 'sms' | 'liveness'> = {
   LIVENESS_VERIFICATION_REQUIRED: 'liveness',
 };
 
+const MFA_REFUSAL = /requires mfa checking/i;
+const EXCERPT_LENGTH = 200;
+
 const STATUS_ERRORS: Record<number, typeof APIError> = {
   400: BadRequestError,
   401: AuthenticationError,
@@ -142,7 +145,11 @@ export function errorFromResponse(status: number, body: unknown, headers?: Heade
   const data = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
   const errorCode = text(data.status) ?? text(data.error);
   const message =
-    text(data.message) ?? text(data.error_description) ?? text(data.retMsg) ?? errorCode;
+    text(data.message) ??
+    text(data.error_description) ??
+    text(data.retMsg) ??
+    errorCode ??
+    (typeof body === 'string' ? excerpt(body) : undefined);
   const details: APIErrorDetails = {
     status,
     code: integer(data.code) ?? integer(data.retCode),
@@ -156,7 +163,8 @@ export function errorFromResponse(status: number, body: unknown, headers?: Heade
 
   const verification = errorCode === undefined ? undefined : VERIFICATIONS[errorCode];
   if (verification) return new VerificationRequiredError(summary, verification, details);
-  if (errorCode === 'MFA_CHECKING_REQUIRED' || /requires mfa checking/i.test(summary)) {
+  // The refusal comes in `message` from some services and in `status` from others.
+  if ([data.message, data.status].some((value) => MFA_REFUSAL.test(text(value) ?? ''))) {
     return new MFARequiredError(summary, details);
   }
   if (errorCode === 'invalid_grant') return new AuthenticationError(summary, details);
@@ -172,6 +180,13 @@ export function parseRetryAfter(headers: Headers): number | undefined {
   if (Number.isFinite(seconds)) return Math.max(0, seconds);
   const date = Date.parse(value);
   return Number.isNaN(date) ? undefined : Math.max(0, (date - Date.now()) / 1000);
+}
+
+/** The start of a text body, such as an HTML error page, on one line. */
+function excerpt(body: string): string | undefined {
+  const line = body.replace(/\s+/g, ' ').trim();
+  if (line === '') return undefined;
+  return line.length > EXCERPT_LENGTH ? `${line.slice(0, EXCERPT_LENGTH)}…` : line;
 }
 
 function text(value: unknown): string | undefined {

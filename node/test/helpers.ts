@@ -9,8 +9,8 @@ export class MockApi {
 
   constructor(routes: Record<string, Handler | Handler[]> = {}) {
     this.route('POST /oauth/token', () => Response.json(tokenResponse()));
-    // An unavailable 2FA status check: the login sends neither a code nor a captcha.
-    this.route('POST /api/v1/client/mfa', () => new Response(null, { status: 404 }));
+    // An account with 2FA whose first password grant already returns tokens.
+    this.route('POST /api/v1/client/mfa', () => Response.json({ mfaEnabled: true }));
     for (const [route, handler] of Object.entries(routes)) this.route(route, handler);
   }
 

@@ -28,7 +28,7 @@ export class SupportResource extends APIResource {
         headers: { recaptcha },
         body,
         bodyType: 'multipart',
-        partTypes: { request: 'application/json' },
+        partTypes: { request: 'text/plain' },
       },
       options,
     );
@@ -38,5 +38,5 @@ export class SupportResource extends APIResource {
 /** Parameters of {@link SupportResource.send}. */
 export interface SupportSendParams extends SupportSendRequest {
   /** Google reCAPTCHA v3 token (public support form). */
-  recaptcha?: string;
+  recaptcha?: string | undefined;
 }

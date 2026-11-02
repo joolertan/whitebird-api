@@ -36,7 +36,12 @@ export class ClientResource extends APIResource {
    */
   completeTesting(options?: RequestOptions): Promise<unknown> {
     return this._client.call(
-      { service: 'exchange', method: 'POST', path: '/api/v1/client/testing/complete' },
+      {
+        service: 'exchange',
+        method: 'POST',
+        path: '/api/v1/client/testing/complete',
+        responseType: 'auto',
+      },
       options,
     );
   }
@@ -54,7 +59,13 @@ export class ClientResource extends APIResource {
    */
   features(params: ClientFeaturesParams = {}, options?: RequestOptions): Promise<ClientFeature[]> {
     return this._client.call(
-      { service: 'exchange', method: 'GET', path: '/api/v1/client/features', query: params },
+      {
+        service: 'exchange',
+        method: 'GET',
+        path: '/api/v1/client/features',
+        query: params,
+        defaults: { query: { merchantId: '11111111-1111-1111-1111-111111111111' } },
+      },
       options,
     );
   }
@@ -62,5 +73,6 @@ export class ClientResource extends APIResource {
 
 /** Parameters of {@link ClientResource.features}. */
 export interface ClientFeaturesParams {
-  merchantId?: string;
+  /** @defaultValue `'11111111-1111-1111-1111-111111111111'`, sent when not set */
+  merchantId?: string | undefined;
 }

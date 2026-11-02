@@ -16,7 +16,8 @@ import type {
   BalanceFiatWithdrawalRequest,
   BalanceOperation,
   BalanceOperationFilter,
-  BalanceRejectRequest,
+  BalanceRejectCryptoRequest,
+  BalanceRejectFiatRequest,
 } from '../models.js';
 
 /** Endpoints under `client.balance`. */
@@ -39,7 +40,12 @@ export class BalanceResource extends APIResource {
    */
   current(options?: RequestOptions): Promise<BalanceCurrentOperations> {
     return this._client.call(
-      { service: 'api', method: 'GET', path: '/api/v2/exchange/client/balance/current' },
+      {
+        service: 'api',
+        method: 'GET',
+        path: '/api/v2/exchange/client/balance/current',
+        responseShape: 'BalanceCurrentOperations',
+      },
       options,
     );
   }
@@ -52,7 +58,8 @@ export class BalanceDepositsResource extends APIResource {
    *
    * Returns the Whitebird address to send the crypto to (`depositCryptoAddress`). Errors:
    * `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already uses
-   * the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+   * the network), `INVALID_CRYPTO_ADDRESS`, `INVALID_MFA_STATUS` (two-factor authentication must
+   * be enabled), `EXCHANGE_UNAVAILABLE`.
    *
    * `POST /api/v2/exchange/client/balance/crypto/deposit`
    *
@@ -68,6 +75,7 @@ export class BalanceDepositsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/crypto/deposit',
         body: params,
+        bodyShape: 'BalanceCryptoDepositRequest',
       },
       options,
     );
@@ -81,7 +89,8 @@ export class BalanceDepositsResource extends APIResource {
    * `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice
    * (see `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
    * `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
-   * `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+   * `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `INVALID_MFA_STATUS` (two-factor authentication
+   * must be enabled), `EXCHANGE_UNAVAILABLE`.
    *
    * `POST /api/v2/exchange/client/balance/fiat/deposit`
    *
@@ -97,6 +106,7 @@ export class BalanceDepositsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/fiat/deposit',
         body: params,
+        bodyShape: 'BalanceFiatDepositRequest',
       },
       options,
     );
@@ -119,6 +129,8 @@ export class BalanceDepositsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/crypto/deposit/calculate',
         body: params,
+        bodyShape: 'BalanceCryptoCalculationRequest',
+        responseShape: 'BalanceCalculation',
       },
       options,
     );
@@ -141,6 +153,8 @@ export class BalanceDepositsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/fiat/deposit/calculate',
         body: params,
+        bodyShape: 'BalanceFiatCalculationRequest',
+        responseShape: 'BalanceCalculation',
       },
       options,
     );
@@ -156,13 +170,15 @@ export class BalanceOperationsResource extends APIResource {
    *
    * @experimental
    */
-  rejectCrypto(params: BalanceRejectRequest, options?: RequestOptions): Promise<unknown> {
+  rejectCrypto(params: BalanceRejectCryptoRequest, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
       {
         service: 'api',
         method: 'POST',
         path: '/api/v2/exchange/client/balance/crypto/reject',
         body: params,
+        responseType: 'auto',
+        defaults: { body: { operationType: 'crypto' } },
       },
       options,
     );
@@ -175,13 +191,15 @@ export class BalanceOperationsResource extends APIResource {
    *
    * @experimental
    */
-  rejectFiat(params: BalanceRejectRequest, options?: RequestOptions): Promise<unknown> {
+  rejectFiat(params: BalanceRejectFiatRequest, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
       {
         service: 'api',
         method: 'POST',
         path: '/api/v2/exchange/client/balance/fiat/reject',
         body: params,
+        responseType: 'auto',
+        defaults: { body: { operationType: 'fiat' } },
       },
       options,
     );
@@ -196,10 +214,7 @@ export class BalanceOperationsResource extends APIResource {
    *   every item.
    * @experimental
    */
-  list(
-    params: BalanceOperationsListParams = {},
-    options?: RequestOptions,
-  ): Paginator<BalanceOperation> {
+  list(params: BalanceOperationsListParams, options?: RequestOptions): Paginator<BalanceOperation> {
     const { page, size, sort, ...body } = params;
     return this._client.paginate(
       {
@@ -208,6 +223,8 @@ export class BalanceOperationsResource extends APIResource {
         path: '/api/v2/exchange/client/balance/operation',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0, size: 20, sort: 'creationDate,desc' }, body: { limit: 20 } },
+        responseShape: { content: ['array', 'BalanceOperation'] },
       },
       options,
     );
@@ -221,7 +238,10 @@ export class BalanceWithdrawalsResource extends APIResource {
    *
    * Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount
    * and network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without it
-   * the service answers "Operation denied, requires mfa checking". Errors:
+   * the service answers "Operation denied, requires mfa checking" in `message` or in `status`.
+   * Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`;
+   * after the check, send the same request again (calculate again on `INVALID_CALCULATION`).
+   * Errors:
    * `INVALID_CALCULATION` (calculation expired, calculate again),
    * `ACTIVE_WITHDRAWAL_REQUEST_FOUND`, `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`,
    * `DESTINATION_ADDRESS_IS_INTERNAL`, `INVALID_AMOUNT` (commission exceeds the amount),
@@ -230,10 +250,11 @@ export class BalanceWithdrawalsResource extends APIResource {
    *
    * `POST /api/v2/exchange/client/balance/crypto/withdrawal`
    *
-   * Needs an operation MFA token for `WITHDRAWAL`: the client gets one with the configured `otp`,
-   * or call {@link Whitebird.confirmOperation} first.
+   * Needs an operation MFA token for `WITHDRAWAL`: when the API asks for it, the client gets one
+   * with a code from the configured `otp` and sends the request again. Without `otp`, call {@link
+   * Whitebird.confirmOperation} first.
    *
-   * @throws {@link MFARequiredError} if the operation MFA token is missing and no `otp` is
+   * @throws {@link MFARequiredError} if the API asks for an operation MFA token and no `otp` is
    *   configured.
    * @experimental
    */
@@ -244,6 +265,7 @@ export class BalanceWithdrawalsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/crypto/withdrawal',
         body: params,
+        responseType: 'auto',
         mfa: 'WITHDRAWAL',
       },
       options,
@@ -255,15 +277,16 @@ export class BalanceWithdrawalsResource extends APIResource {
    *
    * Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card /
    * payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
-   * `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the
-   * crypto withdrawal.
+   * `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors, MFA refusal
+   * and anti-fraud checks as the crypto withdrawal.
    *
    * `POST /api/v2/exchange/client/balance/fiat/withdrawal`
    *
-   * Needs an operation MFA token for `WITHDRAWAL`: the client gets one with the configured `otp`,
-   * or call {@link Whitebird.confirmOperation} first.
+   * Needs an operation MFA token for `WITHDRAWAL`: when the API asks for it, the client gets one
+   * with a code from the configured `otp` and sends the request again. Without `otp`, call {@link
+   * Whitebird.confirmOperation} first.
    *
-   * @throws {@link MFARequiredError} if the operation MFA token is missing and no `otp` is
+   * @throws {@link MFARequiredError} if the API asks for an operation MFA token and no `otp` is
    *   configured.
    * @experimental
    */
@@ -274,7 +297,9 @@ export class BalanceWithdrawalsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/fiat/withdrawal',
         body: params,
+        responseType: 'auto',
         mfa: 'WITHDRAWAL',
+        bodyShape: 'BalanceFiatWithdrawalRequest',
       },
       options,
     );
@@ -300,6 +325,8 @@ export class BalanceWithdrawalsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/crypto/withdrawal/calculate',
         body: params,
+        bodyShape: 'BalanceCryptoCalculationRequest',
+        responseShape: 'BalanceCalculation',
       },
       options,
     );
@@ -322,6 +349,8 @@ export class BalanceWithdrawalsResource extends APIResource {
         method: 'POST',
         path: '/api/v2/exchange/client/balance/fiat/withdrawal/calculate',
         body: params,
+        bodyShape: 'BalanceFiatCalculationRequest',
+        responseShape: 'BalanceCalculation',
       },
       options,
     );
@@ -330,10 +359,19 @@ export class BalanceWithdrawalsResource extends APIResource {
 
 /** Parameters of {@link BalanceOperationsResource.list}. */
 export interface BalanceOperationsListParams extends BalanceOperationFilter {
-  /** Zero-based page index. */
-  page?: number;
-  /** Page size. */
-  size?: number;
-  /** Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`. */
-  sort?: string[];
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /**
+   * Page size.
+   * @defaultValue `20`, sent when not set
+   */
+  size?: number | undefined;
+  /**
+   * Sort criteria in the format `property,(asc|desc)`.
+   * @defaultValue `'creationDate,desc'`, sent when not set
+   */
+  sort?: string | undefined;
 }

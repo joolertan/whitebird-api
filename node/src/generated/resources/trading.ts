@@ -50,6 +50,7 @@ export class TradingAccountResource extends APIResource {
         path: '/api/v1/accounts/fee-rate',
         query: params,
         envelope: 'retcode',
+        responseShape: 'TradingFeeRate',
       },
       options,
     );
@@ -73,6 +74,7 @@ export class TradingAccountResource extends APIResource {
         path: '/api/v1/portfolio/statistics',
         query: params,
         envelope: 'retcode',
+        responseShape: 'TradingPortfolioStatistics',
       },
       options,
     );
@@ -85,20 +87,23 @@ export class TradingDemoResource extends APIResource {
    * Top up the demo account
    *
    * Credits virtual funds to the trading account. Meant for the demo environment
-   * (`trading-demo-service`); a deposit limit applies.
+   * (`trading-demo-service`); a deposit limit applies. The answer is a `retCode` envelope like the
+   * order management responses; the web app ignores its `result`.
    *
    * `POST /api/v1/demo/balance/deposit`
    *
    * @experimental
    */
-  deposit(params: TradingDemoDepositRequest, options?: RequestOptions): Promise<void> {
+  deposit(params: TradingDemoDepositRequest, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
       {
         service: 'trading',
         method: 'POST',
         path: '/api/v1/demo/balance/deposit',
         body: params,
-        responseType: 'empty',
+        responseType: 'auto',
+        envelope: 'retcode',
+        bodyShape: 'TradingDemoDepositRequest',
       },
       options,
     );
@@ -125,6 +130,8 @@ export class TradingExecutionsResource extends APIResource {
         path: '/api/v1/executions',
         query: params,
         envelope: 'retcode',
+        defaults: { query: { limit: 1000 } },
+        responseShape: ['array', 'TradingExecution'],
       },
       options,
     );
@@ -151,6 +158,7 @@ export class TradingOrdersResource extends APIResource {
         path: '/api/v1/orders',
         body: params,
         envelope: 'retcode',
+        defaults: { body: { category: 'spot' } },
       },
       options,
     );
@@ -171,6 +179,7 @@ export class TradingOrdersResource extends APIResource {
         path: '/api/v1/orders',
         body: params,
         envelope: 'retcode',
+        defaults: { body: { timeInForce: 'GTC', category: 'spot' } },
       },
       options,
     );
@@ -191,6 +200,7 @@ export class TradingOrdersResource extends APIResource {
         path: '/api/v1/orders',
         query: params,
         envelope: 'retcode',
+        defaults: { query: { category: 'spot' } },
       },
       options,
     );
@@ -214,6 +224,7 @@ export class TradingOrdersResource extends APIResource {
         path: '/api/v1/orders/active',
         query: params,
         envelope: 'retcode',
+        responseShape: ['array', 'TradingOrder'],
       },
       options,
     );
@@ -221,6 +232,9 @@ export class TradingOrdersResource extends APIResource {
 
   /**
    * List closed orders in a time range
+   *
+   * The web app only sends `startTime` and `endTime`; the other filters follow the Bybit
+   * convention and are not verified. The result is a plain list without a cursor.
    *
    * `GET /api/v1/orders/history`
    *
@@ -237,6 +251,7 @@ export class TradingOrdersResource extends APIResource {
         path: '/api/v1/orders/history',
         query: params,
         envelope: 'retcode',
+        responseShape: ['array', 'TradingOrder'],
       },
       options,
     );
@@ -261,6 +276,8 @@ export class TradingOrdersResource extends APIResource {
         method: 'GET',
         path: '/api/v1/orders/history/page',
         query: params,
+        defaults: { query: { page: 0, size: 30, sortBy: 'exchangeTime', sortDir: 'DESC' } },
+        responseShape: { content: ['array', 'TradingOrderRecord'] },
       },
       options,
     );
@@ -287,6 +304,7 @@ export class TradingReportsResource extends APIResource {
         path: '/api/v1/operations/report',
         body: params,
         responseType: 'binary',
+        defaults: { body: { format: 'PDF' } },
       },
       options,
     );
@@ -300,18 +318,21 @@ export interface TradingAccountFeeRateParams {
 
 /** Parameters of {@link TradingAccountResource.portfolioStatistics}. */
 export interface TradingAccountPortfolioStatisticsParams {
-  period?: TradingPortfolioPeriod;
+  period?: TradingPortfolioPeriod | undefined;
 }
 
 /** Parameters of {@link TradingExecutionsResource.list}. */
 export interface TradingExecutionsListParams {
-  symbol?: string;
+  symbol?: string | undefined;
   /** Epoch milliseconds. */
-  startTime?: number;
+  startTime?: number | undefined;
   /** Epoch milliseconds. */
-  endTime?: number;
-  /** The web app asks for 1000. */
-  limit?: number;
+  endTime?: number | undefined;
+  /**
+   * Maximum number of executions.
+   * @defaultValue `1000`, sent when not set
+   */
+  limit?: number | undefined;
 }
 
 /** Parameters of {@link TradingOrdersResource.cancel}. */
@@ -320,39 +341,45 @@ export interface TradingOrdersCancelParams {
   id: string;
   /** Instrument symbol without separator, e.g. `BTCUSDT`. */
   symbol: string;
-  category?: TradingCategory;
+  /** @defaultValue `'spot'`, sent when not set */
+  category?: TradingCategory | undefined;
 }
 
 /** Parameters of {@link TradingOrdersResource.active}. */
 export interface TradingOrdersActiveParams {
   /** Only orders of this instrument, e.g. `BTCUSDT`. */
-  symbol?: string;
+  symbol?: string | undefined;
 }
 
 /** Parameters of {@link TradingOrdersResource.history}. */
 export interface TradingOrdersHistoryParams {
-  symbol?: string;
-  orderId?: string;
-  orderLinkId?: string;
-  orderStatus?: string;
+  symbol?: string | undefined;
+  orderId?: string | undefined;
+  orderLinkId?: string | undefined;
+  orderStatus?: string | undefined;
   /** Epoch milliseconds. */
-  startTime?: number;
+  startTime?: number | undefined;
   /** Epoch milliseconds. */
-  endTime?: number;
-  limit?: number;
-  cursor?: string;
+  endTime?: number | undefined;
+  limit?: number | undefined;
 }
 
 /** Parameters of {@link TradingOrdersResource.list}. */
 export interface TradingOrdersListParams {
-  symbol?: string;
+  symbol?: string | undefined;
   /** Epoch milliseconds. */
-  startTime?: number;
+  startTime?: number | undefined;
   /** Epoch milliseconds. */
-  endTime?: number;
-  page?: number;
-  size?: number;
-  /** Sort field; the web terminal uses `exchangeTime`. */
-  sortBy?: string;
-  sortDir?: TradingSortDirection;
+  endTime?: number | undefined;
+  /** @defaultValue `0`, sent when not set */
+  page?: number | undefined;
+  /** @defaultValue `30`, sent when not set */
+  size?: number | undefined;
+  /**
+   * Sort field, e.g. `exchangeTime` (creation time).
+   * @defaultValue `'exchangeTime'`, sent when not set
+   */
+  sortBy?: string | undefined;
+  /** @defaultValue `'DESC'`, sent when not set */
+  sortDir?: TradingSortDirection | undefined;
 }

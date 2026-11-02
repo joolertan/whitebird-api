@@ -1,32 +1,43 @@
 /** OAuth tokens of a logged-in session. */
 export interface Tokens {
   accessToken: string;
-  refreshToken?: string;
+  refreshToken?: string | undefined;
   /** Expiry of the access token in epoch milliseconds, when known. */
-  expiresAt?: number;
+  expiresAt?: number | undefined;
 }
 
 /**
  * Keeps the session between runs so the client does not log in on every start. Implement it
  * over a file, a database or a secrets manager; the default keeps tokens in memory.
  *
+ * Saved data that is not a valid session is ignored, as if nothing was saved. A failing `load`
+ * fails the call and is tried again on the next one; a failing `save` only emits a warning,
+ * since the client still holds the tokens.
+ *
  * @example
  * ```ts
- * import { readFile, writeFile, rm } from 'node:fs/promises';
+ * import { readFile, rename, rm, writeFile } from 'node:fs/promises';
  *
  * const fileStore: TokenStore = {
- *   load: () => readFile('session.json', 'utf8').then(JSON.parse, () => undefined),
- *   save: (tokens) => writeFile('session.json', JSON.stringify(tokens), { mode: 0o600 }),
+ *   load: () => readFile('session.json', 'utf8').then(JSON.parse).catch(() => undefined),
+ *   async save(tokens) {
+ *     const temporary = `session.json.${process.pid}.${Date.now()}`;
+ *     await writeFile(temporary, JSON.stringify(tokens), { mode: 0o600 });
+ *     await rename(temporary, 'session.json');
+ *   },
  *   clear: () => rm('session.json', { force: true }),
  * };
  * ```
  */
 export interface TokenStore {
-  /** Returns the saved tokens, if any. Called once, before the first authenticated request. */
+  /**
+   * Returns the saved tokens, if any. Called before the first authenticated request, and again
+   * before a refresh, to pick up a session that another process renewed.
+   */
   load(): Tokens | undefined | Promise<Tokens | undefined>;
   /** Saves tokens after every login and refresh. */
   save(tokens: Tokens): unknown;
-  /** Forgets the saved tokens. */
+  /** Forgets the saved tokens, after a logout or when the session can no longer be renewed. */
   clear(): unknown;
 }
 
@@ -64,4 +75,19 @@ export function jwtExpiry(token: string): number | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Reads saved tokens, or returns `undefined` when the value is not a valid session. */
+export function parseTokens(value: unknown): Tokens | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { accessToken, refreshToken, expiresAt } = value as Record<string, unknown>;
+  if (typeof accessToken !== 'string' || accessToken.trim() === '') return undefined;
+  const expiry =
+    typeof expiresAt === 'number' && Number.isFinite(expiresAt) ? expiresAt : undefined;
+  return {
+    accessToken,
+    refreshToken:
+      typeof refreshToken === 'string' && refreshToken !== '' ? refreshToken : undefined,
+    expiresAt: expiry ?? jwtExpiry(accessToken),
+  };
 }

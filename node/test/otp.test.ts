@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateTotp, type TotpAlgorithm, totp } from '../src/otp.js';
-import { client, form, MockApi } from './helpers.js';
+import { client, form, MockApi, tokenResponse } from './helpers.js';
 
 const encoder = new TextEncoder();
 const SEEDS: Record<TotpAlgorithm, Uint8Array> = {
@@ -56,12 +56,17 @@ describe('TOTP', () => {
   });
 
   it('provides fresh codes for login', async () => {
-    const api = new MockApi();
+    const api = new MockApi({
+      'POST /oauth/token': [
+        () => Response.json({ mfaEnabled: true }),
+        () => Response.json(tokenResponse()),
+      ],
+    });
     const provider = totp('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
 
     await client(api, { otp: provider }).login();
 
-    const { code } = await form(api.calls('POST /oauth/token')[0] as Request);
+    const { code } = await form(api.calls('POST /oauth/token')[1] as Request);
     expect(code).toMatch(/^\d{6}$/);
   });
 });

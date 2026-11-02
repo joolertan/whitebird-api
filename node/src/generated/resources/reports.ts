@@ -15,10 +15,7 @@ export class ReportsResource extends APIResource {
    *
    * @experimental
    */
-  downloadBalance(
-    params: ReportBalanceRequest = {},
-    options?: RequestOptions,
-  ): Promise<Uint8Array> {
+  downloadBalance(params: ReportBalanceRequest, options?: RequestOptions): Promise<Uint8Array> {
     return this._client.call(
       {
         service: 'exchange',
@@ -26,6 +23,7 @@ export class ReportsResource extends APIResource {
         path: '/api/v1/client/balance/report',
         body: params,
         responseType: 'binary',
+        defaults: { body: { limit: 20 } },
       },
       options,
     );
@@ -41,7 +39,7 @@ export class ReportsResource extends APIResource {
    *
    * @experimental
    */
-  emailBalance(params: ReportBalanceRequest = {}, options?: RequestOptions): Promise<void> {
+  emailBalance(params: ReportBalanceRequest, options?: RequestOptions): Promise<void> {
     return this._client.call(
       {
         service: 'exchange',
@@ -49,6 +47,7 @@ export class ReportsResource extends APIResource {
         path: '/api/v1/client/balance/email/report',
         body: params,
         responseType: 'empty',
+        defaults: { body: { limit: 20 } },
       },
       options,
     );
@@ -72,6 +71,7 @@ export class ReportsResource extends APIResource {
         path: '/api/v1/client/exchange/report',
         body: params,
         responseType: 'binary',
+        defaults: { body: { limit: 20 } },
       },
       options,
     );
@@ -92,6 +92,7 @@ export class ReportsResource extends APIResource {
         path: '/api/v1/client/exchange/email/report',
         body: params,
         responseType: 'empty',
+        defaults: { body: { limit: 20 } },
       },
       options,
     );

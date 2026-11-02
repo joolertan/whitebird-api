@@ -191,11 +191,10 @@ export const BalanceOrderStatus = {
   PENDING: 'PENDING',
 } as const;
 
-/** Same as the path segment (`crypto` or `fiat`). */
-export type BalanceRejectRequestOperationType = 'crypto' | 'fiat' | (string & {});
+export type BalanceRejectOperationType = 'crypto' | 'fiat' | (string & {});
 
-/** Known values of {@link BalanceRejectRequestOperationType}; others may appear as the API evolves. */
-export const BalanceRejectRequestOperationType = {
+/** Known values of {@link BalanceRejectOperationType}; others may appear as the API evolves. */
+export const BalanceRejectOperationType = {
   CRYPTO: 'crypto',
   FIAT: 'fiat',
 } as const;
@@ -295,13 +294,24 @@ export const CurrentAccountFiatOpType = {
   BROKER: 'BROKER',
 } as const;
 
-export type ExchangeAssetCategory = 'CRYPTO' | 'STABLECOIN' | 'STOCK' | 'FIAT' | (string & {});
+export type ExchangeAssetCategory =
+  | 'CRYPTO'
+  | 'STABLECOIN'
+  | 'GOLD'
+  | 'ETF'
+  | 'STOCK'
+  | 'EARN'
+  | 'FIAT'
+  | (string & {});
 
 /** Known values of {@link ExchangeAssetCategory}; others may appear as the API evolves. */
 export const ExchangeAssetCategory = {
   CRYPTO: 'CRYPTO',
   STABLECOIN: 'STABLECOIN',
+  GOLD: 'GOLD',
+  ETF: 'ETF',
   STOCK: 'STOCK',
+  EARN: 'EARN',
   FIAT: 'FIAT',
 } as const;
 
@@ -1432,14 +1442,14 @@ export interface AccountingAccount {
 export interface AccountingAccountRequest {
   type: AccountingAccountType;
   /** Asset codes to include; all assets when null. */
-  assets?: string[] | null;
+  assets?: string[] | null | undefined;
 }
 
 export interface AccountingBalance {
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
   /** Inferred from the web application, not observed in API responses. */
   type?: AccountingAccountType;
   /**
@@ -1458,28 +1468,28 @@ export interface AccountingEnhancedBalance {
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
   /**
    * Value in USD.
    * Inferred from the web application, not observed in API responses.
    */
-  usdAmount?: number;
+  usdAmount?: string;
   /**
    * Price in USD.
    * Inferred from the web application, not observed in API responses.
    */
-  usdRate?: number;
+  usdRate?: string;
   /** Inferred from the web application, not observed in API responses. */
   fiat?: boolean;
   /** Inferred from the web application, not observed in API responses. */
   type?: AccountingAccountType;
   /** Inferred from the web application, not observed in API responses. */
-  reservedAmount?: number;
+  reservedAmount?: string;
   /**
    * Older name of `reservedAmount`.
    * Inferred from the web application, not observed in API responses.
    */
-  reserved?: number;
+  reserved?: string;
 }
 
 export interface AccountingTransaction {
@@ -1496,7 +1506,7 @@ export interface AccountingTransaction {
    */
   referralId?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /** Inferred from the web application, not observed in API responses. */
@@ -1511,8 +1521,8 @@ export interface AccountingTransactionDetails {
 }
 
 export interface AccountingTransactionFilter {
-  transactionTypes?: AccountingTransactionType[];
-  accountType?: AccountingAccountType;
+  transactionTypes?: AccountingTransactionType[] | undefined;
+  accountType?: AccountingAccountType | undefined;
 }
 
 export interface AlfaCardBindUrl {
@@ -1611,11 +1621,11 @@ export interface AlfaPayment {
  */
 export interface AssetFilter {
   /** Source asset for OTC exchange (use together with toAsset) */
-  fromAsset?: string;
+  fromAsset?: string | undefined;
   /** Target asset for OTC exchange (use together with fromAsset) */
-  toAsset?: string;
+  toAsset?: string | undefined;
   /** Single asset for Balance orders (DEPOSIT/WITHDRAWAL) */
-  asset?: string;
+  asset?: string | undefined;
 }
 
 export interface AssistCardBindForm {
@@ -1657,39 +1667,39 @@ export interface AuthCaptcha {
 export interface AuthDeviceFingerprint {
   source: AuthDeviceFingerprintSource;
   /** FingerprintJS visitor id. */
-  browserFingerprint?: string;
-  locale?: string;
+  browserFingerprint?: string | undefined;
+  locale?: string | undefined;
   /** `Date.getTimezoneOffset()` in minutes, as a string. */
-  timeZone?: string;
-  screenWidth?: string;
-  screenHeight?: string;
-  screenColorDepth?: string;
+  timeZone?: string | undefined;
+  screenWidth?: string | undefined;
+  screenHeight?: string | undefined;
+  screenColorDepth?: string | undefined;
   /** Logical CPU cores (0 if unknown). */
-  cpu?: number;
+  cpu?: number | undefined;
   /** Device memory in GiB (0 if unknown). */
-  memory?: number;
-  localStorage?: boolean;
-  touchSupport?: boolean;
+  memory?: string | number | undefined;
+  localStorage?: boolean | undefined;
+  touchSupport?: boolean | undefined;
   /** SHA-256 hex of the detected font list. */
-  fontFingerprint?: string;
-  webglFingerprint?: string;
-  canvasData?: string;
+  fontFingerprint?: string | undefined;
+  webglFingerprint?: string | undefined;
+  canvasData?: string | undefined;
   /** Audio fingerprint */
-  audioContext?: number;
-  platform?: string;
-  userAgent?: string;
-  webGLData?: AuthWebGlData;
+  audioContext?: string | number | undefined;
+  platform?: string | undefined;
+  userAgent?: string | undefined;
+  webGLData?: AuthWebGlData | undefined;
   /** Empty when geolocation is unavailable. */
-  latitude?: string;
-  longitude?: string;
-  accuracy?: string;
-  cpuModel?: string | null;
-  intlHourCycle?: string | null;
-  intlNumberSystem?: string | null;
-  displayDynamicRangeHigh?: boolean;
-  storageQuotaBytes?: number | null;
-  visualViewportExactHeight?: number | null;
-  mediaCapabilitiesInfo?: AuthMediaCapabilities;
+  latitude?: string | undefined;
+  longitude?: string | undefined;
+  accuracy?: string | undefined;
+  cpuModel?: string | null | undefined;
+  intlHourCycle?: string | null | undefined;
+  intlNumberSystem?: string | null | undefined;
+  displayDynamicRangeHigh?: boolean | undefined;
+  storageQuotaBytes?: number | null | undefined;
+  visualViewportExactHeight?: string | number | null | undefined;
+  mediaCapabilitiesInfo?: AuthMediaCapabilities | undefined;
 }
 
 export interface AuthGeo {
@@ -1698,9 +1708,9 @@ export interface AuthGeo {
 }
 
 export interface AuthMediaCapabilities {
-  supported?: boolean;
-  smooth?: boolean | null;
-  powerEfficient?: boolean | null;
+  supported?: boolean | undefined;
+  smooth?: boolean | null | undefined;
+  powerEfficient?: boolean | null | undefined;
 }
 
 export interface AuthMfaStatus {
@@ -1709,13 +1719,8 @@ export interface AuthMfaStatus {
 }
 
 export interface AuthMfaStatusRequest {
-  /** Account email. */
+  /** Account email as the user typed it. */
   username: string;
-}
-
-export interface AuthMfaToken {
-  /** Inferred from the web application, not observed in API responses. */
-  mfaToken?: string;
 }
 
 export interface AuthMfaTokenRequest {
@@ -1725,12 +1730,12 @@ export interface AuthMfaTokenRequest {
 }
 
 export interface AuthWebGlData {
-  renderer?: string;
-  rendererUnmasked?: string;
-  shadingLanguageVersion?: string;
-  vendor?: string;
-  vendorUnmasked?: string;
-  version?: string;
+  renderer?: string | undefined;
+  rendererUnmasked?: string | undefined;
+  shadingLanguageVersion?: string | undefined;
+  vendor?: string | undefined;
+  vendorUnmasked?: string | undefined;
+  version?: string | undefined;
 }
 
 export interface BalanceCalculation {
@@ -1740,27 +1745,34 @@ export interface BalanceCalculation {
    */
   id?: string;
   /** Inferred from the web application, not observed in API responses. */
-  commissionAmount?: number;
+  commissionAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  receivedAmount?: number;
+  receivedAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  withdrawalAmount?: number;
+  withdrawalAmount?: string;
+  /**
+   * Amount debited; the web app shows it as the withdrawal amount.
+   * Inferred from the web application, not observed in API responses.
+   */
+  grossAmount?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  creationDate?: string;
   /** Inferred from the web application, not observed in API responses. */
   expirationDate?: string;
 }
 
 export interface BalanceCryptoAsset {
   code: string;
-  amount: number;
+  amount: string | number;
   /** Network of the asset, e.g. `Tron`, `Ethereum`, `BNB`, `SOLANA`, `Ton`, `Bitcoin`. */
-  network?: string;
+  network?: string | undefined;
 }
 
 export interface BalanceCryptoCalculationRequest {
   accountType: BalanceAccountType;
   asset: BalanceCryptoAsset;
   /** Destination address (withdrawals). */
-  toAddress?: string;
+  toAddress?: string | undefined;
 }
 
 export interface BalanceCryptoDeposit {
@@ -1774,14 +1786,14 @@ export interface BalanceCryptoDepositRequest {
   accountType: BalanceAccountType;
   asset: BalanceCryptoAsset;
   /** Wait longer for the transfer (deposits from services with deferred payouts). */
-  additionalSubmitTimeout?: boolean;
+  additionalSubmitTimeout?: boolean | undefined;
 }
 
 export interface BalanceCryptoWithdrawalRequest {
   accountType: BalanceAccountType;
   calculationId: string;
   /** Memo / destination tag. */
-  comment?: string;
+  comment?: string | undefined;
 }
 
 export interface BalanceCurrentOperation {
@@ -1799,11 +1811,11 @@ export interface BalanceCurrentOperation {
   /** Inferred from the web application, not observed in API responses. */
   asset?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  serviceFee?: number;
+  serviceFee?: string;
   /** Inferred from the web application, not observed in API responses. */
-  networkFee?: number;
+  networkFee?: string;
   /** Inferred from the web application, not observed in API responses. */
   createdAt?: string;
   /**
@@ -1845,14 +1857,14 @@ export interface BalanceCurrentOperations {
 
 export interface BalanceFiatAsset {
   code: string;
-  amount: number;
+  amount: string | number;
 }
 
 export interface BalanceFiatCalculationRequest {
   asset: BalanceFiatAsset;
   fiatProviderType: PaymentProviderType;
-  paymentToken?: string;
-  commissionType?: BalanceCommissionType;
+  paymentToken?: string | undefined;
+  commissionType?: BalanceCommissionType | undefined;
 }
 
 export interface BalanceFiatDeposit {
@@ -1869,20 +1881,20 @@ export interface BalanceFiatDepositRequest {
   asset: BalanceFiatAsset;
   fiatProviderType: PaymentProviderType;
   /** Id of the payment method (bound card) to pay with. */
-  paymentToken?: string;
+  paymentToken?: string | undefined;
   /** Whitebird bank account to pay to (required for `CA` current-account deposits). */
-  internalToken?: string;
-  returnUrl?: string;
-  failUrl?: string;
+  internalToken?: string | undefined;
+  returnUrl?: string | undefined;
+  failUrl?: string | undefined;
 }
 
 export interface BalanceFiatWithdrawalRequest {
   accountType: BalanceAccountType;
   asset: BalanceFiatAsset;
   fiatProviderType: PaymentProviderType;
-  paymentToken?: string;
-  commissionType?: BalanceCommissionType;
-  bankIdentifier?: string;
+  paymentToken?: string | undefined;
+  commissionType?: BalanceCommissionType | undefined;
+  bankIdentifier?: string | undefined;
 }
 
 export interface BalanceOperation {
@@ -1905,11 +1917,11 @@ export interface BalanceOperation {
   /** Inferred from the web application, not observed in API responses. */
   asset?: string;
   /** Inferred from the web application, not observed in API responses. */
-  requestedAmount?: number;
+  requestedAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  netAmount?: number;
+  netAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  commission?: number;
+  commission?: string;
   /** Inferred from the web application, not observed in API responses. */
   providerType?: PaymentProviderType;
   /**
@@ -1930,28 +1942,30 @@ export interface BalanceOperation {
 }
 
 export interface BalanceOperationFilter {
-  limit?: number;
-  transactionTypes?: BalanceOperationType[];
-  statuses?: BalanceOperationStatus[];
-  currencies?: string[];
-  from?: string;
-  to?: string;
-  expandCurrencyNetworks?: boolean;
+  /** @defaultValue `20`, sent when not set */
+  limit?: number | undefined;
+  /** Operation types to list; pass all three for no filter. */
+  transactionTypes: BalanceOperationType[];
+  statuses?: BalanceOperationStatus[] | undefined;
+  currencies?: string[] | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+  expandCurrencyNetworks?: boolean | undefined;
 }
 
 export interface BalanceOrderFilterRequest {
-  uuid?: string;
-  status?: BalanceOrderStatus;
-  creationDateFrame?: DateFrame;
-  completionDateFrame?: DateFrame;
+  uuid?: string | undefined;
+  status?: BalanceOrderStatus | undefined;
+  creationDateFrame?: DateFrame | undefined;
+  completionDateFrame?: DateFrame | undefined;
   /**
    * Broker ID to filter by. If the requester is Broker, this value will be ignored and overridden
    * with the current broker's ID.
    */
-  brokerId?: string;
-  subaccountId?: string;
-  assetCode?: string;
-  amount?: number;
+  brokerId?: string | undefined;
+  subaccountId?: string | undefined;
+  assetCode?: string | undefined;
+  amount?: string | number | undefined;
 }
 
 export interface BalanceOrderResponse {
@@ -1965,7 +1979,7 @@ export interface BalanceOrderResponse {
   direction?: BalanceOrderResponseDirection;
   providerType?: ProviderType;
   internalToken?: string;
-  amount?: number;
+  amount?: string;
   toCryptoAddressId?: string;
   toCryptoAddress?: string;
   depositAddress?: string;
@@ -1987,10 +2001,22 @@ export interface BalancePaymentDetails {
   postForm?: ExchangePostForm;
 }
 
-export interface BalanceRejectRequest {
+export interface BalanceRejectCryptoRequest {
   transactionId: string;
-  /** Same as the path segment (`crypto` or `fiat`). */
-  operationType?: BalanceRejectRequestOperationType;
+  /**
+   * Same as the path segment.
+   * @defaultValue `'crypto'`, sent when not set
+   */
+  operationType?: BalanceRejectOperationType | undefined;
+}
+
+export interface BalanceRejectFiatRequest {
+  transactionId: string;
+  /**
+   * Same as the path segment.
+   * @defaultValue `'fiat'`, sent when not set
+   */
+  operationType?: BalanceRejectOperationType | undefined;
 }
 
 export interface CarusellBank {
@@ -2063,38 +2089,28 @@ export interface CryptoDepositRequest {
   subaccountId: string;
   assetCode: string;
   assetNetwork: Network;
-  amount: number;
+  amount: string | number;
 }
 
 export interface CryptoWithdrawalCalculation {
-  commissionAmount?: number;
-  receivedAmount?: number;
+  commissionAmount?: string;
+  receivedAmount?: string;
   expirationDate?: string;
 }
 
 export interface CryptoWithdrawalRequest {
   subaccountId: string;
   toCryptoAddressId: string;
-  comment?: string;
+  comment?: string | undefined;
   assetCode: string;
   assetNetwork: Network;
-  amount: number;
+  amount: string | number;
 }
 
-export interface CurrentAccountDateFrame {
-  start?: string;
-  end?: string;
-}
-
-/**
- * Shared document-request body. The web app sends `{}` for invoices; the fields exist for
- * statements served by the same code path.
- */
+/** The web app always sends `{}` for invoices. */
 export interface CurrentAccountReportRequest {
-  limit?: number;
-  completionDateFrame?: CurrentAccountDateFrame;
-  type?: string;
-  format?: string;
+  /** Document type; its code path could send it, but never does for invoices. */
+  type?: string | undefined;
 }
 
 export interface CurrentAccountSystemAccount {
@@ -2110,8 +2126,8 @@ export interface CurrentAccountSystemAccount {
 }
 
 export interface DateFrame {
-  start?: string;
-  end?: string;
+  start?: string | Date | undefined;
+  end?: string | Date | undefined;
 }
 
 export interface DownloadTokenResponse {
@@ -2152,8 +2168,8 @@ export interface ExchangeCryptoAsset {
  * colon-less offset, e.g. `2026-11-07T00:00:00+0300`.
  */
 export interface ExchangeDateFrame {
-  start?: string;
-  end?: string;
+  start?: string | undefined;
+  end?: string | undefined;
 }
 
 export interface ExchangeFiatAsset {
@@ -2171,17 +2187,17 @@ export interface ExchangeLeg {
   /** Inferred from the web application, not observed in API responses. */
   asset?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
   /**
    * Amount actually received or sent; differs from `amount` after a recalculation.
    * Inferred from the web application, not observed in API responses.
    */
-  transactionAmount?: number;
+  transactionAmount?: string;
   /**
    * Service commission on the fiat leg, network commission on the crypto leg.
    * Inferred from the web application, not observed in API responses.
    */
-  feeAmount?: number;
+  feeAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
   status?: ExchangeLegStatus;
   /** Inferred from the web application, not observed in API responses. */
@@ -2265,20 +2281,20 @@ export interface ExchangeLegacyOrder {
 
 export interface ExchangeLimits {
   /** Inferred from the web application, not observed in API responses. */
-  fromMinAmount?: number;
+  fromMinAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  fromMaxAmount?: number;
+  fromMaxAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  toMinAmount?: number;
+  toMinAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  toMaxAmount?: number;
+  toMaxAmount?: string;
 }
 
 export interface ExchangeLimitsLeg {
   type: ExchangeLegType;
-  provider?: PaymentProviderType;
-  token?: string;
-  toAddress?: string;
+  provider?: PaymentProviderType | undefined;
+  token?: string | undefined;
+  toAddress?: string | undefined;
 }
 
 export interface ExchangeLimitsRequest {
@@ -2286,7 +2302,7 @@ export interface ExchangeLimitsRequest {
   fromPaymentDetails: ExchangeLimitsLeg;
   toAsset: string;
   toPaymentDetails: ExchangeLimitsLeg;
-  merchantId?: string;
+  merchantId?: string | undefined;
 }
 
 export interface ExchangeOrder {
@@ -2306,7 +2322,7 @@ export interface ExchangeOrder {
   /** Inferred from the web application, not observed in API responses. */
   conditions?: ExchangeOrderConditions;
   /** Inferred from the web application, not observed in API responses. */
-  exchangeRateValue?: number;
+  exchangeRateValue?: string;
   /** Inferred from the web application, not observed in API responses. */
   postForm?: ExchangePostForm;
   /**
@@ -2324,59 +2340,64 @@ export interface ExchangeOrderConditions {
   /** Inferred from the web application, not observed in API responses. */
   fromAsset?: string;
   /** Inferred from the web application, not observed in API responses. */
-  fromGrossAmount?: number;
+  fromGrossAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  fromFeeAmount?: number;
+  fromFeeAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
   toAsset?: string;
   /** Inferred from the web application, not observed in API responses. */
-  toNetAmount?: number;
+  toNetAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  toFeeAmount?: number;
+  toFeeAmount?: string;
   /**
    * Pair of the rate, e.g. `BTC/USDT`.
    * Inferred from the web application, not observed in API responses.
    */
   rate?: string;
   /** Inferred from the web application, not observed in API responses. */
-  actualRateValue?: number;
+  actualRateValue?: string;
   /** Inferred from the web application, not observed in API responses. */
-  exchangeRateValue?: number;
+  exchangeRateValue?: string;
 }
 
 export interface ExchangeOrderHistoryFilter {
-  limit?: number;
-  inputAssets?: string[];
-  outputAssets?: string[];
-  inputOperationTypes?: ExchangeLegType[];
-  outputOperationTypes?: ExchangeLegType[];
-  statuses?: ExchangeOrderStatus[];
-  creationDateFrame?: ExchangeDateFrame;
+  /** @defaultValue `20`, sent when not set */
+  limit?: number | undefined;
+  inputAssets?: string[] | undefined;
+  outputAssets?: string[] | undefined;
+  inputOperationTypes?: ExchangeLegType[] | undefined;
+  outputOperationTypes?: ExchangeLegType[] | undefined;
+  statuses?: ExchangeOrderStatus[] | undefined;
+  /** Orders with one of these assets on either leg. */
+  assets?: string[] | undefined;
+  /** Orders with one of these leg types on either leg. */
+  operationTypes?: ExchangeLegType[] | undefined;
+  creationDateFrame?: ExchangeDateFrame | undefined;
 }
 
 /** The web app sends `{"requestBody": {}}`. */
 export interface ExchangeOrderRejectRequest {
-  requestBody?: unknown;
+  requestBody?: unknown | undefined;
 }
 
 export interface ExchangeOrderRequest {
   quoteId: string;
   destination: ExchangeDestination;
   /** Where the payment page returns after success. */
-  returnUrl?: string;
+  returnUrl?: string | undefined;
   /** Where the payment page returns after a failure. */
-  failUrl?: string;
+  failUrl?: string | undefined;
   /**
    * Whitebird bank account to pay to (current-account `CA` purchases), from
    * `current_account.banking_details`.
    */
-  systemToken?: string;
+  systemToken?: string | undefined;
   /** Recipient bank for SBP payouts (RUB crypto-to-fiat). */
-  bankIdentifier?: string;
+  bankIdentifier?: string | undefined;
   /** Longer waiting time for a crypto transfer from a service with deferred payouts. */
-  additionalTimeout?: boolean;
+  additionalTimeout?: boolean | undefined;
   /** Merchant-side order id (widget). */
-  externalId?: string;
+  externalId?: string | undefined;
 }
 
 /** HTML form to submit with POST (Assist acquiring). */
@@ -2407,9 +2428,9 @@ export interface ExchangeQuote {
    * Displayed rate.
    * Inferred from the web application, not observed in API responses.
    */
-  exchangeRateValue?: number;
+  exchangeRateValue?: string;
   /** Inferred from the web application, not observed in API responses. */
-  actualRateValue?: number;
+  actualRateValue?: string;
   /** Inferred from the web application, not observed in API responses. */
   promoCode?: ExchangePromoCode;
   /** Inferred from the web application, not observed in API responses. */
@@ -2423,24 +2444,24 @@ export interface ExchangeQuoteLegRequest {
   asset: string;
   type: ExchangeLegType;
   /** Set on the leg whose amount the client fixes (input or output, not both). */
-  amount?: number;
-  provider?: PaymentProviderType;
+  amount?: string | number | undefined;
+  provider?: PaymentProviderType | undefined;
   /** Payment method id (bound card) of a `FIAT_PROVIDER` leg; the card number for `CORTI_MILLI`. */
-  token?: string;
+  token?: string | undefined;
   /** External crypto address of a `CRYPTO_TRANSFER` output. */
-  toAddress?: string;
+  toAddress?: string | undefined;
   /** Memo / destination tag of a `CRYPTO_TRANSFER` output. */
-  comment?: string;
+  comment?: string | undefined;
 }
 
 export interface ExchangeQuoteRequest {
   input: ExchangeQuoteLegRequest;
   output: ExchangeQuoteLegRequest;
-  promoCode?: string;
+  promoCode?: string | undefined;
   /** Widget session id (merchant SDK). */
-  sessionId?: string;
+  sessionId?: string | undefined;
   /** Merchant id when quoting inside a merchant widget. */
-  merchantId?: string;
+  merchantId?: string | undefined;
 }
 
 export interface ExchangeRateStat {
@@ -2449,12 +2470,12 @@ export interface ExchangeRateStat {
   /** Inferred from the web application, not observed in API responses. */
   quote?: string;
   /** Inferred from the web application, not observed in API responses. */
-  value?: number;
+  value?: string;
   /**
    * Rate 24 hours ago.
    * Inferred from the web application, not observed in API responses.
    */
-  value24h?: number;
+  value24h?: string;
 }
 
 /** Filter of the statistics; the web app always sends `{}`. */
@@ -2462,30 +2483,39 @@ export type ExchangeRateStatsFilter = Record<string, unknown>;
 
 export interface FiatDepositRequest {
   subaccountId: string;
+  /** The web app sends `CA` (current account). */
   fiatProviderType: ProviderType;
-  internalToken?: string;
+  /**
+   * Settlement account to deposit from, the `id` of an account from
+   * `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
+   */
+  internalToken?: string | undefined;
+  /** The web app sends `RUB`. */
   assetCode: string;
-  amount: number;
+  amount: string | number;
 }
 
 export interface FiatWithdrawalRequest {
   subaccountId: string;
+  /** The web app sends `CA` (current account). */
   fiatProviderType: ProviderType;
-  paymentToken?: string;
-  assetCode?: string;
-  amount: number;
+  /** Bank account to withdraw to, the `id` of a method from `brokerage.payments.methods`. */
+  paymentToken?: string | undefined;
+  /** The web app sends `RUB`. */
+  assetCode?: string | undefined;
+  amount: string | number;
 }
 
 export interface IcoAccountTransferRequest {
-  /** Client ID of the user. */
-  clientId?: string;
+  /** The client's `identity` from `client.get`. */
+  clientId: string;
   currencyFrom: string;
   /** `ICO_BALANCE`. */
   accountTypeFrom: IcoAccountType;
   currencyTo: string;
   /** `USER_BALANCE`. */
   accountTypeTo: IcoAccountType;
-  amount: number;
+  amount: string | number;
 }
 
 export interface IcoBalanceBuyRequest {
@@ -2495,7 +2525,7 @@ export interface IcoBalanceBuyRequest {
   /** Currency of the paying account. */
   asset: string;
   /** Number of tokens. */
-  amount: number;
+  amount: string | number;
 }
 
 export interface IcoBuyResult {
@@ -2530,12 +2560,12 @@ export interface IcoBuybackApplication {
    * Tokens requested.
    * Inferred from the web application, not observed in API responses.
    */
-  valueRequest?: number;
+  valueRequest?: string;
   /**
    * Tokens approved (meaningful once `APPROVED`/`COMPLETED`).
    * Inferred from the web application, not observed in API responses.
    */
-  value?: number;
+  value?: string;
   /** Inferred from the web application, not observed in API responses. */
   status?: IcoBuybackApplicationStatus;
   /**
@@ -2561,9 +2591,9 @@ export interface IcoBuybackApplication {
 }
 
 export interface IcoBuybackApplicationFilter {
-  issuerIds?: string[];
-  emissionIds?: string[];
-  statuses?: IcoBuybackApplicationStatus[];
+  issuerIds?: string[] | undefined;
+  emissionIds?: string[] | undefined;
+  statuses?: IcoBuybackApplicationStatus[] | undefined;
 }
 
 /** One offer (buyback) window of an issuer's emission with its applications totals. */
@@ -2578,7 +2608,7 @@ export interface IcoBuybackOffer {
    * Offer percentage as a fraction.
    * Inferred from the web application, not observed in API responses.
    */
-  buybackRate?: number;
+  buybackRate?: string;
   /**
    * Request window start (ISO-8601).
    * Inferred from the web application, not observed in API responses.
@@ -2600,16 +2630,16 @@ export interface IcoBuybackOffer {
    * Tokens requested.
    * Inferred from the web application, not observed in API responses.
    */
-  value?: number;
+  value?: string;
   /**
    * Amount requested.
    * Inferred from the web application, not observed in API responses.
    */
-  amount?: number;
+  amount?: string;
   /** Inferred from the web application, not observed in API responses. */
-  valueApproved?: number;
+  valueApproved?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amountApproved?: number;
+  amountApproved?: string;
   /**
    * Settlement date (ISO-8601).
    * Inferred from the web application, not observed in API responses.
@@ -2634,42 +2664,42 @@ export interface IcoBuybackOffer {
    * Credited to investors, account currency.
    * Inferred from the web application, not observed in API responses.
    */
-  amountPaid?: number;
+  amountPaid?: string;
 }
 
 export interface IcoBuybackOfferFilter {
-  emissionNames?: string[];
-  currencies?: string[];
-  statuses?: IcoBuybackOfferStatus[];
+  emissionNames?: string[] | undefined;
+  currencies?: string[] | undefined;
+  statuses?: IcoBuybackOfferStatus[] | undefined;
   /** Fraction. */
-  buybackRateFrom?: number;
+  buybackRateFrom?: string | number | undefined;
   /** Fraction. */
-  buybackRateTo?: number;
+  buybackRateTo?: string | number | undefined;
   /** Request window from. */
-  fromRequestDate?: string;
+  fromRequestDate?: string | Date | undefined;
   /** Request window to. */
-  toRequestDate?: string;
+  toRequestDate?: string | Date | undefined;
   /** Payment window from. */
-  fromDate?: string;
+  fromDate?: string | Date | undefined;
   /** Payment window to. */
-  toDate?: string;
+  toDate?: string | Date | undefined;
 }
 
 export interface IcoBuybackRequest {
   emissionId: string;
   /** Tokens to sell back (at least 1). */
-  value: number;
+  value: string | number;
   /** Existing application to change. */
-  buybackId?: string;
+  buybackId?: string | undefined;
 }
 
 export interface IcoCalculatorRequest {
   /** Emission to evaluate (emission page). */
-  emissionId?: string;
+  emissionId?: string | undefined;
   /** Currency to evaluate (landing page). */
-  currency?: string;
+  currency?: string | undefined;
   /** The web app sends 100. */
-  amount?: number;
+  amount?: string | number | undefined;
 }
 
 export interface IcoCalculatorResult {
@@ -2677,61 +2707,61 @@ export interface IcoCalculatorResult {
    * Minimum investment.
    * Inferred from the web application, not observed in API responses.
    */
-  minAmount?: number;
+  minAmount?: string;
   /**
    * Maximum investment.
    * Inferred from the web application, not observed in API responses.
    */
-  maxAmount?: number;
+  maxAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /**
    * Annual interest rate as a fraction.
    * Inferred from the web application, not observed in API responses.
    */
-  rate?: number;
+  rate?: string;
 }
 
 export interface IcoCardBuyCalculation {
   /** Inferred from the web application, not observed in API responses. */
-  commission?: number;
+  commission?: string;
   /**
    * Amount charged to the card.
    * Inferred from the web application, not observed in API responses.
    */
-  totalAmount?: number;
+  totalAmount?: string;
 }
 
 export interface IcoCardBuyCalculationRequest {
   emissionId: string;
   /** Emission currency. */
-  asset?: string;
+  asset?: string | undefined;
   /** Number of tokens. */
-  tokenAmount: number;
-  fiatProviderType?: string;
-  paymentToken?: string;
+  tokenAmount: string | number;
+  fiatProviderType?: string | undefined;
+  paymentToken?: string | undefined;
 }
 
 export interface IcoCardBuyRequest {
   emissionId: string;
   /** Buyer client ID (from `ico.statistics.client_info`). */
-  toClientId?: string;
+  toClientId?: string | undefined;
   /** The web app sends `USER_PAYMENT`. */
-  accountType?: IcoAccountType;
+  accountType?: IcoAccountType | undefined;
   /** Emission currency. */
-  asset?: string;
+  asset?: string | undefined;
   /** Number of tokens. */
-  tokenAmount: number;
+  tokenAmount: string | number;
   /** Card provider type, e.g. `ALFA`. */
-  fiatProviderType?: string;
+  fiatProviderType?: string | undefined;
   /** ID of the selected card provider / saved card. */
-  paymentToken?: string;
+  paymentToken?: string | undefined;
   /** Total from `calculate_card_buy`. */
-  totalAmount?: number;
+  totalAmount?: string | number | undefined;
   /** Return URL, sent for `ALFA`. */
-  returnUrl?: string;
+  returnUrl?: string | undefined;
   /** Failure URL, sent for `ALFA`. */
-  failUrl?: string;
+  failUrl?: string | undefined;
 }
 
 export interface IcoClientInfo {
@@ -2749,12 +2779,12 @@ export interface IcoClientInfo {
 }
 
 export interface IcoDebtPeriodRequest {
-  currency?: string | null;
-  asset?: string | null;
+  currency?: string | null | undefined;
+  asset?: string | null | undefined;
   /** Emission name. */
-  name?: string | null;
-  from?: string | null;
-  to?: string | null;
+  name?: string | null | undefined;
+  from?: string | Date | null | undefined;
+  to?: string | Date | null | undefined;
 }
 
 /**
@@ -2804,29 +2834,29 @@ export interface IcoEmission {
    * Nominal price of one token in `currency`.
    * Inferred from the web application, not observed in API responses.
    */
-  rate?: number;
+  rate?: string;
   /**
    * Number of tokens issued.
    * Inferred from the web application, not observed in API responses.
    */
-  value?: number;
+  value?: string;
   /**
    * Tokens still on sale.
    * Inferred from the web application, not observed in API responses.
    */
-  available?: number;
+  available?: string;
   /**
    * Annual interest rate as a fraction (0.15 = 15 %).
    * Inferred from the web application, not observed in API responses.
    */
-  feeRate?: number;
+  feeRate?: string;
   /** Inferred from the web application, not observed in API responses. */
   feeInterval?: IcoPaymentInterval;
   /**
    * Offer percentage as a fraction: share of tokens the issuer buys back per offer window.
    * Inferred from the web application, not observed in API responses.
    */
-  buybackRate?: number;
+  buybackRate?: string;
   /** Inferred from the web application, not observed in API responses. */
   buybackInterval?: IcoPaymentInterval;
   /**
@@ -2867,9 +2897,9 @@ export interface IcoEmission {
    * Net assets of the issuer, BYN.
    * Inferred from the web application, not observed in API responses.
    */
-  netAssets?: number;
+  netAssets?: string;
   /** Inferred from the web application, not observed in API responses. */
-  riskCoefficient?: number | null;
+  riskCoefficient?: string | null;
   /**
    * Residency flag; the web app blocks purchases when it is false.
    * Inferred from the web application, not observed in API responses.
@@ -2894,40 +2924,40 @@ export interface IcoEmission {
    * Rate to the issuer's account currency. Issuer cabinet only.
    * Inferred from the web application, not observed in API responses.
    */
-  exchangeRate?: number;
+  exchangeRate?: string;
   /**
    * Offer payments. Issuer cabinet only.
    * Inferred from the web application, not observed in API responses.
    */
-  buybackValue?: number;
+  buybackValue?: string;
   /**
    * Interest due in the current period. Issuer cabinet only.
    * Inferred from the web application, not observed in API responses.
    */
-  feeCurrentAmount?: number;
+  feeCurrentAmount?: string;
   /**
    * Offer payments due in the current period. Issuer cabinet only.
    * Inferred from the web application, not observed in API responses.
    */
-  buybackCurrentAmount?: number;
+  buybackCurrentAmount?: string;
 }
 
 export interface IcoEmissionFilter {
   /** The web app always sends true. */
-  withLogo?: boolean;
+  withLogo?: boolean | undefined;
   /** Token type; the web app sends `ICO`. */
-  tokenType?: string;
-  currencies?: string[];
+  tokenType?: string | undefined;
+  currencies?: string[] | undefined;
   /** Issuer client IDs. */
-  clientIds?: string[];
+  clientIds?: string[] | undefined;
   /** Minimum interest rate as a fraction. */
-  feeRateFrom?: number;
+  feeRateFrom?: string | number | undefined;
   /** Maximum interest rate as a fraction. */
-  feeRateTo?: number;
+  feeRateTo?: string | number | undefined;
   /** Minimum offer percentage as a fraction. */
-  buybackRateFrom?: number;
+  buybackRateFrom?: string | number | undefined;
   /** Maximum offer percentage as a fraction. */
-  buybackRateTo?: number;
+  buybackRateTo?: string | number | undefined;
 }
 
 /** One sale of the issuer's tokens. */
@@ -2948,19 +2978,19 @@ export interface IcoEmissionSale {
    * Tokens sold.
    * Inferred from the web application, not observed in API responses.
    */
-  soldValue?: number;
+  soldValue?: string;
   /**
    * Proceeds in `currency`.
    * Inferred from the web application, not observed in API responses.
    */
-  soldAmount?: number;
+  soldAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /**
    * Proceeds in the account currency.
    * Inferred from the web application, not observed in API responses.
    */
-  soldAmountUsd?: number;
+  soldAmountUsd?: string;
 }
 
 export interface IcoInvestedBalance {
@@ -2975,7 +3005,7 @@ export interface IcoInvestedBalance {
    */
   ownerName?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
 }
 
 export interface IcoInvestedIncome {
@@ -2998,14 +3028,14 @@ export interface IcoInvestedIncomeItem {
    * Interest paid out.
    * Inferred from the web application, not observed in API responses.
    */
-  totalFee?: number;
+  totalFee?: string;
   /**
    * Interest still to be paid.
    * Inferred from the web application, not observed in API responses.
    */
-  totalRemain?: number;
+  totalRemain?: string;
   /** Inferred from the web application, not observed in API responses. */
-  totalAmount?: number;
+  totalAmount?: string;
   /** Inferred from the web application, not observed in API responses. */
   fromDate?: string;
   /** Inferred from the web application, not observed in API responses. */
@@ -3013,9 +3043,9 @@ export interface IcoInvestedIncomeItem {
 }
 
 export interface IcoInvestedIncomeRequest {
-  currency?: string | null;
-  from?: string | null;
-  to?: string | null;
+  currency?: string | null | undefined;
+  from?: string | Date | null | undefined;
+  to?: string | Date | null | undefined;
 }
 
 export interface IcoInvestedTotal {
@@ -3025,7 +3055,7 @@ export interface IcoInvestedTotal {
 
 export interface IcoInvestedTotalRequest {
   /** Null for all currencies. */
-  currency?: string | null;
+  currency?: string | null | undefined;
 }
 
 export interface IcoInvestorEmission {
@@ -3042,30 +3072,30 @@ export interface IcoInvestorObligations {
 /** Form values are sent as strings, as typed by the user. */
 export interface IcoIssueRequest {
   /** Currency of the issue (`BYN`, `USD`, `EUR`, `RUB`). */
-  currency?: string;
+  currency?: string | undefined;
   /** Issue volume. */
-  amount?: string;
+  amount?: string | undefined;
   /** Circulation period in months: `24`, `36`, `48`, `60` or a custom value. */
-  expirationDate?: string;
+  expirationDate?: string | undefined;
   /** Sale period in months: `3`, `6` or `12`. */
-  primaryDeactivation?: string;
-  feeInterval?: IcoPaymentInterval;
+  primaryDeactivation?: string | undefined;
+  feeInterval?: IcoPaymentInterval | undefined;
   /** Interest rate, percent. */
-  feeRate?: string;
+  feeRate?: string | undefined;
   /** Interest payment day of month: `5`, `10`, `15`, `20` or `25`. */
-  feeDay?: string;
-  buybackInterval?: IcoPaymentInterval;
+  feeDay?: string | undefined;
+  buybackInterval?: IcoPaymentInterval | undefined;
   /** Offer percentage. */
-  buybackRate?: string;
-  companyName?: string;
+  buybackRate?: string | undefined;
+  companyName?: string | undefined;
   /** Contact person. */
-  clientName?: string;
-  phoneNumber?: string;
-  email?: string;
-  companyUrl?: string;
-  comment?: string;
+  clientName?: string | undefined;
+  phoneNumber?: string | undefined;
+  email?: string | undefined;
+  companyUrl?: string | undefined;
+  comment?: string | undefined;
   /** True for the full issuer-cabinet form; absent for the contact-only landing form. */
-  fullRequest?: boolean;
+  fullRequest?: boolean | undefined;
 }
 
 /** An issuer: a company that issues tokens. */
@@ -3083,12 +3113,12 @@ export interface IcoIssuerDebt {
    * Principal debt of the current period.
    * Inferred from the web application, not observed in API responses.
    */
-  amount?: number;
+  amount?: string;
   /**
    * Accrued interest of the current period.
    * Inferred from the web application, not observed in API responses.
    */
-  currentDebt?: number;
+  currentDebt?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
 }
@@ -3105,14 +3135,14 @@ export interface IcoIssuerDetails {
   activityType?: string;
   employeesCount?: number;
   /** Thousands of `currency`. */
-  revenue?: number;
+  revenue?: string;
   /** Thousands of `currency`. */
-  netProfit?: number;
+  netProfit?: string;
   currency?: string;
   revenueCurrency?: string;
   /** Percent with a decimal comma, e.g. `0,10`. */
   returnOnAssets?: string;
-  liquidityK1?: number;
+  liquidityK1?: string;
   solvency?: IcoSolvency;
 }
 
@@ -3142,30 +3172,30 @@ export interface IcoIssuerName {
 export interface IcoIssuerStatistics {
   currency?: string;
   /** Total issued, in `currency`. */
-  emissionAmount?: number;
+  emissionAmount?: string;
   /** Total interest paid, in `currency`. */
-  feeAmount?: number;
+  feeAmount?: string;
   investors?: number;
 }
 
 export interface IcoMyEmissionFilter {
   /** Emission names. */
-  names?: string[];
-  currencies?: string[];
-  statuses?: IcoEmissionStatus[];
-  buybackStatuses?: IcoBuybackPaymentStatus[];
+  names?: string[] | undefined;
+  currencies?: string[] | undefined;
+  statuses?: IcoEmissionStatus[] | undefined;
+  buybackStatuses?: IcoBuybackPaymentStatus[] | undefined;
   /** Only emissions with (true) or without (false) current debt. */
-  currentDebt?: boolean;
+  currentDebt?: boolean | undefined;
 }
 
 export interface IcoMyEmissionReportRequest {
   type: IcoReportFormat;
   /** Emission names. */
-  names?: string[];
-  currencies?: string[];
-  statuses?: IcoEmissionStatus[];
-  buybackStatuses?: IcoBuybackPaymentStatus[];
-  currentDebt?: boolean;
+  names?: string[] | undefined;
+  currencies?: string[] | undefined;
+  statuses?: IcoEmissionStatus[] | undefined;
+  buybackStatuses?: IcoBuybackPaymentStatus[] | undefined;
+  currentDebt?: boolean | undefined;
 }
 
 /**
@@ -3189,24 +3219,24 @@ export interface IcoObligation {
    * Tokens held.
    * Inferred from the web application, not observed in API responses.
    */
-  value?: number;
+  value?: string;
   /**
    * Token price in `currency`.
    * Inferred from the web application, not observed in API responses.
    */
-  exchangeRate?: number;
+  exchangeRate?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /**
    * Annual interest rate as a fraction.
    * Inferred from the web application, not observed in API responses.
    */
-  feeRate?: number;
+  feeRate?: string;
   /**
    * Interest still to be received.
    * Inferred from the web application, not observed in API responses.
    */
-  remainFee?: number;
+  remainFee?: string;
   /**
    * Start of the current offer request window (ISO-8601).
    * Inferred from the web application, not observed in API responses.
@@ -3230,10 +3260,10 @@ export interface IcoObligation {
 }
 
 export interface IcoObligationFilter {
-  currencies?: string[];
-  issuerIds?: string[];
-  emissionIds?: string[];
-  statuses?: IcoObligationStatus[];
+  currencies?: string[] | undefined;
+  issuerIds?: string[] | undefined;
+  emissionIds?: string[] | undefined;
+  statuses?: IcoObligationStatus[] | undefined;
 }
 
 /** An operation on ICO or e-accounts caused by the token lifecycle. */
@@ -3257,7 +3287,7 @@ export interface IcoOperation {
   /** Inferred from the web application, not observed in API responses. */
   status?: IcoOperationStatus;
   /** Inferred from the web application, not observed in API responses. */
-  amountFrom?: number;
+  amountFrom?: string;
   /** Inferred from the web application, not observed in API responses. */
   assetFrom?: string;
   /** Inferred from the web application, not observed in API responses. */
@@ -3266,7 +3296,7 @@ export interface IcoOperation {
    * Tokens for purchases.
    * Inferred from the web application, not observed in API responses.
    */
-  amountTo?: number;
+  amountTo?: string;
   /** Inferred from the web application, not observed in API responses. */
   assetTo?: string;
   /** Inferred from the web application, not observed in API responses. */
@@ -3294,14 +3324,14 @@ export interface IcoOperationDetails {
 }
 
 export interface IcoOperationFilter {
-  dateFrom?: string;
-  dateTo?: string;
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
   /** Operation type names from `type_names`. */
-  nameTypes?: string[];
-  issuerIds?: string[];
-  emissionIds?: string[];
-  accounts?: IcoOperationAccount[];
-  statuses?: IcoOperationStatus[];
+  nameTypes?: string[] | undefined;
+  issuerIds?: string[] | undefined;
+  emissionIds?: string[] | undefined;
+  accounts?: IcoOperationAccount[] | undefined;
+  statuses?: IcoOperationStatus[] | undefined;
 }
 
 export interface IcoPaymentSchedule {
@@ -3312,9 +3342,9 @@ export interface IcoPaymentSchedule {
 export interface IcoPaymentScheduleRequest {
   /** Emission name. */
   name: string;
-  currency?: string;
-  from?: string;
-  to?: string;
+  currency?: string | undefined;
+  from?: string | Date | undefined;
+  to?: string | Date | undefined;
 }
 
 export interface IcoRate {
@@ -3323,7 +3353,7 @@ export interface IcoRate {
   /** Inferred from the web application, not observed in API responses. */
   toAsset?: string;
   /** Inferred from the web application, not observed in API responses. */
-  rate?: number;
+  rate?: string;
 }
 
 export interface IcoRateRequest {
@@ -3332,12 +3362,12 @@ export interface IcoRateRequest {
 }
 
 export interface IcoSalesAnalyticsFilter {
-  emissionNames?: string[];
-  statuses?: IcoEmissionStatus[];
+  emissionNames?: string[] | undefined;
+  statuses?: IcoEmissionStatus[] | undefined;
   /** Sale date from. */
-  dateFrom?: string;
+  dateFrom?: string | Date | undefined;
   /** Sale date to. */
-  dateTo?: string;
+  dateTo?: string | Date | undefined;
 }
 
 export interface IcoScheduledPayment {
@@ -3347,7 +3377,7 @@ export interface IcoScheduledPayment {
    */
   date?: string;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /**
@@ -3358,15 +3388,15 @@ export interface IcoScheduledPayment {
 }
 
 export interface IcoStatementRequest {
-  dateFrom?: string;
-  dateTo?: string;
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
   /** Operation type names from `type_names`. */
-  nameTypes?: string[];
-  issuerIds?: string[];
-  emissionIds?: string[];
-  accounts?: IcoOperationAccount[];
-  statuses?: IcoOperationStatus[];
-  type?: IcoReportFormat;
+  nameTypes?: string[] | undefined;
+  issuerIds?: string[] | undefined;
+  emissionIds?: string[] | undefined;
+  accounts?: IcoOperationAccount[] | undefined;
+  statuses?: IcoOperationStatus[] | undefined;
+  type?: IcoReportFormat | undefined;
 }
 
 export interface IcoStatistics {
@@ -3383,7 +3413,7 @@ export interface IcoYearAmount {
   /** Inferred from the web application, not observed in API responses. */
   year?: number;
   /** Inferred from the web application, not observed in API responses. */
-  amount?: number;
+  amount?: string;
 }
 
 export interface IcoYield {
@@ -3391,18 +3421,18 @@ export interface IcoYield {
    * Yield of the period as a fraction.
    * Inferred from the web application, not observed in API responses.
    */
-  current?: number;
+  current?: string;
   /**
    * Yield of the previous period as a fraction.
    * Inferred from the web application, not observed in API responses.
    */
-  last?: number;
+  last?: string;
 }
 
 export interface IcoYieldRequest {
   type: IcoYieldPeriod;
   /** `USD`, `EUR`, `RUB`, `BYN` or null for all. */
-  currency?: string | null;
+  currency?: string | null | undefined;
 }
 
 export interface KycActualData {
@@ -3511,7 +3541,7 @@ export interface KycLivenessStartRequest {
    * Where the provider returns after the check; the web app sends it only for the redirect flow
    * (in-app web views and the Telegram bot).
    */
-  redirectUrl?: string;
+  redirectUrl?: string | undefined;
 }
 
 export interface KycMsiRedirect {
@@ -3601,20 +3631,20 @@ export interface KycProfileClosureConfirmRequest {
  */
 export interface KycQualificationRequest {
   requestedInvestorStatus: KycInvestorStatus;
-  incomeOver80kByn?: boolean;
-  assetsOver150kByn?: boolean;
-  incomeOver300kByn?: boolean;
-  assetsOver600kByn?: boolean;
-  certifiedExpert?: boolean;
-  experienceInOrganization?: boolean;
-  personalTradingExperience?: boolean;
+  incomeOver80kByn?: boolean | undefined;
+  assetsOver150kByn?: boolean | undefined;
+  incomeOver300kByn?: boolean | undefined;
+  assetsOver600kByn?: boolean | undefined;
+  certifiedExpert?: boolean | undefined;
+  experienceInOrganization?: boolean | undefined;
+  personalTradingExperience?: boolean | undefined;
 }
 
 export interface KycQualificationSubmitRequest {
   /** JSON-encoded `KycQualificationRequest`. */
   request: KycQualificationRequest;
   /** Supporting documents, sent as one part per file. */
-  files: Blob[];
+  files: (Blob | Uint8Array)[];
 }
 
 export interface KycSumsubToken {
@@ -3658,24 +3688,25 @@ export interface KycVerification {
 }
 
 /**
- * The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (from geo, default
- * `BY`), `countryFlag: false`, `residencePermitInBelarusPresent: true`,
- * `exchangeInPersonalInterests: true`, `notUSTaxpayer: true`, `userConfirmed: false`,
- * `firstStageConfirmed: true`, `secondStageConfirmed: false` and `emailVerified: true`.
+ * The web app sends the questionnaire from `GET /api/v1/kyc` with `country` (the questionnaire's
+ * own value, else the code of the country reported by `auth.geo`, else `BY`), `countryFlag: false`,
+ * `residencePermitInBelarusPresent: true`, `exchangeInPersonalInterests: true`, `notUSTaxpayer:
+ * true`, `userConfirmed: false`, `firstStageConfirmed: true`, `secondStageConfirmed: false` and
+ * `emailVerified: true`.
  */
 export interface KycVerificationRequest {
-  provider?: KycProvider;
+  provider?: KycProvider | undefined;
   /** ISO 3166-1 alpha-2 country code. */
-  country?: string;
-  countryFlag?: boolean;
-  residencePermitInBelarusPresent?: boolean;
-  exchangeInPersonalInterests?: boolean;
-  notUSTaxpayer?: boolean;
-  userConfirmed?: boolean;
-  sdkOferta?: boolean;
-  firstStageConfirmed?: boolean;
-  secondStageConfirmed?: boolean;
-  emailVerified?: boolean;
+  country?: string | undefined;
+  countryFlag?: boolean | undefined;
+  residencePermitInBelarusPresent?: boolean | undefined;
+  exchangeInPersonalInterests?: boolean | undefined;
+  notUSTaxpayer?: boolean | undefined;
+  userConfirmed?: boolean | undefined;
+  sdkOferta?: boolean | undefined;
+  firstStageConfirmed?: boolean | undefined;
+  secondStageConfirmed?: boolean | undefined;
+  emailVerified?: boolean | undefined;
 }
 
 export interface MarketInstrument {
@@ -3799,6 +3830,53 @@ export interface MerchantCurrencyPair {
   toCurrency?: string;
 }
 
+/** Exchange order of a merchant's client. */
+export interface MerchantOrder {
+  /** Inferred from the web application, not observed in API responses. */
+  id?: string;
+  /**
+   * Application number shown to the client.
+   * Inferred from the web application, not observed in API responses.
+   */
+  number?: number;
+  /** Inferred from the web application, not observed in API responses. */
+  status?: ExchangeOrderStatus;
+  /** Inferred from the web application, not observed in API responses. */
+  input?: ExchangeLeg;
+  /** Inferred from the web application, not observed in API responses. */
+  output?: ExchangeLeg;
+  /** Inferred from the web application, not observed in API responses. */
+  conditions?: ExchangeOrderConditions;
+  /** Inferred from the web application, not observed in API responses. */
+  exchangeRateValue?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  postForm?: ExchangePostForm;
+  /**
+   * Why the terms were recalculated, e.g. `WRONG_AMOUNT` (a different amount was received).
+   * Inferred from the web application, not observed in API responses.
+   */
+  recalculationReason?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  creationDate?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  completionDate?: string;
+  /**
+   * The client who placed the order.
+   * Inferred from the web application, not observed in API responses.
+   */
+  clientId?: string;
+}
+
+export interface MerchantOrderFilter {
+  /** @defaultValue `20`, sent when not set */
+  limit?: number | undefined;
+  creationDateFrame?: ExchangeDateFrame | undefined;
+  statuses?: ExchangeOrderStatus[] | undefined;
+  assets?: string[] | undefined;
+  /** Only the orders of this client. */
+  clientId?: string | null | undefined;
+}
+
 export interface MerchantPair {
   /** Inferred from the web application, not observed in API responses. */
   currencyPair?: MerchantCurrencyPair;
@@ -3808,10 +3886,10 @@ export interface MerchantPair {
 
 export interface MerchantReportRequest {
   fileType: MerchantReportFileType;
-  creationDateFrame?: ExchangeDateFrame;
-  statuses?: ExchangeOrderStatus[];
-  assets?: string[];
-  clientId?: string | null;
+  creationDateFrame?: ExchangeDateFrame | undefined;
+  statuses?: ExchangeOrderStatus[] | undefined;
+  assets?: string[] | undefined;
+  clientId?: string | null | undefined;
 }
 
 export interface MerchantShowNameRequest {
@@ -3819,8 +3897,8 @@ export interface MerchantShowNameRequest {
 }
 
 export interface MerchantStatisticFilter {
-  fromDate?: string;
-  toDate?: string;
+  fromDate?: string | undefined;
+  toDate?: string | undefined;
 }
 
 export interface MerchantWebhookUrlRequest {
@@ -3835,7 +3913,7 @@ export interface MtsCardBindRequest {
 
 export interface MtsQrAmount {
   /** Inferred from the web application, not observed in API responses. */
-  base?: number;
+  base?: string;
   /**
    * Currency code, `RUB` in practice.
    * Inferred from the web application, not observed in API responses.
@@ -3848,14 +3926,14 @@ export interface MtsQrCommission {
    * Amount the web app then pays for the ticket (presumably including the provider commission).
    * Inferred from the web application, not observed in API responses.
    */
-  amount?: number;
+  amount?: string;
 }
 
 export interface MtsQrCommissionRequest {
   /** Ticket returned by `info`. */
   qrTicketId: string;
   /** Amount the payer entered, in the QR code's currency. */
-  amount: number;
+  amount: string | number;
 }
 
 /** Result of decoding; `code` 0 means success. */
@@ -3923,7 +4001,7 @@ export interface NotificationMarkViewedRequest {
 
 export interface NotificationSearchRequest {
   /** `false` returns unread events only. */
-  viewed?: boolean;
+  viewed?: boolean | undefined;
 }
 
 /** JSON `data` of one SSE message. */
@@ -3942,22 +4020,22 @@ export interface NotificationStreamMessage {
 }
 
 export interface OrderUnifiedFilterRequest {
-  uuid?: string;
-  operationTypes?: OrderUnifiedOperationType[];
+  uuid?: string | undefined;
+  operationTypes?: OrderUnifiedOperationType[] | undefined;
   /**
    * Asset filters. For OTC orders specify both fromAsset and toAsset. For Balance orders specify
    * asset (single-asset).
    */
-  assetFilters?: AssetFilter[];
-  statuses?: string[];
-  creationDateFrame?: DateFrame;
-  completionDateFrame?: DateFrame;
+  assetFilters?: AssetFilter[] | undefined;
+  statuses?: string[] | undefined;
+  creationDateFrame?: DateFrame | undefined;
+  completionDateFrame?: DateFrame | undefined;
   /**
    * Broker ID to filter by. If the requester is Broker, this value will be ignored and overridden
    * with the current broker's ID.
    */
-  brokerId?: string;
-  subaccountId?: string;
+  brokerId?: string | undefined;
+  subaccountId?: string | undefined;
 }
 
 export interface OrderUnifiedResponse {
@@ -3968,9 +4046,9 @@ export interface OrderUnifiedResponse {
   assetNetwork?: Network;
   fromAsset?: string;
   toAsset?: string;
-  amount?: number;
-  fromAmount?: number;
-  toAmount?: number;
+  amount?: string;
+  fromAmount?: string;
+  toAmount?: string;
   operationType?: OrderUnifiedOperationType;
   depositCryptoAddress?: string;
   balanceOperationId?: string;
@@ -3983,21 +4061,21 @@ export interface OrderUnifiedResponse {
   status?: string;
   cryptoTxStatus?: OrderUnifiedResponseCryptoTxStatus;
   fiatTxStatus?: OrderUnifiedResponseFiatTxStatus;
-  requestedAmount?: number;
-  commission?: number;
+  requestedAmount?: string;
+  commission?: string;
 }
 
 export interface OtcOrderCalculateRequest {
   fromAsset: string;
-  fromAmount: number;
+  fromAmount: string | number;
   toAsset: string;
   /** Asset pair in format BASE/QUOTE */
   exchangeRatePair: string;
-  exchangeRateValue: number;
+  exchangeRateValue: string | number;
 }
 
 export interface OtcOrderCalculateResponse {
-  toAmount?: number;
+  toAmount?: string;
 }
 
 export interface OtcOrderConfirmRequest {
@@ -4006,30 +4084,30 @@ export interface OtcOrderConfirmRequest {
 }
 
 export interface OtcOrderFilterRequest {
-  uuid?: string;
-  status?: OtcOrderStatus;
-  creationDateFrame?: DateFrame;
-  completionDateFrame?: DateFrame;
+  uuid?: string | undefined;
+  status?: OtcOrderStatus | undefined;
+  creationDateFrame?: DateFrame | undefined;
+  completionDateFrame?: DateFrame | undefined;
   /**
    * Broker ID to filter by. If the requester is Broker, this value will be ignored and overridden
    * with the current broker's ID.
    */
-  brokerId?: string;
-  subaccountId?: string;
-  fromAsset?: string;
-  fromAmount?: number;
-  toAsset?: string;
-  toAmount?: number;
+  brokerId?: string | undefined;
+  subaccountId?: string | undefined;
+  fromAsset?: string | undefined;
+  fromAmount?: string | number | undefined;
+  toAsset?: string | undefined;
+  toAmount?: string | number | undefined;
 }
 
 export interface OtcOrderRequest {
   subaccountId: string;
   fromAsset: string;
-  fromAmount: number;
+  fromAmount: string | number;
   toAsset: string;
   /** Asset pair in format BASE/QUOTE */
   exchangeRatePair: string;
-  exchangeRateValue: number;
+  exchangeRateValue: string | number;
 }
 
 export interface OtcOrderResponse {
@@ -4039,11 +4117,11 @@ export interface OtcOrderResponse {
   brokerUuid?: string;
   brokerIdentity?: string;
   fromAsset?: string;
-  fromAmount?: number;
+  fromAmount?: string;
   toAsset?: string;
-  toAmount?: number;
+  toAmount?: string;
   exchangeRatePair?: string;
-  exchangeRateValue?: number;
+  exchangeRateValue?: string;
   status?: OtcOrderStatus;
   side?: OtcOrderResponseSide;
   creationDate?: string;
@@ -4113,12 +4191,12 @@ export interface PaymentCommission {
 
 export interface PaymentCommissionPair {
   /**
-   * Percent, decimal comma.
+   * Percent as a decimal string, e.g. `1.5`.
    * Inferred from the web application, not observed in API responses.
    */
   buy?: string;
   /**
-   * Percent, decimal comma.
+   * Percent as a decimal string, e.g. `1.5`.
    * Inferred from the web application, not observed in API responses.
    */
   sell?: string;
@@ -4195,11 +4273,11 @@ export interface PaymentMethodResponse {
 
 export interface PaymentMethodsRequest {
   /** Fiat currency of the direction. */
-  fiatAsset?: string;
-  orderType?: PaymentOrderType;
-  destination?: ExchangeDestination;
-  countryGroup?: PaymentCountryGroup[];
-  providers?: PaymentProviderType[];
+  fiatAsset?: string | undefined;
+  orderType?: PaymentOrderType | undefined;
+  destination?: ExchangeDestination | undefined;
+  countryGroup?: PaymentCountryGroup[] | undefined;
+  providers?: PaymentProviderType[] | undefined;
 }
 
 export interface PaymentProvider {
@@ -4218,7 +4296,7 @@ export interface PaymentProvider {
 }
 
 export interface PaymentProvidersRequest {
-  destination?: ExchangeDestination | null;
+  destination?: ExchangeDestination | null | undefined;
 }
 
 export interface Referral {
@@ -4243,7 +4321,7 @@ export interface ReferralTransaction {
    * Negative for withdrawals from the referral balance.
    * Inferred from the web application, not observed in API responses.
    */
-  amount?: number;
+  amount?: string;
   /** Inferred from the web application, not observed in API responses. */
   currency?: string;
   /** Inferred from the web application, not observed in API responses. */
@@ -4251,9 +4329,13 @@ export interface ReferralTransaction {
 }
 
 export interface ReferralTransactionsRequest {
-  /** Zero-based page index. */
-  page?: number;
-  size?: number;
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
+  /** @defaultValue `20`, sent when not set */
+  size?: number | undefined;
 }
 
 export interface RegistrationCodeRequest {
@@ -4274,7 +4356,7 @@ export interface RegistrationInitiateRequest {
   /** Acceptance of the user agreement and documents (must be true). */
   agreements: boolean;
   /** Consent to marketing messages. */
-  promoAgreement?: boolean;
+  promoAgreement?: boolean | undefined;
 }
 
 export interface RegistrationSdkInitiateRequest {
@@ -4282,9 +4364,9 @@ export interface RegistrationSdkInitiateRequest {
   /** Phone number in international format. */
   phone: string;
   agreements: boolean;
-  promoAgreement?: boolean;
+  promoAgreement?: boolean | undefined;
   /** Client id in the merchant's system. */
-  externalClientId?: string;
+  externalClientId?: string | undefined;
   merchantId: string;
 }
 
@@ -4309,17 +4391,17 @@ export interface RegistrationState {
 
 /** Statement filter plus the operation filter of `balance.operations.list`. */
 export interface ReportBalanceRequest {
-  limit?: number;
-  completionDateFrame?: ReportDateFrame;
-  /** Document type (`PDF`, `XLSX`). */
-  type?: string;
-  /** Document format (`PDF`). */
-  format?: string;
-  transactionTypes?: ReportOperationType[];
-  statuses?: string[];
-  currencies?: string[];
-  from?: string;
-  to?: string;
+  /** @defaultValue `20`, sent when not set */
+  limit?: number | undefined;
+  completionDateFrame?: ReportDateFrame | undefined;
+  /** Operation types to include; pass all three for no filter. */
+  transactionTypes: ReportOperationType[];
+  /** Document type (`PDF`, `XLSX`); the web app does not choose one for this statement. */
+  type?: string | undefined;
+  statuses?: string[] | undefined;
+  currencies?: string[] | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
 }
 
 /**
@@ -4327,21 +4409,18 @@ export interface ReportBalanceRequest {
  * offset, e.g. `2026-11-07T00:00:00+0300`.
  */
 export interface ReportDateFrame {
-  start?: string;
-  end?: string;
+  start?: string | undefined;
+  end?: string | undefined;
 }
 
 /**
  * Filter of a statement. All fields are optional; the web app sends `limit` and
- * `completionDateFrame` for exchange statements and nothing for invoices.
+ * `completionDateFrame` for exchange statements.
  */
 export interface ReportRequest {
-  limit?: number;
-  completionDateFrame?: ReportDateFrame;
-  /** Document type (`PDF`, `XLSX`). */
-  type?: string;
-  /** Document format (`PDF`). */
-  format?: string;
+  /** @defaultValue `20`, sent when not set */
+  limit?: number | undefined;
+  completionDateFrame?: ReportDateFrame | undefined;
 }
 
 export interface StatusbankCardDetails {
@@ -4427,8 +4506,8 @@ export interface SubaccountAddressRequest {
   city: string;
   street: string;
   houseAndFlat: string;
-  postCode?: string;
-  residenceAsRegistered?: boolean;
+  postCode?: string | undefined;
+  residenceAsRegistered?: boolean | undefined;
 }
 
 export interface SubaccountDetailsResponse {
@@ -4470,14 +4549,14 @@ export interface SubaccountIndividualEntrepreneurRequest {
   email: string;
   firstName: string;
   lastName: string;
-  patronymic?: string;
+  patronymic?: string | undefined;
   registrationNumber: string;
   registrationDate: string;
   registrationAuthority: string;
   unp: string;
-  registrationCountry?: string;
-  type?: SubaccountType;
-  displayName?: string;
+  registrationCountry?: string | undefined;
+  type?: SubaccountType | undefined;
+  displayName?: string | undefined;
 }
 
 export interface SubaccountIndividualRequest {
@@ -4485,23 +4564,23 @@ export interface SubaccountIndividualRequest {
   email: string;
   firstName: string;
   lastName: string;
-  patronymic?: string;
-  engFirstName?: string;
-  engLastName?: string;
-  resCountry?: string;
+  patronymic?: string | undefined;
+  engFirstName?: string | undefined;
+  engLastName?: string | undefined;
+  resCountry?: string | undefined;
   birthDate: string;
   placeOfBirth: string;
   citizenship: string;
-  personalNumber?: string;
-  docType?: SubaccountDocType;
+  personalNumber?: string | undefined;
+  docType?: SubaccountDocType | undefined;
   identityDocSeriesAndNumber: string;
   identityDocDateOfIssue: string;
   identityDocIssuer: string;
-  validTill?: string;
+  validTill?: string | undefined;
   address: SubaccountAddressRequest;
-  residenceAddress?: SubaccountAddressRequest;
-  type?: SubaccountType;
-  displayName?: string;
+  residenceAddress?: SubaccountAddressRequest | undefined;
+  type?: SubaccountType | undefined;
+  displayName?: string | undefined;
 }
 
 export interface SubaccountOrganizationRequest {
@@ -4513,9 +4592,9 @@ export interface SubaccountOrganizationRequest {
   registrationAuthority: string;
   companyAddress: string;
   unp: string;
-  registrationCountry?: string;
-  type?: SubaccountType;
-  displayName?: string;
+  registrationCountry?: string | undefined;
+  type?: SubaccountType | undefined;
+  displayName?: string | undefined;
 }
 
 export interface SubaccountResponse {
@@ -4526,7 +4605,7 @@ export interface SubaccountResponse {
   email?: string;
   brokerUuid?: string;
   brokerIdentity?: string;
-  balances?: Record<string, number>;
+  balances?: Record<string, string>;
   status?: SubaccountStatus;
 }
 
@@ -4555,20 +4634,20 @@ export interface SupportSendRequest {
   /** JSON-encoded `SupportRequest`. */
   request: SupportRequest;
   /** Attachments, sent as one part per file. */
-  files?: Blob[];
+  files?: (Blob | Uint8Array)[] | undefined;
 }
 
 export interface TradingDemoDepositRequest {
   /** Coin to credit; the web app always sends `USDT`. */
   asset: string;
   /** Amount to credit */
-  amount: number;
+  amount: string | number;
 }
 
 /** Fill of an order; also pushed on the `execution` WebSocket topic. */
 export interface TradingExecution {
   /**
-   * Execution id.
+   * Execution id; the main web app treats it as the id of the order.
    * Inferred from the web application, not observed in API responses.
    */
   id?: string;
@@ -4592,11 +4671,11 @@ export interface TradingExecution {
    */
   execValue?: string;
   /** Inferred from the web application, not observed in API responses. */
-  execFee?: number;
+  execFee?: string;
   /** Inferred from the web application, not observed in API responses. */
-  totalFee?: number;
+  totalFee?: string;
   /** Inferred from the web application, not observed in API responses. */
-  fee?: number;
+  fee?: string;
   /**
    * Epoch milliseconds.
    * Inferred from the web application, not observed in API responses.
@@ -4611,12 +4690,12 @@ export interface TradingFeeRate {
    * Percent
    * Inferred from the web application, not observed in API responses.
    */
-  takerFeeRate?: number;
+  takerFeeRate?: string;
   /**
    * Percent.
    * Inferred from the web application, not observed in API responses.
    */
-  makerFeeRate?: number;
+  makerFeeRate?: string;
   /**
    * Fee tier
    * Inferred from the web application, not observed in API responses.
@@ -4629,7 +4708,8 @@ export interface TradingOperationsReportRequest {
   startTime: number;
   /** Epoch milliseconds. */
   endTime: number;
-  format?: TradingReportFormat;
+  /** @defaultValue `'PDF'`, sent when not set */
+  format?: TradingReportFormat | undefined;
 }
 
 /** Order in the Bybit-like shape shared by the REST lists and the `order` WebSocket topic. */
@@ -4666,7 +4746,7 @@ export interface TradingOrder {
   /** Inferred from the web application, not observed in API responses. */
   avgPrice?: string;
   /** Inferred from the web application, not observed in API responses. */
-  totalFee?: number;
+  totalFee?: string;
   /** Inferred from the web application, not observed in API responses. */
   timeInForce?: TradingTimeInForce;
   /** Inferred from the web application, not observed in API responses. */
@@ -4704,18 +4784,19 @@ export interface TradingOrderAmendRequest {
   /** Order id. */
   id: string;
   symbol: string;
-  qty?: string;
-  price?: string;
+  qty?: string | undefined;
+  price?: string | undefined;
   /** New take-profit trigger price; `"0"` removes it. */
-  takeProfit?: string;
+  takeProfit?: string | undefined;
   /** New stop-loss trigger price; `"0"` removes it. */
-  stopLoss?: string;
-  tpslMode?: string;
-  tpOrderType?: TradingOrderType;
-  slOrderType?: TradingOrderType;
-  tpLimitPrice?: string;
-  slLimitPrice?: string;
-  category?: TradingCategory;
+  stopLoss?: string | undefined;
+  tpslMode?: string | undefined;
+  tpOrderType?: TradingOrderType | undefined;
+  slOrderType?: TradingOrderType | undefined;
+  tpLimitPrice?: string | undefined;
+  slLimitPrice?: string | undefined;
+  /** @defaultValue `'spot'`, sent when not set */
+  category?: TradingCategory | undefined;
 }
 
 export interface TradingOrderCreateRequest {
@@ -4726,23 +4807,27 @@ export interface TradingOrderCreateRequest {
   /** Quantity in the base coin. For market buys it is the amount to spend in the quote coin. */
   qty: string;
   /** Limit price; leave out for market orders. */
-  price?: string;
-  /** The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders. */
-  timeInForce?: TradingTimeInForce;
+  price?: string | undefined;
+  /**
+   * `PostOnly` for maker-only limit orders. The web terminal sends `GTC` also for market orders.
+   * @defaultValue `'GTC'`, sent when not set
+   */
+  timeInForce?: TradingTimeInForce | undefined;
   /** Client order id. */
-  orderLinkId?: string;
+  orderLinkId?: string | undefined;
   /** Take-profit trigger price. */
-  takeProfit?: string;
+  takeProfit?: string | undefined;
   /** Stop-loss trigger price. */
-  stopLoss?: string;
-  tpslMode?: string;
-  tpOrderType?: TradingOrderType;
-  slOrderType?: TradingOrderType;
+  stopLoss?: string | undefined;
+  tpslMode?: string | undefined;
+  tpOrderType?: TradingOrderType | undefined;
+  slOrderType?: TradingOrderType | undefined;
   /** Limit price of the take-profit order when `tpOrderType` is `Limit`. */
-  tpLimitPrice?: string;
+  tpLimitPrice?: string | undefined;
   /** Limit price of the stop-loss order when `slOrderType` is `Limit`. */
-  slLimitPrice?: string;
-  category?: TradingCategory;
+  slLimitPrice?: string | undefined;
+  /** @defaultValue `'spot'`, sent when not set */
+  category?: TradingCategory | undefined;
 }
 
 /** Order as stored by the order management service (history page). */
@@ -4767,23 +4852,23 @@ export interface TradingOrderRecord {
   /** Inferred from the web application, not observed in API responses. */
   timeInForce?: TradingTimeInForce;
   /** Inferred from the web application, not observed in API responses. */
-  price?: number;
+  price?: string;
   /** Inferred from the web application, not observed in API responses. */
-  avgPrice?: number;
+  avgPrice?: string;
   /** Inferred from the web application, not observed in API responses. */
-  origQty?: number;
+  origQty?: string;
   /** Inferred from the web application, not observed in API responses. */
-  executedQty?: number;
+  executedQty?: string;
   /** Inferred from the web application, not observed in API responses. */
-  remainingQty?: number;
+  remainingQty?: string;
   /** Inferred from the web application, not observed in API responses. */
-  cumulativeQuoteQty?: number;
+  cumulativeQuoteQty?: string;
   /** Inferred from the web application, not observed in API responses. */
-  totalFee?: number;
+  totalFee?: string;
   /** Inferred from the web application, not observed in API responses. */
-  takeProfit?: number;
+  takeProfit?: string;
   /** Inferred from the web application, not observed in API responses. */
-  stopLoss?: number;
+  stopLoss?: string;
   /**
    * Rejection reason.
    * Inferred from the web application, not observed in API responses.
@@ -4811,7 +4896,7 @@ export interface TradingPortfolioPoint {
    * Portfolio value.
    * Inferred from the web application, not observed in API responses.
    */
-  value?: number;
+  value?: string;
 }
 
 export interface TradingPortfolioStatistics {
@@ -4832,7 +4917,7 @@ export interface UserEmailChangeRequest {
   /** New email address (lowercased by the web app). */
   email: string;
   /** Current TOTP code when 2FA is enabled. */
-  mfaSecret?: string;
+  mfaSecret?: string | undefined;
 }
 
 export interface UserEmailChangeResult {
@@ -4874,7 +4959,7 @@ export interface UserPasswordChangeRequest {
   /** 10-30 characters with a lowercase and an uppercase letter */
   newPassword: string;
   /** Current TOTP code when 2FA is enabled (the web app sends an empty string otherwise). */
-  mfaSecret?: string;
+  mfaSecret?: string | undefined;
 }
 
 export interface UserPasswordResetRequest {
@@ -4883,7 +4968,7 @@ export interface UserPasswordResetRequest {
   newPassword: string;
   repeatedPassword: string;
   /** Current TOTP code when 2FA is enabled. */
-  mfaSecret?: string;
+  mfaSecret?: string | undefined;
 }
 
 export interface UserPhoneChangeRequest {
@@ -4891,7 +4976,7 @@ export interface UserPhoneChangeRequest {
   countryCode: string;
   phoneNumber: string;
   /** Current TOTP code when 2FA is enabled. */
-  mfaSecret?: string;
+  mfaSecret?: string | undefined;
 }
 
 export interface UserPhoneChangeResult {
@@ -4951,7 +5036,7 @@ export interface VtbCortiMilliRate {
    * Somoni (TJS) paid per 1 RUB.
    * Inferred from the web application, not observed in API responses.
    */
-  rate?: number;
+  rate?: string;
 }
 
 export interface VtbCortiMilliRateRequest {
@@ -4960,5 +5045,6 @@ export interface VtbCortiMilliRateRequest {
    * token of an existing quote's output here.
    */
   card: string;
-  serviceType?: VtbCortiMilliServiceType;
+  /** @defaultValue `'EXCHANGE'`, sent when not set */
+  serviceType?: VtbCortiMilliServiceType | undefined;
 }

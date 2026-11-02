@@ -60,7 +60,8 @@ export async function solveCaptcha(
     puzzlePiece: decodeImage(images.puzzlePiece),
     positionY: images.positionY ?? 0,
   });
-  return btoa(JSON.stringify({ sliderPosition: Math.round(position), requestId }));
+  // The web app sends the value of its range input, which is a string.
+  return btoa(JSON.stringify({ sliderPosition: String(Math.round(position)), requestId }));
 }
 
 function decodeImage(base64 = ''): Uint8Array {

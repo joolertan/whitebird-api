@@ -4,47 +4,59 @@ import { type ApiRequest, Core } from './core.js';
 import { Resources } from './generated/index.js';
 import {
   type Environment,
+  LOGOUT,
   OAUTH,
   OPERATION_MFA,
   SERVICE_URLS,
   type ServiceName,
 } from './generated/services.js';
+import { DECIMALS } from './generated/shapes.js';
 import type { RequestOptions } from './http.js';
 import { MemoryTokenStore, type TokenStore } from './tokens.js';
 
 /** Options of the {@link Whitebird} client. */
 export interface WhitebirdOptions {
   /** Account email, used to log in. */
-  username?: string;
+  username?: string | undefined;
   /** Account password, used to log in and to start a new session when a refresh fails. */
-  password?: string;
+  password?: string | undefined;
   /**
-   * Two-factor code for accounts with 2FA: a code, a function returning one, or
-   * `totp(secret)` from `whitebird-api/otp` to compute codes from the authenticator secret.
+   * Two-factor code for accounts with 2FA, asked for at login and to confirm operations such as
+   * withdrawals: a code, a function returning one (such as a prompt), or `totp(secret)` from
+   * `whitebird-api/otp` to compute codes from the authenticator secret.
    */
-  otp?: CodeProvider;
+  otp?: CodeProvider | undefined;
   /**
    * Solves the slider captcha that accounts without two-factor authentication get when logging
    * in. Without it such a login fails with {@link CaptchaRequiredError} before the password is
    * sent.
    */
-  captcha?: CaptchaSolver;
+  captcha?: CaptchaSolver | undefined;
   /**
    * Platform contour: `demo` is the sandbox for trading. Services without a demo host use
    * production.
    * @defaultValue `'production'`
    */
-  environment?: Environment;
+  environment?: Environment | undefined;
   /** Base URLs per service, overriding the environment, e.g. `{ brokerage: 'https://...' }`. */
-  baseUrls?: Partial<Record<ServiceName | (string & {}), string>>;
+  baseUrls?: Partial<Record<ServiceName | (string & {}), string>> | undefined;
+  /**
+   * Language of messages and texts in responses, sent as `Accept-Language` with every request,
+   * such as `'en'` or `'ru'`. By default no preference is sent.
+   */
+  language?: string | undefined;
   /** `fetch` implementation, for proxies, testing or instrumentation. @defaultValue `globalThis.fetch` */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
   /** Where the session is kept between runs. @defaultValue a new {@link MemoryTokenStore} */
-  tokenStore?: TokenStore;
-  /** Retries of idempotent requests on network errors, 429, 502, 503 and 504. @defaultValue 2 */
-  maxRetries?: number;
+  tokenStore?: TokenStore | undefined;
+  /**
+   * Retries of a request on transient failures: network errors, timeouts, 429, 502, 503 and 504
+   * for GET, HEAD and OPTIONS; for other methods only failed connections and 429.
+   * @defaultValue 2
+   */
+  maxRetries?: number | undefined;
   /** Request timeout in milliseconds; `Infinity` disables it. @defaultValue 30000 */
-  timeout?: number;
+  timeout?: number | undefined;
 }
 
 /** Arguments of {@link Whitebird.request}. */
@@ -56,11 +68,12 @@ export interface RawRequest
  * Client of the Whitebird API.
  *
  * Logs in on the first authenticated call (or when {@link Whitebird.login} is called), refreshes
- * the access token before it expires, and retries idempotent requests on transient failures.
- * Endpoints are grouped into resources, such as `client.brokerage.otcOrders`.
+ * the access token before it expires, and retries requests on transient failures when that is
+ * safe. Endpoints are grouped into resources, such as `client.brokerage.otcOrders`.
  *
- * Amounts are JavaScript numbers: values with more than 15 significant digits lose precision.
- * Timestamps are ISO 8601 strings.
+ * Decimal amounts are strings in responses, with exactly the digits the API sent, and may be
+ * given as strings or numbers in requests; strings are sent with their exact digits. Timestamps
+ * are ISO 8601 strings in responses; in requests they may also be `Date`s.
  *
  * @example
  * ```ts
@@ -70,7 +83,7 @@ export interface RawRequest
  * const client = new Whitebird({
  *   username: 'me@example.com',
  *   password: process.env.WHITEBIRD_PASSWORD,
- *   otp: totp(process.env.WHITEBIRD_TOTP_SECRET!),
+ *   otp: totp(process.env.WHITEBIRD_TOTP_SECRET ?? ''),
  * });
  *
  * const balances = await client.brokerage.balances();
@@ -99,6 +112,9 @@ export class Whitebird extends Resources {
         mfaStatusPath: OAUTH.mfaStatusPath,
         captchaPath: OAUTH.captchaPath,
         operationMfa: OPERATION_MFA,
+        logout: LOGOUT,
+        language: options.language,
+        shapes: DECIMALS,
         store: options.tokenStore ?? new MemoryTokenStore(),
         username: options.username,
         password: options.password,
@@ -111,7 +127,8 @@ export class Whitebird extends Resources {
   /**
    * Operation MFA token, sent as `x-mfa-token` with every request while set. Sensitive
    * operations such as withdrawals need it: {@link Whitebird.confirmOperation} sets it, and so
-   * does the client on its own when `otp` is configured. Set it to `undefined` to stop sending it.
+   * does the client on its own when such an operation is refused and `otp` is configured. Set it
+   * to `undefined` to stop sending it.
    */
   get mfaToken(): string | undefined {
     return this._client.mfaToken;
@@ -125,8 +142,9 @@ export class Whitebird extends Resources {
    * Confirms a sensitive operation with a two-factor code: exchanges the code for an operation
    * MFA token, which is then sent with every request (see {@link Whitebird.mfaToken}).
    *
-   * With `otp` configured there is no need to call this: operations that need a token get one
-   * before they are sent, and a new one when theirs is refused.
+   * With `otp` configured there is no need to call this: when the API refuses an operation for
+   * want of a token, the client gets one with a code from `otp` and sends the operation again.
+   * Concurrent operations refused together share one confirmation.
    *
    * @param operation - Operation to confirm, such as `WITHDRAWAL`.
    * @param code - Current two-factor code. @defaultValue the next code of `otp`
@@ -145,21 +163,30 @@ export class Whitebird extends Resources {
   }
 
   /**
-   * Logs in now instead of on the first authenticated call.
+   * Logs in now instead of on the first authenticated call, like the web application: asks
+   * whether the account has two-factor authentication, sends the password (with a solved captcha
+   * when it has not) and, when Whitebird asks for it, the two-factor code.
    *
-   * @throws {@link MFARequiredError} if the account has two-factor authentication and no `otp`
-   * is configured.
-   * @throws {@link CaptchaRequiredError} if a captcha must be solved and no `captcha` solver is
-   * configured, or it failed three times.
-   * @throws {@link AuthenticationError} if the credentials or the two-factor code are rejected.
+   * @param code - Two-factor code for this login. @defaultValue the next code of `otp`
+   * @param options - `signal` stops waiting, for example for a code nobody enters.
+   * @throws {@link MFARequiredError} if Whitebird asks for a two-factor code and none is given
+   * or configured.
+   * @throws {@link CaptchaRequiredError} if the account has no two-factor authentication and no
+   * `captcha` solver is configured, or the solved captchas were rejected three times.
+   * @throws {@link AuthenticationError} if there is no account with this username, or the
+   * password or the code is wrong.
    */
-  login(): Promise<void> {
-    return this._client.session.login();
+  login(code?: string, options: Pick<RequestOptions, 'signal'> = {}): Promise<void> {
+    return this._client.session.login(code, options.signal);
   }
 
-  /** Forgets the session and clears the token store. */
-  logout(): Promise<void> {
-    return this._client.session.logout();
+  /**
+   * Signs out: revokes the session on the server when there is one (failures are ignored), then
+   * forgets it, its operation MFA token and the tokens in the token store. Logins and refreshes
+   * in progress no longer count. The next authenticated call logs in again.
+   */
+  logout(options?: RequestOptions): Promise<void> {
+    return this._client.logout(options);
   }
 
   /**
@@ -169,17 +196,17 @@ export class Whitebird extends Resources {
    * @param service - Service key, such as `brokerage`.
    * @param method - HTTP method.
    * @param path - Path from the host root, such as `/api/v1/brokerage/broker/balances`.
-   * @returns The decoded response: parsed JSON by default.
+   * @returns The decoded response: parsed JSON, or the text when the body is not JSON. Numbers
+   * are JavaScript numbers here, since nothing tells which ones are decimals.
    * @throws {@link APIError} (or a subclass) when the API rejects the request.
    * @throws {@link TransportError} when no response arrives.
    *
    * @example
    * ```ts
-   * const methods = await client.request<{ id: string }[]>(
-   *   'brokerage',
-   *   'GET',
-   *   '/api/v1/brokerage/payment/methods',
-   * );
+   * // An endpoint added to Whitebird after this version of the SDK:
+   * const result = await client.request('brokerage', 'POST', '/api/v1/brokerage/new-endpoint', {
+   *   body: { from: new Date('2026-01-01'), amount: '0.15' },
+   * });
    * ```
    */
   request<T = unknown>(
@@ -197,7 +224,7 @@ export class Whitebird extends Resources {
         query,
         body,
         bodyType,
-        responseType,
+        responseType: responseType ?? 'auto',
         auth,
         envelope,
       },

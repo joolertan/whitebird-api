@@ -31,3 +31,15 @@ export const OPERATION_MFA = {
   service: {{ operation_mfa.service | quote }},
   tokenPath: {{ operation_mfa.token_path | quote }},
 } as const;
+
+/** Endpoint that ends the session on the server; {@link Whitebird.logout} calls it. */
+export const LOGOUT: { service: ServiceName; method: string; path: string } | undefined =
+{% if logout %}
+  {
+    service: {{ logout.service | quote }},
+    method: {{ logout.method | quote }},
+    path: {{ logout.path | quote }},
+  };
+{% else %}
+  undefined;
+{% endif %}

@@ -61,12 +61,16 @@ export class Paginator<T> implements PromiseLike<Page<T>>, AsyncIterable<T> {
     return this.#firstPage().then(onFulfilled, onRejected);
   }
 
-  /** Iterates over whole pages instead of items. */
+  /**
+   * Iterates over whole pages instead of items. Stops after the last page, and when the server
+   * answers with another page than the one asked for, as it does when it ignores the page index.
+   */
   async *pages(): AsyncGenerator<Page<T>, void, undefined> {
     let index = this.#start;
     let page = await this.#firstPage();
     const size = page.size ?? page.content.length;
     for (;;) {
+      if (typeof page.number === 'number' && page.number !== index) return;
       yield page;
       if (isLastPage(page, index, size)) return;
       index += 1;
@@ -79,7 +83,14 @@ export class Paginator<T> implements PromiseLike<Page<T>>, AsyncIterable<T> {
   }
 
   #firstPage(): Promise<Page<T>> {
-    this.#first ??= this.#fetchPage(this.#start);
+    if (!this.#first) {
+      const first = this.#fetchPage(this.#start);
+      this.#first = first;
+      // A failed first page is fetched again the next time.
+      first.catch(() => {
+        if (this.#first === first) this.#first = undefined;
+      });
+    }
     return this.#first;
   }
 }

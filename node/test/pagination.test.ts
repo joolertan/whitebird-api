@@ -141,6 +141,29 @@ describe('Paginator', () => {
     ).toEqual([1]);
   });
 
+  it('stops when the server answers with another page than the one asked for', async () => {
+    const requested: number[] = [];
+    const paginator = new Paginator<number>(async (index) => {
+      requested.push(index);
+      return { content: [index], number: 0, last: false } as unknown as Page<number>;
+    });
+    const items: number[] = [];
+    for await (const item of paginator) items.push(item);
+    expect(items).toEqual([0]);
+    expect(requested).toEqual([0, 1]);
+  });
+
+  it('fetches a failed first page again', async () => {
+    let calls = 0;
+    const paginator = new Paginator<number>(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('flaky');
+      return { content: [1], last: true } as unknown as Page<number>;
+    });
+    await expect(paginator).rejects.toThrow('flaky');
+    await expect(paginator).resolves.toMatchObject({ content: [1] });
+  });
+
   it('is typed as a promise of the first page', async () => {
     const whitebird: Pick<Whitebird, 'brokerage'> = client(new MockApi({ [LIST]: orders }));
     const page: Page<{ uuid?: string }> = await whitebird.brokerage.otcOrders.list();

@@ -13,7 +13,7 @@ function stream(chunks: string[], onCancel?: () => void): ReadableStream<Uint8Ar
       for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
       if (!onCancel) controller.close();
     },
-    cancel: onCancel,
+    ...(onCancel && { cancel: onCancel }),
   });
 }
 
@@ -132,6 +132,47 @@ describe('streams', () => {
 
     expect(cancelled).toBe(true);
     expect(api.calls(CONNECT)).toHaveLength(1);
+  });
+
+  it('stop when the server answers 204', async () => {
+    const api = new MockApi({ [CONNECT]: () => new Response(null, { status: 204 }) });
+    await expect(take(subscribe(api), 1)).resolves.toEqual([]);
+    expect(api.calls(CONNECT)).toHaveLength(1);
+  });
+
+  it('reconnect when the answer is not an event stream', async () => {
+    const api = new MockApi({
+      [CONNECT]: [
+        () =>
+          new Response('<html>maintenance</html>', { headers: { 'Content-Type': 'text/html' } }),
+        () => events('retry: 0\ndata: {"orderId":"o-1"}\n\n'),
+      ],
+    });
+    const received = await take(subscribe(api), 1);
+    expect(received[0]?.data).toEqual({ orderId: 'o-1' });
+    expect(api.calls(CONNECT)).toHaveLength(2);
+  });
+
+  it('resume after the last complete event only', async () => {
+    const api = new MockApi({
+      [CONNECT]: [
+        () => events('retry: 0\nid: 7\ndata: {"orderId":"o-1"}\n\nid: 8\ndata: {"orderId":'),
+        () => events('id: 8\ndata: {"orderId":"o-2"}\n\n'),
+      ],
+    });
+    const received = await take(subscribe(api), 2);
+    expect(received.map((event) => event.id)).toEqual(['7', '8']);
+    expect(api.calls(CONNECT).map((r) => r.headers.get('last-event-id'))).toEqual([null, '7']);
+  });
+
+  it('send Accept-Language', async () => {
+    const api = new MockApi({ [CONNECT]: () => events('data: 1\n\n') });
+    const core = (client(api, { language: 'ru' }) as unknown as { _client: Core })._client;
+    await take(
+      core.stream({ service: 'notification', method: 'GET', path: '/api/v1/sse/connect' }),
+      1,
+    );
+    expect(api.calls(CONNECT)[0]?.headers.get('accept-language')).toBe('ru');
   });
 
   it('refresh the token once on 401 or 403, then stop', async () => {

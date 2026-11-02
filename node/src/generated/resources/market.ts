@@ -88,7 +88,7 @@ export class MarketResource extends APIResource {
 
 /** Parameters of {@link MarketResource.instruments}. */
 export interface MarketInstrumentsParams {
-  category?: MarketCategory;
+  category?: MarketCategory | undefined;
 }
 
 /** Parameters of {@link MarketResource.orderbook}. */
@@ -96,7 +96,7 @@ export interface MarketOrderbookParams {
   /** Instrument symbol without separator, e.g. `BTCUSDT`. */
   symbol: string;
   /** Number of price levels per side (500 observed to work). */
-  limit?: number;
+  limit?: number | undefined;
 }
 
 /** Parameters of {@link MarketResource.klines}. */
@@ -106,9 +106,9 @@ export interface MarketKlinesParams {
   /** Candle interval. The Bybit spellings (`1`, `60`, `D`, ...) are accepted too. */
   interval: MarketKlineInterval;
   /** Start of the range, epoch milliseconds. */
-  start?: number;
+  start?: number | undefined;
   /** End of the range, epoch milliseconds. */
-  end?: number;
+  end?: number | undefined;
   /** Maximum number of candles. The web terminal asks for 3500. */
-  limit?: number;
+  limit?: number | undefined;
 }

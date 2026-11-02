@@ -1,0 +1,15 @@
+// {{ HEADER }}
+
+import type { Shapes } from '../json.js';
+
+/**
+ * Where decimal numbers sit in the models that hold them, so that they are read and sent with
+ * their exact digits.
+ *
+ * @internal
+ */
+export const DECIMALS: Shapes = {
+{% for name, fields in models %}
+  {{ name | key }}: { {{ fields }} },
+{% endfor %}
+};

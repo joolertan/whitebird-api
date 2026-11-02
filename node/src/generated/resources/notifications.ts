@@ -38,6 +38,7 @@ export class NotificationsResource extends APIResource {
         path: '/api/v1/notifications/events/search',
         query: { page, size, sort },
         body,
+        defaults: { query: { page: 0 } },
       },
       options,
     );
@@ -71,8 +72,7 @@ export class NotificationsResource extends APIResource {
    * Server-Sent Events stream of account updates (order progress, balance operations, KYC
    * applicant and client status). The web app opens it with `fetch` (not `EventSource`) so it
    * can send `Authorization: Bearer <access token>` and `Accept-Language`; it sends
-   * `Accept: text/event-stream` and optionally `Cache-Control: no-cache, no-store,
-   * must-revalidate` / `Pragma: no-cache`.
+   * `Accept: text/event-stream`.
    *
    * Every message carries a JSON `data` field (`NotificationStreamMessage`); the SSE `event`
    * name is not used for routing, messages are dispatched on `data.type`:
@@ -85,10 +85,10 @@ export class NotificationsResource extends APIResource {
    * - `CLIENT_STATUS_UPDATE`: client status change; `payload` shape not used by the web app.
    *
    * Messages without `data` (keep-alive comments) are ignored. The `id` of the last message
-   * is sent back as `Last-Event-ID` on reconnect. The web app reconnects with backoff
-   * 1 s x 4^(n-1), capped at 30 s; 401/403 are fatal (re-authenticate before reconnecting).
-   * It also reconnects when the UI language changes, since the server localises messages
-   * by `Accept-Language`.
+   * is sent back as `Last-Event-ID` on reconnect. After an error the web app reconnects with
+   * backoff 1 s x 4^(n-1), capped at 30 s; 401/403 are fatal (re-authenticate before
+   * reconnecting). It does not reconnect when the server ends the stream cleanly. The server
+   * localises messages by `Accept-Language`.
    *
    * `GET /api/v1/sse/connect`
    *
@@ -106,10 +106,13 @@ export class NotificationsResource extends APIResource {
 
 /** Parameters of {@link NotificationsResource.search}. */
 export interface NotificationsSearchParams extends NotificationSearchRequest {
-  /** Zero-based page index. */
-  page?: number;
+  /**
+   * Zero-based page index.
+   * @defaultValue `0`, sent when not set
+   */
+  page?: number | undefined;
   /** Page size (the web app uses 5). */
-  size?: number;
+  size?: number | undefined;
   /** Sort expression `property,direction`, e.g. `creationDate,DESC`. */
-  sort?: string;
+  sort?: string | undefined;
 }

@@ -43,7 +43,12 @@ describe('error responses', () => {
       'VerificationRequiredError',
     ],
     [401, {}, AuthenticationError, 'AuthenticationError'],
-    [400, { status: 'MFA_CHECKING_REQUIRED' }, MFARequiredError, 'MFARequiredError'],
+    [
+      403,
+      { status: 'Operation denied, requires mfa checking', message: 'Forbidden' },
+      MFARequiredError,
+      'MFARequiredError',
+    ],
     [
       403,
       { message: 'Operation denied, requires mfa checking' },
@@ -103,6 +108,23 @@ describe('error responses', () => {
     }
   });
 
+  it('reads retCode and retMsg of error envelopes', async () => {
+    const api = new MockApi({
+      [PUBLIC]: () => Response.json({ retCode: 10001, retMsg: 'Invalid symbol' }, { status: 400 }),
+    });
+    await expect(call(api)).rejects.toMatchObject({ code: 10001, message: 'Invalid symbol' });
+  });
+
+  it('keeps the start of a text body as the message', async () => {
+    const page = `<html>\n  <body>Bad gateway: upstream ${'x'.repeat(300)}</body></html>`;
+    const api = new MockApi({ [PUBLIC]: () => new Response(page, { status: 502 }) });
+
+    const error = (await call(api).catch((e: unknown) => e)) as Error;
+
+    expect(error.message).toMatch(/^<html> <body>Bad gateway: upstream x+…$/);
+    expect(error.message.length).toBeLessThanOrEqual(201);
+  });
+
   it('reads Retry-After of rate limit errors', async () => {
     const api = new MockApi({
       [PUBLIC]: () => new Response('slow down', { status: 429, headers: { 'Retry-After': '7' } }),
@@ -140,14 +162,48 @@ describe('retries', () => {
     expect(api.calls(PUBLIC)).toHaveLength(2);
   });
 
-  it('never retries POST unless marked idempotent', async () => {
-    const api = new MockApi({ 'POST /public': [unavailable, ok, unavailable, ok] });
-    const whitebird = client(api, { baseUrls: { brokerage: 'https://api.test' } });
-    const post = (idempotent?: boolean) =>
-      whitebird.request('brokerage', 'POST', '/public', { auth: false, idempotent });
+  it('does not retry other methods on server errors unless marked idempotent', async () => {
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      const api = new MockApi({ [`${method} /public`]: [unavailable, ok, unavailable, ok] });
+      const whitebird = client(api, { baseUrls: { brokerage: 'https://api.test' } });
+      const send = (idempotent?: boolean) =>
+        whitebird.request('brokerage', method, '/public', { auth: false, idempotent });
 
-    await expect(post()).rejects.toBeInstanceOf(ServerError);
-    await expect(post(true)).resolves.toEqual({ ok: true });
+      await expect(send()).rejects.toBeInstanceOf(ServerError);
+      await expect(send(true)).resolves.toEqual({ ok: true });
+    }
+  });
+
+  it('retries other methods on 429 and on connections that failed before sending', async () => {
+    const limited = () => new Response(null, { status: 429, headers: { 'Retry-After': '0' } });
+    const refused = () => {
+      throw new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      });
+    };
+    const reset = () => {
+      throw new TypeError('fetch failed', {
+        cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+      });
+    };
+    const api = new MockApi({ 'POST /public': [limited, ok, refused, ok, reset, ok] });
+    const whitebird = client(api, { baseUrls: { brokerage: 'https://api.test' } });
+    const post = () => whitebird.request('brokerage', 'POST', '/public', { auth: false });
+    vi.useFakeTimers();
+    const settle = async (result: Promise<unknown>) => {
+      const outcome = result.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      return outcome;
+    };
+
+    expect(await settle(post())).toEqual({ value: { ok: true } });
+    expect(await settle(post())).toEqual({ value: { ok: true } });
+    const unsure = await settle(post());
+    expect((unsure as { error: unknown }).error).toBeInstanceOf(TransportError);
+    expect(api.calls('POST /public')).toHaveLength(5);
   });
 
   it('does not retry client errors', async () => {

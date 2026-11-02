@@ -1,15 +1,30 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { type Captcha, type TokenStore, Whitebird } from 'whitebird-api';
 import { totp } from 'whitebird-api/otp';
 
-/** Keeps the session in a JSON file, so that only the first run logs in. */
+/**
+ * Keeps the session in a JSON file readable only by its owner, so that only the first run logs
+ * in. A missing or damaged file means no session; the file is replaced atomically.
+ */
 export function fileTokenStore(path: URL): TokenStore {
   return {
-    load: () => readFile(path, 'utf8').then(JSON.parse, () => undefined),
-    save: (tokens) => writeFile(path, JSON.stringify(tokens), { mode: 0o600 }),
+    load: () =>
+      readFile(path, 'utf8')
+        .then(JSON.parse)
+        .catch(() => undefined),
+    async save(tokens) {
+      const temporary = new URL(`${path.href}.${randomUUID()}.tmp`);
+      try {
+        await writeFile(temporary, JSON.stringify(tokens), { mode: 0o600, flush: true });
+        await rename(temporary, path);
+      } finally {
+        await rm(temporary, { force: true });
+      }
+    },
     clear: () => rm(path, { force: true }),
   };
 }

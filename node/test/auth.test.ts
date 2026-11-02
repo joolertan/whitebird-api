@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   AuthenticationError,
+  BadRequestError,
   type Captcha,
   CaptchaRequiredError,
   MemoryTokenStore,
   MFARequiredError,
+  ServerError,
 } from '../src/index.js';
 import { bearer, client, form, jwt, MockApi, tokenResponse } from './helpers.js';
 
@@ -21,8 +23,9 @@ const captchaImages = () =>
     puzzlePiece: `data:image/png;base64,${btoa('\x04')}`,
     positionY: 42,
   });
-const withMfa = () => Response.json({ mfaEnabled: true });
 const withoutMfa = () => Response.json({ mfaEnabled: false });
+/** The answer of the token endpoint to a password grant without the code of a 2FA account. */
+const askForCode = () => Response.json({ mfaEnabled: true });
 const invalidCaptcha = () =>
   Response.json({ status: 'INVALID_CAPTCHA', message: 'Invalid captcha' }, { status: 400 });
 const mfaDenied = () =>
@@ -53,42 +56,68 @@ describe('login', () => {
       username: 'trader@example.com',
       password: 'secret',
     });
-    expect(await api.calls(MFA_CHECK)[0]?.json()).toEqual({ username: 'trader@example.com' });
     expect(bearer(api.calls(ME)[0] as Request)).toBe(access);
   });
 
-  it('sends the code to accounts with 2FA', async () => {
-    const api = new MockApi({ [MFA_CHECK]: withMfa, [ME]: subaccount });
-    await client(api, { otp: '123456' }).brokerage.subaccounts.me();
-
-    expect(api.calls(MFA_CHECK)).toHaveLength(1);
-    expect(await form(api.calls(TOKEN)[0] as Request)).toMatchObject({ code: '123456' });
-    expect(api.calls(TOKEN)[0]?.headers.has('captcha')).toBe(false);
+  it('checks for 2FA with the username as typed', async () => {
+    const api = new MockApi();
+    await client(api).login();
+    expect(await api.calls(MFA_CHECK)[0]?.json()).toEqual({ username: 'Trader@Example.com' });
   });
 
-  it('still sends the code when the 2FA status check fails', async () => {
-    const api = new MockApi({ [MFA_CHECK]: () => new Response(null, { status: 500 }) });
+  it('sends the code in a second grant when the account asks for it', async () => {
+    const otp = vi.fn(() => ' 123456 ');
+    const api = new MockApi({ [TOKEN]: [askForCode, () => Response.json(tokenResponse())] });
 
-    await client(api, { otp: '123456', maxRetries: 0 }).login();
+    await client(api, { otp }).login();
 
-    expect(api.calls(MFA_CHECK)).toHaveLength(1);
-    expect(await form(api.calls(TOKEN)[0] as Request)).toMatchObject({ code: '123456' });
+    const [first, second] = await Promise.all(api.calls(TOKEN).map(form));
+    expect(first).not.toHaveProperty('code');
+    expect(second).toEqual({
+      grant_type: 'password',
+      username: 'trader@example.com',
+      password: 'secret',
+      code: '123456',
+    });
+    expect(otp).toHaveBeenCalledTimes(1);
+    expect(api.calls(TOKEN).some((r) => r.headers.has('captcha'))).toBe(false);
+  });
+
+  it('does not ask for a code when the first grant returns tokens', async () => {
+    const otp = vi.fn(() => '123456');
+    const api = new MockApi();
+
+    await client(api, { otp }).login();
+
+    expect(otp).not.toHaveBeenCalled();
+    expect(api.calls(TOKEN)).toHaveLength(1);
   });
 
   it('asks the code provider for a fresh code on every login', async () => {
     const otp = vi.fn().mockResolvedValueOnce('111111').mockResolvedValueOnce('222222');
-    const api = new MockApi();
+    const tokens = () => Response.json(tokenResponse());
+    const api = new MockApi({ [TOKEN]: [askForCode, tokens, askForCode, tokens] });
     const whitebird = client(api, { otp });
 
     await whitebird.login();
     await whitebird.login();
 
     const codes = await Promise.all(api.calls(TOKEN).map(async (r) => (await form(r)).code));
-    expect(codes).toEqual(['111111', '222222']);
+    expect(codes).toEqual([undefined, '111111', undefined, '222222']);
   });
 
-  it('raises MFARequiredError before logging in when 2FA is on and no code is configured', async () => {
-    const api = new MockApi({ [MFA_CHECK]: () => Response.json({ mfaEnabled: true }) });
+  it('uses the code passed to login()', async () => {
+    const otp = vi.fn(() => '111111');
+    const api = new MockApi({ [TOKEN]: [askForCode, () => Response.json(tokenResponse())] });
+
+    await client(api, { otp }).login('999999');
+
+    expect((await form(api.calls(TOKEN)[1] as Request)).code).toBe('999999');
+    expect(otp).not.toHaveBeenCalled();
+  });
+
+  it('raises MFARequiredError when a code is asked for and none is configured', async () => {
+    const api = new MockApi({ [TOKEN]: askForCode });
 
     const error = await client(api)
       .login()
@@ -97,27 +126,20 @@ describe('login', () => {
     expect(error).toBeInstanceOf(MFARequiredError);
     expect(error).toBeInstanceOf(AuthenticationError);
     expect((error as Error).message).toMatch(/otp/);
-    expect(api.calls(TOKEN)).toHaveLength(0);
+    expect(api.calls(TOKEN)).toHaveLength(1);
   });
 
-  it('raises MFARequiredError when the token endpoint asks for a code', async () => {
-    const api = new MockApi({
-      [MFA_CHECK]: () => new Response(null, { status: 404 }),
-      [TOKEN]: () => Response.json({ mfaEnabled: true }),
-    });
-    await expect(client(api).login()).rejects.toBeInstanceOf(MFARequiredError);
-  });
-
-  it('treats invalid_grant as a missing code when the MFA check is unavailable', async () => {
-    const api = new MockApi({
-      [MFA_CHECK]: () => new Response(null, { status: 500 }),
-      [TOKEN]: () =>
-        Response.json(
-          { error: 'invalid_grant', error_description: 'Bad credentials' },
-          { status: 400 },
-        ),
-    });
-    await expect(client(api, { maxRetries: 0 }).login()).rejects.toBeInstanceOf(MFARequiredError);
+  it('reports a rejected code as AuthenticationError', async () => {
+    const invalidCode = () =>
+      Response.json({ status: 'INVALID_CODE', message: 'Invalid code' }, { status: 400 });
+    for (const rejection of [invalidCode, askForCode]) {
+      const api = new MockApi({ [TOKEN]: [askForCode, rejection] });
+      const error = await client(api, { otp: '000000' })
+        .login()
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(AuthenticationError);
+      expect(error).not.toBeInstanceOf(MFARequiredError);
+    }
   });
 
   it('reports wrong credentials as AuthenticationError', async () => {
@@ -144,29 +166,88 @@ describe('login', () => {
     });
   });
 
-  it('reports a rejected code as AuthenticationError', async () => {
-    const invalidGrant = new MockApi({
-      [TOKEN]: () =>
-        Response.json(
-          { error: 'invalid_grant', error_description: 'Invalid code' },
-          { status: 400 },
-        ),
+  it('keeps the class of blocked and rate-limited logins', async () => {
+    const api = new MockApi({
+      [TOKEN]: () => Response.json({ status: 'USER_BLOCKED' }, { status: 400 }),
     });
-    const askedAgain = new MockApi({ [TOKEN]: () => Response.json({ mfaEnabled: true }) });
+    const error = await client(api)
+      .login()
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(BadRequestError);
+    expect(error).not.toBeInstanceOf(AuthenticationError);
+  });
 
-    for (const api of [invalidGrant, askedAgain]) {
-      const error = await client(api, { otp: '000000' })
+  it('never sends the password for an unknown username', async () => {
+    for (const unknown of [
+      () => Response.json({ status: 'NOT_FOUND', message: 'User not found' }, { status: 404 }),
+      () => Response.json({ status: 'NOT_FOUND' }),
+    ]) {
+      const api = new MockApi({ [MFA_CHECK]: unknown });
+      const error = await client(api, { otp: '123456', captcha: () => 10 })
         .login()
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(AuthenticationError);
       expect(error).not.toBeInstanceOf(MFARequiredError);
+      expect((error as Error).message).toMatch(/no Whitebird account/);
+      expect(api.calls(TOKEN)).toHaveLength(0);
     }
   });
 
-  it('needs credentials or a stored session', async () => {
+  it('never sends the password when the 2FA status check fails', async () => {
+    const api = new MockApi({ [MFA_CHECK]: () => new Response(null, { status: 500 }) });
+
+    const error = await client(api, { otp: '123456', maxRetries: 0 })
+      .login()
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ServerError);
+    expect(api.calls(TOKEN)).toHaveLength(0);
+  });
+
+  it('treats a missing mfaEnabled as an account without 2FA', async () => {
+    const api = new MockApi({ [MFA_CHECK]: () => Response.json({ mfaEnabled: null }) });
+    await expect(client(api, { otp: '123456' }).login()).rejects.toBeInstanceOf(
+      CaptchaRequiredError,
+    );
+    expect(api.calls(TOKEN)).toHaveLength(0);
+  });
+
+  it('needs credentials or a stored session, before any request', async () => {
+    const captcha = vi.fn(() => 10);
     const api = new MockApi({ [ME]: subaccount });
-    const anonymous = client(api, { username: undefined, password: undefined });
+    const anonymous = client(api, { username: undefined, password: undefined, captcha });
     await expect(anonymous.brokerage.subaccounts.me()).rejects.toThrow(/username/);
+    expect(api.requests).toHaveLength(0);
+    expect(captcha).not.toHaveBeenCalled();
+  });
+
+  it('sends Accept-Language with sign-in and API requests', async () => {
+    const api = new MockApi({ [ME]: subaccount });
+    await client(api, { language: 'en' }).brokerage.subaccounts.me();
+    expect(api.requests.map((r) => r.headers.get('accept-language'))).toEqual(['en', 'en', 'en']);
+  });
+
+  it('stops waiting for a login when the signal aborts, and starts over next time', async () => {
+    let answer: (code: string) => void = () => {};
+    const otp = vi
+      .fn<() => Promise<string>>()
+      .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+      .mockResolvedValueOnce('222222');
+    const api = new MockApi({
+      [TOKEN]: [askForCode, askForCode, () => Response.json(tokenResponse())],
+      [ME]: subaccount,
+    });
+    const whitebird = client(api, { otp });
+    const controller = new AbortController();
+
+    const stuck = whitebird.brokerage.subaccounts.me({ signal: controller.signal });
+    await vi.waitFor(() => expect(otp).toHaveBeenCalledTimes(1));
+    controller.abort();
+    await expect(stuck).rejects.toMatchObject({ name: 'AbortError' });
+
+    await expect(whitebird.brokerage.subaccounts.me()).resolves.toEqual({ uuid: 'sub-1' });
+    expect((await form(api.calls(TOKEN)[2] as Request)).code).toBe('222222');
+    answer('111111');
   });
 });
 
@@ -189,7 +270,8 @@ describe('captcha', () => {
       puzzlePiece: new Uint8Array([4]),
       positionY: 42,
     });
-    expect(captchaAnswer(api.calls(TOKEN)[0])).toEqual({ sliderPosition: 120, requestId });
+    // Like the web app, which sends the value of its range input.
+    expect(captchaAnswer(api.calls(TOKEN)[0])).toEqual({ sliderPosition: '120', requestId });
   });
 
   it('is solved again when rejected', async () => {
@@ -203,7 +285,7 @@ describe('captcha', () => {
 
     const ids = api.calls(CAPTCHA).map((r) => new URL(r.url).searchParams.get('requestId'));
     const answers = api.calls(TOKEN).map(captchaAnswer);
-    expect(answers).toEqual(ids.map((requestId) => ({ sliderPosition: 10, requestId })));
+    expect(answers).toEqual(ids.map((requestId) => ({ sliderPosition: '10', requestId })));
     expect(new Set(ids).size).toBe(2);
   });
 
@@ -224,20 +306,6 @@ describe('captcha', () => {
     expect(api.calls(CAPTCHA)).toHaveLength(3);
   });
 
-  it('raises CaptchaRequiredError when a captcha is needed and no solver is configured', async () => {
-    const api = new MockApi({ [TOKEN]: invalidCaptcha });
-
-    const error = await client(api)
-      .login()
-      .catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(CaptchaRequiredError);
-    expect(error).toBeInstanceOf(AuthenticationError);
-    expect((error as Error).message).toMatch(/`captcha` solver/);
-    expect(api.calls(TOKEN)[0]?.headers.has('captcha')).toBe(false);
-    expect(api.calls(TOKEN)).toHaveLength(1);
-  });
-
   it('is required before sending the password when the account has no 2FA', async () => {
     const otp = vi.fn(() => '123456');
     const api = new MockApi({ [MFA_CHECK]: withoutMfa });
@@ -247,42 +315,47 @@ describe('captcha', () => {
       .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(CaptchaRequiredError);
+    expect(error).toBeInstanceOf(AuthenticationError);
     expect((error as Error).message).toMatch(/captcha solver/);
     expect(otp).not.toHaveBeenCalled();
     expect(api.calls(TOKEN)).toHaveLength(0);
   });
 
-  it('replaces the code for accounts without 2FA', async () => {
-    const otp = vi.fn(() => '123456');
-    const api = new MockApi({ [MFA_CHECK]: withoutMfa, [CAPTCHA]: captchaImages });
+  it('is followed by the code step when the account asks for a code anyway', async () => {
+    const api = new MockApi({
+      [MFA_CHECK]: withoutMfa,
+      [CAPTCHA]: captchaImages,
+      [TOKEN]: [askForCode, () => Response.json(tokenResponse())],
+    });
 
-    await client(api, { otp, captcha: () => 10 }).login();
+    await client(api, { otp: '123456', captcha: () => 10 }).login();
 
-    expect(otp).not.toHaveBeenCalled();
-    expect(await form(api.calls(TOKEN)[0] as Request)).not.toHaveProperty('code');
-    expect(captchaAnswer(api.calls(TOKEN)[0])).toMatchObject({ sliderPosition: 10 });
+    const [first, second] = api.calls(TOKEN);
+    expect(captchaAnswer(first)).toMatchObject({ sliderPosition: '10' });
+    expect(await form(first as Request)).not.toHaveProperty('code');
+    expect(await form(second as Request)).toMatchObject({ code: '123456' });
+    expect(second?.headers.has('captcha')).toBe(false);
   });
 
   it('is not solved for accounts with 2FA', async () => {
     const solver = vi.fn(() => 10);
-    const api = new MockApi({ [MFA_CHECK]: () => Response.json({ mfaEnabled: true }) });
+    const api = new MockApi({ [TOKEN]: [askForCode, () => Response.json(tokenResponse())] });
 
     await client(api, { otp: '123456', captcha: solver }).login();
 
     expect(solver).not.toHaveBeenCalled();
-    expect(api.calls(TOKEN)[0]?.headers.has('captcha')).toBe(false);
-    expect(await form(api.calls(TOKEN)[0] as Request)).toMatchObject({ code: '123456' });
+    expect(api.calls(TOKEN).some((r) => r.headers.has('captcha'))).toBe(false);
   });
 });
 
 describe('refresh', () => {
-  it('refreshes proactively when the token expires within 30 seconds', async () => {
+  it('refreshes proactively when the token expires within a minute', async () => {
     const fresh = jwt(3600);
     const api = new MockApi({
       [TOKEN]: () => Response.json(tokenResponse(fresh, 'refresh-2')),
       [ME]: subaccount,
     });
-    const store = new MemoryTokenStore({ accessToken: jwt(10), refreshToken: 'refresh-1' });
+    const store = new MemoryTokenStore({ accessToken: jwt(50), refreshToken: 'refresh-1' });
     await client(api, { tokenStore: store }).brokerage.subaccounts.me();
 
     expect(await form(api.calls(TOKEN)[0] as Request)).toEqual({
@@ -357,7 +430,7 @@ describe('refresh', () => {
     expect(grants).toEqual(['refresh_token', 'password']);
   });
 
-  it('fails when the refresh token is rejected and no password is known', async () => {
+  it('fails and forgets the session when the refresh token is rejected and no password is known', async () => {
     const api = new MockApi({
       [TOKEN]: () => Response.json({ error: 'invalid_grant' }, { status: 400 }),
       [ME]: subaccount,
@@ -366,6 +439,72 @@ describe('refresh', () => {
     const whitebird = client(api, { tokenStore: store, password: undefined });
 
     await expect(whitebird.brokerage.subaccounts.me()).rejects.toBeInstanceOf(AuthenticationError);
+    expect(store.load()).toBeUndefined();
+  });
+
+  it('does not log in again when the refresh fails for another reason', async () => {
+    const api = new MockApi({
+      [TOKEN]: () => new Response(null, { status: 503 }),
+      [ME]: subaccount,
+    });
+    const store = new MemoryTokenStore({ accessToken: jwt(0), refreshToken: 'refresh-1' });
+
+    const error = await client(api, { tokenStore: store, maxRetries: 0 })
+      .brokerage.subaccounts.me()
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ServerError);
+    expect(api.calls(MFA_CHECK)).toHaveLength(0);
+    expect(store.load()).toMatchObject({ refreshToken: 'refresh-1' });
+  });
+
+  it('keeps the refresh token when the refresh returns none', async () => {
+    const fresh = jwt(3600);
+    const api = new MockApi({
+      [TOKEN]: () => Response.json({ access_token: fresh, expires_in: 3600 }),
+      [ME]: subaccount,
+    });
+    const store = new MemoryTokenStore({ accessToken: jwt(0), refreshToken: 'refresh-1' });
+
+    await client(api, { tokenStore: store }).brokerage.subaccounts.me();
+
+    expect(store.load()).toMatchObject({ accessToken: fresh, refreshToken: 'refresh-1' });
+  });
+
+  it('skips an expired refresh token and logs in with the password', async () => {
+    const api = new MockApi({ [ME]: subaccount });
+    const store = new MemoryTokenStore({ accessToken: jwt(0), refreshToken: jwt(-10) });
+
+    await client(api, { tokenStore: store }).brokerage.subaccounts.me();
+
+    const grants = await Promise.all(api.calls(TOKEN).map(async (r) => (await form(r)).grant_type));
+    expect(grants).toEqual(['password']);
+  });
+
+  it('uses a token about to expire when it cannot be renewed', async () => {
+    const access = jwt(30);
+    const api = new MockApi({ [ME]: subaccount });
+    const store = new MemoryTokenStore({ accessToken: access });
+
+    await client(api, { tokenStore: store, password: undefined }).brokerage.subaccounts.me();
+
+    expect(api.calls(TOKEN)).toHaveLength(0);
+    expect(bearer(api.calls(ME)[0] as Request)).toBe(access);
+  });
+
+  it('adopts a session another process renewed instead of refreshing', async () => {
+    const renewed = jwt(3600, 'renewed');
+    const api = new MockApi({ [ME]: subaccount });
+    const store = new MemoryTokenStore({ accessToken: jwt(10), refreshToken: 'refresh-1' });
+    const whitebird = client(api, { tokenStore: store });
+    const original = store.load.bind(store);
+    let loads = 0;
+    store.load = () => (++loads === 1 ? original() : { accessToken: renewed });
+
+    await whitebird.brokerage.subaccounts.me();
+
+    expect(api.calls(TOKEN)).toHaveLength(0);
+    expect(bearer(api.calls(ME)[0] as Request)).toBe(renewed);
   });
 });
 
@@ -381,21 +520,60 @@ describe('token store', () => {
     expect(bearer(api.calls(ME)[0] as Request)).toBe(access);
   });
 
-  it('saves tokens after login and clears them on logout', async () => {
+  it('saves tokens after login', async () => {
     const access = jwt(3600);
     const api = new MockApi({ [TOKEN]: () => Response.json(tokenResponse(access)) });
     const store = new MemoryTokenStore();
-    const whitebird = client(api, { tokenStore: store });
 
-    await whitebird.login();
+    await client(api, { tokenStore: store }).login();
+
     expect(store.load()).toEqual({
       accessToken: access,
       refreshToken: 'refresh-1',
       expiresAt: expect.any(Number),
     });
+  });
 
-    await whitebird.logout();
-    expect(store.load()).toBeUndefined();
+  it('ignores saved data that is not a session', async () => {
+    for (const saved of [{ accessToken: 42 }, 'garbage', { refreshToken: 'r' }, null]) {
+      const api = new MockApi({ [ME]: subaccount });
+      const store = { load: () => saved as never, save: () => {}, clear: () => {} };
+      await client(api, { tokenStore: store }).brokerage.subaccounts.me();
+      expect(api.calls(TOKEN)).toHaveLength(1);
+    }
+  });
+
+  it('loads again after a failed load', async () => {
+    const access = jwt(3600);
+    const load = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('disk not ready'))
+      .mockResolvedValue({ accessToken: access });
+    const api = new MockApi({ [ME]: subaccount });
+    const whitebird = client(api, { tokenStore: { load, save: () => {}, clear: () => {} } });
+
+    await expect(whitebird.brokerage.subaccounts.me()).rejects.toThrow('disk not ready');
+    await expect(whitebird.brokerage.subaccounts.me()).resolves.toEqual({ uuid: 'sub-1' });
+    expect(bearer(api.calls(ME)[0] as Request)).toBe(access);
+    expect(api.calls(TOKEN)).toHaveLength(0);
+  });
+
+  it('does not fail the call when saving fails', async () => {
+    const warnings = (globalThis as unknown as { process: { emitWarning(text: string): void } })
+      .process;
+    const warning = vi.spyOn(warnings, 'emitWarning').mockImplementation(() => {});
+    const api = new MockApi({ [ME]: subaccount });
+    const store = {
+      load: () => undefined,
+      save: () => Promise.reject(new Error('read-only')),
+      clear: () => {},
+    };
+
+    await expect(client(api, { tokenStore: store }).brokerage.subaccounts.me()).resolves.toEqual({
+      uuid: 'sub-1',
+    });
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('read-only'));
+    warning.mockRestore();
   });
 
   it('accepts asynchronous stores', async () => {
@@ -412,6 +590,121 @@ describe('token store', () => {
     await client(api, { tokenStore: store }).brokerage.subaccounts.me();
 
     expect(saved).toHaveLength(1);
+  });
+});
+
+describe('logout', () => {
+  const LOGOUT = 'POST /api/v1/user/logout';
+
+  it('revokes the session on the server and forgets it', async () => {
+    const access = jwt(3600);
+    const api = new MockApi({ [LOGOUT]: () => new Response(null), [ME]: subaccount });
+    const store = new MemoryTokenStore({ accessToken: access, refreshToken: 'refresh-1' });
+    const whitebird = client(api, { tokenStore: store });
+    whitebird.mfaToken = 'mfa-1';
+
+    await whitebird.logout();
+
+    expect(bearer(api.calls(LOGOUT)[0] as Request)).toBe(access);
+    expect(store.load()).toBeUndefined();
+    expect(whitebird.mfaToken).toBeUndefined();
+    await whitebird.brokerage.subaccounts.me();
+    expect(api.calls(TOKEN)).toHaveLength(1);
+  });
+
+  it('forgets the session even when the server fails, and does not log in to log out', async () => {
+    const failing = new MockApi({ [LOGOUT]: () => new Response(null, { status: 500 }) });
+    const store = new MemoryTokenStore({ accessToken: jwt(3600) });
+    await client(failing, { tokenStore: store }).logout();
+    expect(store.load()).toBeUndefined();
+
+    const anonymous = new MockApi();
+    await client(anonymous).logout();
+    expect(anonymous.requests).toHaveLength(0);
+  });
+
+  it('drops the result of a login in progress', async () => {
+    let release: () => void = () => {};
+    const api = new MockApi({
+      [TOKEN]: () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(Response.json(tokenResponse()));
+        }),
+    });
+    const store = new MemoryTokenStore();
+    const whitebird = client(api, { tokenStore: store });
+
+    const login = whitebird.login();
+    await vi.waitFor(() => expect(api.calls(TOKEN)).toHaveLength(1));
+    await whitebird.logout();
+    release();
+    await login;
+
+    expect(store.load()).toBeUndefined();
+  });
+
+  it('is what user.logout() does too, whatever the answer', async () => {
+    const api = new MockApi({ [LOGOUT]: () => new Response(null, { status: 500 }) });
+    const store = new MemoryTokenStore({ accessToken: jwt(3600) });
+    const whitebird = client(api, { tokenStore: store, maxRetries: 0 });
+
+    await expect(whitebird.user.logout()).rejects.toBeInstanceOf(ServerError);
+    expect(store.load()).toBeUndefined();
+  });
+});
+
+describe('password change', () => {
+  const CHANGE = 'POST /api/v1/user/password/change-and-reauthorize';
+
+  it('keeps the new tokens and the new password', async () => {
+    const renewed = jwt(3600, 'renewed');
+    const api = new MockApi({
+      [CHANGE]: () => Response.json({ access_token: renewed, refresh_token: 'refresh-9' }),
+      [ME]: subaccount,
+    });
+    const store = new MemoryTokenStore({ accessToken: jwt(3600), refreshToken: 'refresh-1' });
+    const whitebird = client(api, { tokenStore: store });
+
+    await whitebird.user.password.change({ oldPassword: 'secret', newPassword: 'Secret-2' });
+    await whitebird.brokerage.subaccounts.me();
+
+    expect(store.load()).toMatchObject({ accessToken: renewed, refreshToken: 'refresh-9' });
+    expect(bearer(api.calls(ME)[0] as Request)).toBe(renewed);
+
+    store.clear();
+    await whitebird.logout();
+    await whitebird.login();
+    expect((await form(api.calls(TOKEN)[0] as Request)).password).toBe('Secret-2');
+  });
+
+  it('is ignored when the session ended while it was under way', async () => {
+    const store = new MemoryTokenStore({ accessToken: jwt(3600), refreshToken: 'refresh-1' });
+    let whitebird: ReturnType<typeof client> | undefined;
+    const api = new MockApi({
+      [CHANGE]: async () => {
+        await whitebird?.logout(); // a logout elsewhere meanwhile
+        return Response.json({ access_token: jwt(3600, 'renewed') });
+      },
+      'POST /api/v1/user/logout': () => new Response(null, { status: 200 }),
+    });
+    whitebird = client(api, { tokenStore: store });
+
+    await whitebird.user.password.change({ oldPassword: 'secret', newPassword: 'Secret-2' });
+
+    expect(store.load()).toBeUndefined();
+    await whitebird.login();
+    expect((await form(api.calls(TOKEN)[0] as Request)).password).toBe('secret');
+  });
+
+  it('keeps the refresh token when the reply has none', async () => {
+    const renewed = jwt(3600, 'renewed');
+    const api = new MockApi({ [CHANGE]: () => Response.json({ access_token: renewed }) });
+    const store = new MemoryTokenStore({ accessToken: jwt(3600), refreshToken: 'refresh-1' });
+    const whitebird = client(api, { tokenStore: store });
+
+    await whitebird.user.password.change({ oldPassword: 'secret', newPassword: 'Secret-2' });
+
+    expect(store.load()).toMatchObject({ accessToken: renewed, refreshToken: 'refresh-1' });
   });
 });
 
@@ -493,10 +786,10 @@ describe('confirmOperation', () => {
     expect(api.requests).toHaveLength(0);
   });
 
-  it('runs before operations that need a token when otp is configured', async () => {
+  it('is obtained with otp when an operation is refused for want of one', async () => {
     const api = new MockApi({
-      [MFA_TOKEN]: () => Response.json({ mfaToken: 'mfa-1' }),
-      [WITHDRAWAL]: () => Response.json({ id: 'w-1' }),
+      [MFA_TOKEN]: () => Response.json({ mfaToken: ' mfa-1 ' }),
+      [WITHDRAWAL]: [mfaDenied, () => Response.json({ id: 'w-1' })],
     });
 
     await expect(withdraw(client(api, { otp: '123456' }))).resolves.toEqual({ id: 'w-1' });
@@ -505,7 +798,43 @@ describe('confirmOperation', () => {
       operation: 'WITHDRAWAL',
       mfaCode: '123456',
     });
-    expect(api.calls(WITHDRAWAL)[0]?.headers.get('x-mfa-token')).toBe('mfa-1');
+    const sent = api.calls(WITHDRAWAL).map((r) => r.headers.get('x-mfa-token'));
+    expect(sent).toEqual([null, 'mfa-1']);
+  });
+
+  it('is not requested before the API asks for it', async () => {
+    const api = new MockApi({ [WITHDRAWAL]: () => Response.json({ id: 'w-1' }) });
+    await withdraw(client(api, { otp: '123456' }));
+    expect(api.calls(MFA_TOKEN)).toHaveLength(0);
+  });
+
+  it('recognizes the refusal in the status field', async () => {
+    const api = new MockApi({
+      [MFA_TOKEN]: () => Response.json({ mfaToken: 'mfa-1' }),
+      [WITHDRAWAL]: [
+        () =>
+          Response.json(
+            { status: 'Operation denied, requires mfa checking', message: 'Forbidden' },
+            { status: 403 },
+          ),
+        () => Response.json({ id: 'w-1' }),
+      ],
+    });
+    await expect(withdraw(client(api, { otp: '123456' }))).resolves.toEqual({ id: 'w-1' });
+  });
+
+  it('is obtained once for operations refused at the same time', async () => {
+    const api = new MockApi({
+      [MFA_TOKEN]: () => Response.json({ mfaToken: 'mfa-1' }),
+      [WITHDRAWAL]: (request) =>
+        request.headers.get('x-mfa-token') === 'mfa-1' ? Response.json({ id: 'w-1' }) : mfaDenied(),
+    });
+    const whitebird = client(api, { otp: '123456' });
+
+    await Promise.all([withdraw(whitebird), withdraw(whitebird), withdraw(whitebird)]);
+
+    expect(api.calls(MFA_TOKEN)).toHaveLength(1);
+    expect(api.calls(WITHDRAWAL)).toHaveLength(6);
   });
 
   it('runs again once when the token is refused', async () => {
@@ -529,7 +858,7 @@ describe('confirmOperation', () => {
     });
 
     await expect(withdraw(client(api, { otp: '123456' }))).rejects.toBeInstanceOf(MFARequiredError);
-    expect(api.calls(MFA_TOKEN)).toHaveLength(2);
+    expect(api.calls(MFA_TOKEN)).toHaveLength(1);
     expect(api.calls(WITHDRAWAL)).toHaveLength(2);
   });
 });

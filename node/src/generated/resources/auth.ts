@@ -8,7 +8,6 @@ import type {
   AuthGeo,
   AuthMfaStatus,
   AuthMfaStatusRequest,
-  AuthMfaToken,
   AuthMfaTokenRequest,
 } from '../models.js';
 
@@ -30,13 +29,14 @@ export class AuthResource extends APIResource {
    *
    * @experimental
    */
-  createMfaToken(params: AuthMfaTokenRequest, options?: RequestOptions): Promise<AuthMfaToken> {
+  createMfaToken(params: AuthMfaTokenRequest, options?: RequestOptions): Promise<unknown> {
     return this._client.call(
       {
         service: 'api',
         method: 'POST',
         path: '/api/v2/auth/mfa/merchant/client/token',
         body: params,
+        responseType: 'auto',
       },
       options,
     );
@@ -45,9 +45,12 @@ export class AuthResource extends APIResource {
   /**
    * Check whether an account has 2FA enabled
    *
-   * Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without
-   * the slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve the
-   * captcha from `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`.
+   * Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
+   * with 2FA first send the password grant without code and without captcha; when the answer
+   * is `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP
+   * code in `code`. Accounts without 2FA must solve the captcha from
+   * `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`; when this check
+   * fails the web app does not send the password at all.
    *
    * `POST /api/v1/client/mfa`
    *
@@ -68,7 +71,8 @@ export class AuthResource extends APIResource {
    * Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution is
    * the horizontal offset of the piece (the web slider ranges 0-250) and is sent to
    * `POST /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
-   * `base64(JSON.stringify({"sliderPosition": <int>, "requestId": "<requestId>"}))`.
+   * `base64(JSON.stringify({"sliderPosition": "<offset>", "requestId": "<requestId>"}))`. The
+   * sign-in form sends the offset as a string of digits, the registration form as a number.
    * A wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
    * captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
    * temporarily locked.
@@ -109,6 +113,7 @@ export class AuthResource extends APIResource {
         path: '/api/v1/device-fingerprint',
         body: params,
         responseType: 'empty',
+        bodyShape: 'AuthDeviceFingerprint',
       },
       options,
     );
@@ -161,13 +166,13 @@ export interface AuthGenerateCaptchaParams {
 
 /** Parameters of {@link AuthResource.authorize}. */
 export interface AuthAuthorizeParams {
-  response_type?: string;
-  client_id?: string;
-  grant_type?: string;
+  response_type?: string | undefined;
+  client_id?: string | undefined;
+  grant_type?: string | undefined;
   /** Forwarded as-is (standard OAuth parameter */
-  redirect_uri?: string;
+  redirect_uri?: string | undefined;
   /** Forwarded as-is (standard OAuth parameter */
-  scope?: string;
+  scope?: string | undefined;
   /** Forwarded as-is (standard OAuth parameter */
-  state?: string;
+  state?: string | undefined;
 }
