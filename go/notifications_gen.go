@@ -17,7 +17,7 @@ type NotificationsResource struct {
 // [NotificationsResource.SearchPage].
 type NotificationsSearchParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
+	Page int `query:"page" json:"-"`
 	// Page size (the web app uses 5).
 	Size int `query:"size,omitempty" json:"-"`
 	// Sort expression `property,direction`, e.g. `creationDate,DESC`.
@@ -85,8 +85,7 @@ func (r *NotificationsResource) MarkViewed(ctx context.Context, params Notificat
 // Server-Sent Events stream of account updates (order progress, balance operations, KYC applicant
 // and client status). The web app opens it with `fetch` (not `EventSource`) so it can send
 // `Authorization: Bearer <access token>` and `Accept-Language`; it sends `Accept:
-// text/event-stream` and optionally `Cache-Control: no-cache, no-store, must-revalidate` /
-// `Pragma: no-cache`.
+// text/event-stream`.
 //
 // Every message carries a JSON `data` field (`NotificationStreamMessage`); the SSE `event` name is
 // not used for routing, messages are dispatched on `data.type`:
@@ -99,9 +98,10 @@ func (r *NotificationsResource) MarkViewed(ctx context.Context, params Notificat
 //   - `CLIENT_STATUS_UPDATE`: client status change; `payload` shape not used by the web app.
 //
 // Messages without `data` (keep-alive comments) are ignored. The `id` of the last message is sent
-// back as `Last-Event-ID` on reconnect. The web app reconnects with backoff 1 s x 4^(n-1), capped
-// at 30 s; 401/403 are fatal (re-authenticate before reconnecting). It also reconnects when the UI
-// language changes, since the server localises messages by `Accept-Language`.
+// back as `Last-Event-ID` on reconnect. After an error the web app reconnects with backoff 1 s x
+// 4^(n-1), capped at 30 s; 401/403 are fatal (re-authenticate before reconnecting). It does not
+// reconnect when the server ends the stream cleanly. The server localises messages by
+// `Accept-Language`.
 //
 // The stream reconnects when the connection drops, resuming after the last event received. It ends
 // when ctx is done, when the loop breaks or on an error that reconnecting cannot fix.

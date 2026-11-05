@@ -14,56 +14,46 @@ type ReportsResource struct {
 
 // ReportsDownloadBalanceParams holds the parameters of [ReportsResource.DownloadBalance].
 type ReportsDownloadBalanceParams struct {
-	// The server defaults to 20.
+	// Defaults to 20.
 	Limit               *int             `json:"limit,omitzero"`
 	CompletionDateFrame *ReportDateFrame `json:"completionDateFrame,omitzero"`
-	// Document type (`PDF`, `XLSX`).
-	Type *string `json:"type,omitzero"`
-	// Document format (`PDF`).
-	Format           *string               `json:"format,omitzero"`
-	TransactionTypes []ReportOperationType `json:"transactionTypes,omitzero"`
-	Statuses         []string              `json:"statuses,omitzero"`
-	Currencies       []string              `json:"currencies,omitzero"`
-	From             Date                  `json:"from,omitzero"`
-	To               Date                  `json:"to,omitzero"`
+	// Operation types to include; pass all three for no filter.
+	TransactionTypes []ReportOperationType `json:"transactionTypes"`
+	// Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
+	Type       *string  `json:"type,omitzero"`
+	Statuses   []string `json:"statuses,omitzero"`
+	Currencies []string `json:"currencies,omitzero"`
+	From       Date     `json:"from,omitzero"`
+	To         Date     `json:"to,omitzero"`
 }
 
 // ReportsEmailBalanceParams holds the parameters of [ReportsResource.EmailBalance].
 type ReportsEmailBalanceParams struct {
-	// The server defaults to 20.
+	// Defaults to 20.
 	Limit               *int             `json:"limit,omitzero"`
 	CompletionDateFrame *ReportDateFrame `json:"completionDateFrame,omitzero"`
-	// Document type (`PDF`, `XLSX`).
-	Type *string `json:"type,omitzero"`
-	// Document format (`PDF`).
-	Format           *string               `json:"format,omitzero"`
-	TransactionTypes []ReportOperationType `json:"transactionTypes,omitzero"`
-	Statuses         []string              `json:"statuses,omitzero"`
-	Currencies       []string              `json:"currencies,omitzero"`
-	From             Date                  `json:"from,omitzero"`
-	To               Date                  `json:"to,omitzero"`
+	// Operation types to include; pass all three for no filter.
+	TransactionTypes []ReportOperationType `json:"transactionTypes"`
+	// Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
+	Type       *string  `json:"type,omitzero"`
+	Statuses   []string `json:"statuses,omitzero"`
+	Currencies []string `json:"currencies,omitzero"`
+	From       Date     `json:"from,omitzero"`
+	To         Date     `json:"to,omitzero"`
 }
 
 // ReportsDownloadExchangeParams holds the parameters of [ReportsResource.DownloadExchange].
 type ReportsDownloadExchangeParams struct {
-	// The server defaults to 20.
+	// Defaults to 20.
 	Limit               *int             `json:"limit,omitzero"`
 	CompletionDateFrame *ReportDateFrame `json:"completionDateFrame,omitzero"`
-	// Document type (`PDF`, `XLSX`).
-	Type *string `json:"type,omitzero"`
-	// Document format (`PDF`).
-	Format *string `json:"format,omitzero"`
 }
 
 // ReportsEmailExchangeParams holds the parameters of [ReportsResource.EmailExchange].
 type ReportsEmailExchangeParams struct {
-	// The server defaults to 20.
+	// Defaults to 20.
 	Limit               *int             `json:"limit,omitzero"`
 	CompletionDateFrame *ReportDateFrame `json:"completionDateFrame,omitzero"`
-	// Document type (`PDF`, `XLSX`).
-	Type *string `json:"type,omitzero"`
-	// Document format (`PDF`).
-	Format *string `json:"format,omitzero"`
 }
 
 // DownloadBalance downloads the deposits and withdrawals statement.
@@ -74,6 +64,9 @@ type ReportsEmailExchangeParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *ReportsResource) DownloadBalance(ctx context.Context, params ReportsDownloadBalanceParams, opts ...RequestOption) ([]byte, error) {
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
 	return r.core.binary(ctx, &operation{
 		service: ServiceExchange,
 		method:  http.MethodPost,
@@ -89,6 +82,9 @@ func (r *ReportsResource) DownloadBalance(ctx context.Context, params ReportsDow
 //
 // This endpoint is experimental and may change without notice.
 func (r *ReportsResource) EmailBalance(ctx context.Context, params ReportsEmailBalanceParams, opts ...RequestOption) error {
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
 	return r.core.exec(ctx, &operation{
 		service: ServiceExchange,
 		method:  http.MethodPost,
@@ -106,6 +102,9 @@ func (r *ReportsResource) EmailBalance(ctx context.Context, params ReportsEmailB
 //
 // This endpoint is experimental and may change without notice.
 func (r *ReportsResource) DownloadExchange(ctx context.Context, params ReportsDownloadExchangeParams, opts ...RequestOption) ([]byte, error) {
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
 	return r.core.binary(ctx, &operation{
 		service: ServiceExchange,
 		method:  http.MethodPost,
@@ -120,6 +119,9 @@ func (r *ReportsResource) DownloadExchange(ctx context.Context, params ReportsDo
 //
 // This endpoint is experimental and may change without notice.
 func (r *ReportsResource) EmailExchange(ctx context.Context, params ReportsEmailExchangeParams, opts ...RequestOption) error {
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
 	return r.core.exec(ctx, &operation{
 		service: ServiceExchange,
 		method:  http.MethodPost,

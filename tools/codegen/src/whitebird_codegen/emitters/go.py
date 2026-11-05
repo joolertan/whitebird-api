@@ -64,11 +64,12 @@ CORE_NAMES = _words(
     APIError Captcha Client CodeFunc CodeProvider Date DateOf Decimal DecimalFromFloat
     DecimalFromInt Environment ErrAuthentication ErrBadRequest ErrCaptchaRequired ErrConflict
     ErrMFARequired ErrNotFound ErrPermissionDenied ErrRateLimited ErrServer
-    ErrVerificationRequired FileTokenStore MustDecimal NewClient NewDecimal Option Page Ptr
+    ErrVerificationRequired File FileTokenStore MustDecimal NewClient NewDecimal Option Page Ptr
     RequestOption Service StaticCode StreamEvent Time Token TokenStore TransportError Version
     WithBaseURL WithCaptchaSolver WithCodeProvider WithCredentials WithEnvironment
-    WithHTTPClient WithHeader WithIdempotent WithMaxRetries WithQuery WithRequestMaxRetries
-    WithRequestTimeout WithRetcodeEnvelope WithTimeout WithTokenStore WithUserAgent WithoutAuth
+    WithHTTPClient WithHeader WithIdempotent WithLanguage WithMaxRetries WithQuery
+    WithRequestMaxRetries WithRequestTimeout WithRetcodeEnvelope WithTimeout WithTokenStore
+    WithUserAgent WithoutAuth
     """
 )
 
@@ -94,6 +95,8 @@ PATH_KINDS = frozenset(
     {"string", "integer", "number", "decimal", "boolean", "datetime", "date", "enum"}
 )
 CLIENT_METHODS = frozenset({"ConfirmOperation", "Login", "Request", "SetMFAToken"})
+# The core constants for the effects an operation has on the session (x-wb-session).
+SESSION_EFFECTS = {"replace": "sessionReplace", "end": "sessionEnd"}
 
 PACKAGES = {
     "context": "context",
@@ -246,6 +249,8 @@ class GoStruct:
     name: str
     doc: list[str]
     fields: list[GoField]
+    # Statements that give unset fields their default value before the request is sent.
+    defaults: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -294,6 +299,7 @@ class GoMethod:
     kind: str
     target: str = ""
     operation: list[tuple[str, str]] = field(default_factory=list)
+    defaults: list[str] = field(default_factory=list)
     # Iterators over a paginated operation: the page method, its arguments and the page field.
     page_method: str = ""
     page_args: str = ""
@@ -558,8 +564,11 @@ class Emitter:
         fields = [
             ("service", "Service" + exported(op.service)),
             ("method", "http.Method" + op.method.capitalize()),
-            ("path", self._path(op.path, path_args)),
+            ("path", json.dumps(op.path)),
         ]
+        if op.path_params:
+            values = [self._path_value(*path_args[w]) for w in _placeholders(op.path)]
+            fields.append(("pathParams", f"[]string{{{', '.join(values)}}}"))
         if op.auth == "none":
             fields.append(("public", "true"))
         if struct and any(f.tag.startswith(("query:", "header:")) for f in struct.fields):
@@ -570,10 +579,13 @@ class Emitter:
             fields.append(("envelope", "true"))
         if op.auth == "mfa" and op.mfa_operation:
             fields.append(("mfaOperation", json.dumps(op.mfa_operation)))
+        if op.session:
+            fields.append(("session", SESSION_EFFECTS[op.session]))
 
         response = op.response
         paged = op.pagination is not None and response.type is not None
-        method = GoMethod(name, [], args, "", "", operation=fields)
+        defaults = struct.defaults if struct else []
+        method = GoMethod(name, [], args, "", "", operation=fields, defaults=defaults)
         if response.kind == "sse":
             item = "json.RawMessage"
             if response.type:
@@ -613,6 +625,7 @@ class Emitter:
             "call",
             target=method.target,
             operation=fields,
+            defaults=defaults,
         )
         iterator = GoMethod(
             name,
@@ -635,25 +648,14 @@ class Emitter:
             return "*" + go_type
         return go_type
 
-    def _path(self, path: str, args: dict[str, tuple[str, TypeRef]]) -> str:
-        parts = []
-        for piece in re.split(r"(\{[^}]+\})", path):
-            if not piece:
-                continue
-            match = re.fullmatch(r"\{([^}]+)\}", piece)
-            if match:
-                parts.append(self._path_value(*args[match.group(1)]))
-            else:
-                parts.append(json.dumps(piece))
-        return " + ".join(parts)
-
     def _path_value(self, arg: str, type_ref: TypeRef) -> str:
+        """Formats a path argument as a string; the core escapes it."""
         kind = type_ref.kind
         if kind == "enum":
             enum = self.ir.enums[type_ref.name or ""]
             if enum.base == "integer":
                 return f"strconv.Itoa(int({arg}))"
-            return f"url.PathEscape(string({arg}))"
+            return f"string({arg})"
         if kind == "integer":
             return {
                 "int64": f"strconv.FormatInt({arg}, 10)",
@@ -664,10 +666,10 @@ class Emitter:
         if kind == "number":
             return f"strconv.FormatFloat({arg}, 'f', -1, 64)"
         if kind == "datetime":
-            return f"url.PathEscape({arg}.Format(time.RFC3339Nano))"
+            return f"{arg}.Format(wireLayout)"
         if kind in ("decimal", "date"):
-            return f"url.PathEscape({arg}.String())"
-        return f"url.PathEscape({arg})"
+            return f"{arg}.String()"
+        return arg
 
     def _body_expr(self, body: Body, struct: GoStruct | None) -> str:
         encoder = {"json": "jsonBody", "form": "formBody", "multipart": "multipartBody"}[body.kind]
@@ -686,19 +688,31 @@ class Emitter:
         def paging(wire: str) -> bool:
             return pagination is not None and wire in (pagination.page_param, pagination.size_param)
 
+        defaults: list[str] = []
+
+        def default(go_name: str, go_type: str, item: Field | Param, *, paged: bool) -> bool:
+            """Adds the statement that sends the default of item when it is unset, and reports
+            whether the field must be sent even when it holds its zero value."""
+            statement, always = _default(go_name, go_type, item, paged=paged)
+            defaults.extend(statement)
+            return always
+
         for param in [*op.query_params, *op.header_params]:
+            go_name = exported(param.wire)
             if paging(param.wire):
-                type_, option = "int", ",omitempty"
+                type_ = "int"
+                option = "" if default(go_name, type_, param, paged=True) else ",omitempty"
             else:
                 type_ = self.field_type(
                     param.type, required=param.required, nullable=False, request=True
                 )
+                default(go_name, type_, param, paged=False)
                 option = _omitempty(param.required, type_)
             tag = f'{param.location}:"{param.wire}{option}"{skip_json}'
             # The iterators start from params.Page, so its default goes without saying.
             starts = pagination is not None and param.wire == pagination.page_param
-            doc = _field_doc(param.description, param, default=not starts)
-            fields.append(GoField(exported(param.wire), type_, tag, comment(doc)))
+            doc = _field_doc(param.description, param, default=not starts, sent=True)
+            fields.append(GoField(go_name, type_, tag, comment(doc)))
             self.usages.add("used", param.type, name)
 
         if pagination and pagination.location == "query":
@@ -716,6 +730,7 @@ class Emitter:
         if body and body.flattened:
             form = body.kind if body.kind != "json" else None
             for f in body.fields:
+                go_name = exported(f.wire)
                 required = f.required and not paging(f.wire)
                 if paging(f.wire):
                     type_ = "int"
@@ -723,15 +738,18 @@ class Emitter:
                     type_ = self.field_type(
                         f.type, required=required, nullable=f.nullable, request=True, form=form
                     )
+                always = default(go_name, type_, f, paged=paging(f.wire)) or required
                 if form:
                     option = ",omitempty" if paging(f.wire) else _omitempty(required, type_)
+                    if always:
+                        option = ""
                     tag = f'form:"{f.wire}{option}"'
                     if form == "multipart" and f.content_type:
                         tag += f' mime:"{f.content_type}"'
                 else:
-                    tag = f'json:"{f.wire}{"" if required else ",omitzero"}"'
-                doc = comment(_field_doc(f.description, f))
-                fields.append(GoField(exported(f.wire), type_, tag, doc))
+                    tag = f'json:"{f.wire}{"" if always else ",omitzero"}"'
+                doc = comment(_field_doc(f.description, f, sent=True))
+                fields.append(GoField(go_name, type_, tag, doc))
                 self.usages.add("used", f.type, name)
         elif body:
             type_ = self.go_type(body.type, request=True)
@@ -748,7 +766,8 @@ class Emitter:
         targets = f"[{resource}.{method}]"
         if pagination:
             targets += f" and [{resource}.{method}Page]"
-        return GoStruct(name, comment([f"{name} holds the parameters of {targets}."]), fields)
+        doc = comment([f"{name} holds the parameters of {targets}."])
+        return GoStruct(name, doc, fields, defaults)
 
     def _operation_doc(self, op: Operation, name: str, paged: bool, resource: str) -> list[str]:
         texts = [t for t in (op.description, op.summary) if t and t.strip()]
@@ -872,11 +891,15 @@ def _body_types(body: Body | None) -> list[TypeRef]:
     return [f.type for f in body.fields] if body.flattened else [body.type]
 
 
-def _field_doc(description: str | None, item: Field | Param, *, default: bool = True) -> list[str]:
+def _field_doc(
+    description: str | None, item: Field | Param, *, default: bool = True, sent: bool = False
+) -> list[str]:
+    """Documents a field. With sent, the client sends its default when the field is unset."""
     result = [sentence(p) for p in paragraphs(description)]
     notes = []
-    if default and item.default is not None and not isinstance(item.default, (dict, list)):
-        notes.append(f"The server defaults to {json.dumps(item.default)}.")
+    if default and _scalar_default(item) is not None:
+        value = json.dumps(item.default)
+        notes.append(f"Defaults to {value}." if sent else f"The server defaults to {value}.")
     if isinstance(item, Field) and item.inferred:
         notes.append("Inferred from the web application; not yet observed in responses.")
     if notes:
@@ -884,6 +907,51 @@ def _field_doc(description: str | None, item: Field | Param, *, default: bool = 
     if isinstance(item, Field) and item.deprecated:
         result.append("Deprecated: Whitebird has deprecated this field.")
     return result
+
+
+def _scalar_default(item: Field | Param) -> str | int | float | bool | None:
+    value = item.default
+    return value if isinstance(value, (str, int, float, bool)) else None
+
+
+def _default(
+    go_name: str, go_type: str, item: Field | Param, *, paged: bool
+) -> tuple[list[str], bool]:
+    """Returns the statements that set the field go_name of params to the default of item when
+    it is unset, and whether the field must be sent even when it holds its zero value."""
+    value = _scalar_default(item)
+    if value is None or not _compatible(value, item.type.kind):
+        return [], False
+    literal = json.dumps(value)
+    target = f"params.{go_name}"
+    if go_type.startswith("*"):
+        return [f"if {target} == nil {{", f"{target} = Ptr[{go_type[1:]}]({literal})", "}"], False
+    if isinstance(value, bool) or go_type in OMIT_ZERO_TYPES or go_type in ("any", "io.Reader"):
+        # Required booleans are always sent; other value types have no default to give.
+        return [], False
+    if value in ("", 0):
+        # The default is the zero value: send it.
+        return [], True
+    if isinstance(value, str) or paged:
+        # An empty string or a page size of 0 means the field is unset.
+        zero = '""' if isinstance(value, str) else "0"
+        return [f"if {target} == {zero} {{", f"{target} = {literal}", "}"], True
+    # Zero may be meant for a required number.
+    return [], False
+
+
+def _compatible(value: str | int | float | bool, kind: str) -> bool:
+    if isinstance(value, bool):
+        return kind == "boolean"
+    if isinstance(value, int):
+        return kind in ("integer", "number", "enum")
+    if isinstance(value, float):
+        return kind == "number"
+    return kind in ("string", "enum")
+
+
+def _placeholders(path: str) -> list[str]:
+    return re.findall(r"\{([^}]+)\}", path)
 
 
 def _omitempty(required: bool, go_type: str) -> str:

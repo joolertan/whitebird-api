@@ -41,13 +41,16 @@ func testJWT(subject string, exp time.Time) string {
 	return enc.EncodeToString([]byte(`{"alg":"none"}`)) + "." + enc.EncodeToString([]byte(claims)) + ".sig"
 }
 
-// authServer imitates the authorization server.
+// authServer imitates the authorization server. Like the real one, it answers a password
+// grant without a code with {"mfaEnabled": true} for accounts with two-factor authentication.
 type authServer struct {
 	t   *testing.T
 	ttl time.Duration
-	// mfa is the answer of the MFA check; mfaFails makes the check fail.
+	// mfa is the answer of the MFA check; mfaFails makes the check fail and unknown answers
+	// that the account does not exist.
 	mfa      bool
 	mfaFails bool
+	unknown  bool
 	// reply, if set, answers token requests instead of issuing a token, unless it returns
 	// status 0.
 	reply func(form url.Values) (status int, body string)
@@ -57,7 +60,7 @@ type authServer struct {
 	forms      []url.Values
 	answers    []string // captcha headers of the token requests
 	captchaIDs []string
-	mfaChecks  int
+	usernames  []string // usernames of the MFA checks
 	issued     int
 }
 
@@ -91,6 +94,10 @@ func (a *authServer) token(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if a.mfa && r.PostForm.Get("grant_type") == "password" && !r.PostForm.Has("code") {
+		writeJSON(w, map[string]bool{"mfaEnabled": true})
+		return
+	}
 	writeJSON(w, map[string]any{
 		"access_token":  testJWT(fmt.Sprint("access-", n), time.Now().Add(a.ttl)),
 		"refresh_token": fmt.Sprint("refresh-", n),
@@ -105,13 +112,17 @@ func (a *authServer) mfaCheck(w http.ResponseWriter, r *http.Request) {
 		a.t.Error(err)
 	}
 	a.mu.Lock()
-	a.mfaChecks++
+	a.usernames = append(a.usernames, body.Username)
 	a.mu.Unlock()
-	if a.mfaFails {
+	switch {
+	case a.mfaFails:
 		http.Error(w, "unavailable", http.StatusInternalServerError)
-		return
+	case a.unknown:
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(w, map[string]string{"status": "NOT_FOUND", "message": "User not found"})
+	default:
+		writeJSON(w, map[string]bool{"mfaEnabled": a.mfa})
 	}
-	writeJSON(w, map[string]bool{"mfaEnabled": a.mfa})
 }
 
 func (a *authServer) captcha(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +155,17 @@ func (a *authServer) captchas() (ids, answers []string) {
 func (a *authServer) checks() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.mfaChecks
+	return len(a.usernames)
+}
+
+// form returns the form of token request i.
+func (a *authServer) form(i int) url.Values {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if i >= len(a.forms) {
+		a.t.Fatalf("token request %d of %d", i, len(a.forms))
+	}
+	return a.forms[i]
 }
 
 // grants returns the grant types requested so far.

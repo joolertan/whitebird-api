@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -27,8 +28,6 @@ type Captcha struct {
 
 // captchaAttempts limits the captchas solved for one login.
 const captchaAttempts = 3
-
-const captchaHint = "a captcha must be solved; set a solver with WithCaptchaSolver"
 
 // solveCaptcha gets a captcha, has the configured solver solve it and returns the answer as the
 // value of the captcha header of the token request.
@@ -66,10 +65,11 @@ func (c *core) solveCaptcha(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("whitebird: solve captcha: %w", err)
 	}
+	// The web application sends the value of its range input, a string.
 	answer, err := json.Marshal(struct {
-		SliderPosition int    `json:"sliderPosition"`
+		SliderPosition string `json:"sliderPosition"`
 		RequestID      string `json:"requestId"`
-	}{x, id})
+	}{strconv.Itoa(x), id})
 	return base64.StdEncoding.EncodeToString(answer), err
 }
 

@@ -21,7 +21,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	params := whitebird.ExchangeOrdersHistoryParams{Size: 20, Sort: []string{"creationDate,desc"}}
+	// The newest first: the default sort is "creationDate,desc".
+	params := whitebird.ExchangeOrdersHistoryParams{Size: 20}
 	printed := 0
 	for order, err := range client.Exchange.Orders.History(context.Background(), params) {
 		if err != nil {

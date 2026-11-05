@@ -2,9 +2,9 @@
 
 package whitebird
 
-// AccountingAccountType is used in [AccountingAccountsGetParams],
-// [AccountingAccountsGetEnhancedParams], [AccountingTransactionsListParams], [AccountingBalance]
-// and 1 other.
+// AccountingAccountType is used in [AccountingAccountsGetEnhancedParams],
+// [AccountingAccountsGetParams], [AccountingTransactionsListParams], [AccountingBalance] and 1
+// other.
 type AccountingAccountType string
 
 // Known values of [AccountingAccountType].
@@ -168,16 +168,14 @@ const (
 	BalanceOrderStatusPending                    BalanceOrderStatus = "PENDING"
 )
 
-// BalanceRejectRequestOperationType is used in [BalanceOperationsRejectCryptoParams] and
+// BalanceRejectOperationType is used in [BalanceOperationsRejectCryptoParams] and
 // [BalanceOperationsRejectFiatParams].
-//
-// Same as the path segment (`crypto` or `fiat`).
-type BalanceRejectRequestOperationType string
+type BalanceRejectOperationType string
 
-// Known values of [BalanceRejectRequestOperationType].
+// Known values of [BalanceRejectOperationType].
 const (
-	BalanceRejectRequestOperationTypeCrypto BalanceRejectRequestOperationType = "crypto"
-	BalanceRejectRequestOperationTypeFiat   BalanceRejectRequestOperationType = "fiat"
+	BalanceRejectOperationTypeCrypto BalanceRejectOperationType = "crypto"
+	BalanceRejectOperationTypeFiat   BalanceRejectOperationType = "fiat"
 )
 
 // ClientFeature is returned by [ClientResource.Features].
@@ -257,7 +255,10 @@ type ExchangeAssetCategory string
 const (
 	ExchangeAssetCategoryCrypto     ExchangeAssetCategory = "CRYPTO"
 	ExchangeAssetCategoryStablecoin ExchangeAssetCategory = "STABLECOIN"
+	ExchangeAssetCategoryGold       ExchangeAssetCategory = "GOLD"
+	ExchangeAssetCategoryEtf        ExchangeAssetCategory = "ETF"
 	ExchangeAssetCategoryStock      ExchangeAssetCategory = "STOCK"
+	ExchangeAssetCategoryEarn       ExchangeAssetCategory = "EARN"
 	ExchangeAssetCategoryFiat       ExchangeAssetCategory = "FIAT"
 )
 
@@ -306,8 +307,8 @@ const (
 	ExchangeLegTypeInternalBalance ExchangeLegType = "INTERNAL_BALANCE"
 )
 
-// ExchangeOrderStatus is used in [ExchangeOrdersHistoryParams], [MerchantDownloadReportParams] and
-// [ExchangeOrder].
+// ExchangeOrderStatus is used in [ExchangeOrdersHistoryParams], [MerchantOrdersHistoryParams],
+// [MerchantDownloadReportParams], [ExchangeOrder] and 1 other.
 type ExchangeOrderStatus string
 
 // Known values of [ExchangeOrderStatus].

@@ -5,7 +5,6 @@ package whitebird
 import (
 	"context"
 	"net/http"
-	"net/url"
 )
 
 // PaymentsResource holds the operations available as Client.Payments.
@@ -49,10 +48,11 @@ func (r *PaymentsCardsResource) Limits(ctx context.Context, opts ...RequestOptio
 // This endpoint is experimental and may change without notice.
 func (r *PaymentsCardsResource) Rename(ctx context.Context, cardID string, providerType PaymentProviderType, params PaymentsCardsRenameParams, opts ...RequestOption) (*PaymentCard, error) {
 	return call[*PaymentCard](ctx, r.core, &operation{
-		service: ServiceExchange,
-		method:  http.MethodPut,
-		path:    "/api/v1/client/payment/" + url.PathEscape(cardID) + "/provider/" + url.PathEscape(string(providerType)),
-		body:    jsonBody(params),
+		service:    ServiceExchange,
+		method:     http.MethodPut,
+		path:       "/api/v1/client/payment/{cardId}/provider/{providerType}",
+		pathParams: []string{cardID, string(providerType)},
+		body:       jsonBody(params),
 	}, opts)
 }
 

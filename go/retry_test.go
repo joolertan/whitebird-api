@@ -3,6 +3,7 @@ package whitebird
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"slices"
 	"sync/atomic"
@@ -104,18 +105,24 @@ func TestRetriesExhausted(t *testing.T) {
 }
 
 func TestPostIsNotRetried(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
+		var attempts atomic.Int32
+		mux := http.NewServeMux()
+		mux.Handle(method+" /orders", failingHandler(&attempts, nil, 503))
+		client := newTestClient(t, mux)
+
+		err := client.Request(context.Background(), testService, method, "/orders", map[string]int{"amount": 1}, nil, WithoutAuth())
+		if !errors.Is(err, ErrServer) || attempts.Load() != 1 {
+			t.Errorf("%s: Request() = %v after %d attempts, want ErrServer after 1", method, err, attempts.Load())
+		}
+	}
+
 	var attempts atomic.Int32
 	mux := http.NewServeMux()
 	mux.Handle("POST /orders", failingHandler(&attempts, nil, 503))
 	client := newTestClient(t, mux)
 
-	err := client.Request(context.Background(), testService, http.MethodPost, "/orders", map[string]int{"amount": 1}, nil, WithoutAuth())
-	if !errors.Is(err, ErrServer) || attempts.Load() != 1 {
-		t.Errorf("Request() = %v after %d attempts, want ErrServer after 1", err, attempts.Load())
-	}
-
-	attempts.Store(0)
-	err = client.Request(context.Background(), testService, http.MethodPost, "/orders", map[string]int{"amount": 1}, nil, WithoutAuth(), WithIdempotent(true))
+	err := client.Request(context.Background(), testService, http.MethodPost, "/orders", map[string]int{"amount": 1}, nil, WithoutAuth(), WithIdempotent(true))
 	if err != nil || attempts.Load() != 2 {
 		t.Errorf("Request(WithIdempotent) = %v after %d attempts, want success after 2", err, attempts.Load())
 	}
@@ -176,12 +183,69 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+func TestPostRetriedWhenNotSent(t *testing.T) {
+	var attempts atomic.Int32
+	mux := http.NewServeMux()
+	mux.Handle("POST /orders", failingHandler(&attempts, nil, http.StatusTooManyRequests))
+	client := newTestClient(t, mux)
+	recordSleeps(client)
+	if err := client.Request(context.Background(), testService, http.MethodPost, "/orders", nil, nil, WithoutAuth()); err != nil || attempts.Load() != 2 {
+		t.Errorf("Request() after a 429 = %v after %d attempts, want success after 2", err, attempts.Load())
+	}
+
+	var dials atomic.Int32
+	refused := &http.Client{Transport: &http.Transport{
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			dials.Add(1)
+			return nil, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
+		},
+	}}
+	client = newTestClient(t, http.NewServeMux(), WithHTTPClient(refused))
+	recordSleeps(client)
+	err := client.Request(context.Background(), testService, http.MethodPost, "/orders", nil, nil, WithoutAuth())
+	var transport *TransportError
+	if !errors.As(err, &transport) || dials.Load() != 3 {
+		t.Errorf("Request() = %v after %d dials, want a TransportError after 3", err, dials.Load())
+	}
+}
+
+func TestPostNotRetriedAfterSending(t *testing.T) {
+	var attempts atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /drop", func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		conn, _, err := w.(http.Hijacker).Hijack()
+		if err == nil {
+			conn.Close()
+		}
+	})
+	client := newTestClient(t, mux)
+	err := client.Request(context.Background(), testService, http.MethodPost, "/drop", nil, nil, WithoutAuth())
+	var transport *TransportError
+	if !errors.As(err, &transport) || attempts.Load() != 1 {
+		t.Errorf("Request() = %v after %d attempts, want a TransportError after 1", err, attempts.Load())
+	}
+}
+
+func TestBackoffDoesNotOverflow(t *testing.T) {
+	for n := range 100 {
+		d, ok := retryDelay(n, nil, time.Now())
+		if !ok || d < 0 || d > maxRetryDelay {
+			t.Fatalf("retryDelay(%d) = %v, %v", n, d, ok)
+		}
+	}
+}
+
 func TestRetryAfterHeader(t *testing.T) {
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	tests := map[string]time.Duration{
 		"7":                             7 * time.Second,
 		"-1":                            0,
 		"Fri, 02 Jan 2026 03:04:15 GMT": 10 * time.Second,
+		"99999999999":                   retryAfterCap,
+		"99999999999999999999999":       retryAfterCap,
+		"-99999999999999999999999":      0,
+		"Fri, 31 Dec 9999 23:59:59 GMT": retryAfterCap,
 	}
 	for value, want := range tests {
 		got, ok := retryAfter(http.Header{"Retry-After": {value}}, now)

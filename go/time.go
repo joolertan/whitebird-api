@@ -11,9 +11,10 @@ import (
 // Time is a point in time exchanged with the API. It embeds [time.Time], so all of its methods
 // are available.
 //
-// Decoding is lenient: it accepts RFC 3339, ISO 8601 without a time zone (taken as UTC) and
-// milliseconds since the Unix epoch, as a number or a string. Time encodes as RFC 3339; the zero
-// Time encodes as null.
+// Decoding is lenient: it accepts RFC 3339, ISO 8601 with a "+0300" offset or without a time
+// zone (taken as UTC) and milliseconds since the Unix epoch, as a number or a string. Time
+// encodes as the web application sends times, to the second and with the offset of its
+// location: "2026-01-02T15:04:05+0300". The zero Time encodes as null.
 type Time struct {
 	time.Time
 }
@@ -24,6 +25,7 @@ var (
 		"2006-01-02T15:04:05.999999999Z0700",
 		"2006-01-02T15:04:05.999999999Z07",
 		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999Z0700",
 	}
 	naiveLayouts = []string{
 		"2006-01-02T15:04:05.999999999",
@@ -72,12 +74,21 @@ func unquoteTime(data []byte) (string, error) {
 	return strconv.FormatInt(int64(f), 10), err
 }
 
-// MarshalJSON encodes t as an RFC 3339 string, or null for the zero Time.
+// wireLayout is the format of the times the web application sends (dayjs
+// "YYYY-MM-DDTHH:mm:ssZZ").
+const wireLayout = "2006-01-02T15:04:05-0700"
+
+// MarshalJSON encodes t as a "2006-01-02T15:04:05-0700" string, or null for the zero Time.
 func (t Time) MarshalJSON() ([]byte, error) {
 	if t.IsZero() {
 		return []byte("null"), nil
 	}
-	return t.Time.MarshalJSON()
+	return []byte(`"` + t.Format(wireLayout) + `"`), nil
+}
+
+// MarshalText formats t as "2006-01-02T15:04:05-0700", for query parameters.
+func (t Time) MarshalText() ([]byte, error) {
+	return []byte(t.Format(wireLayout)), nil
 }
 
 // UnmarshalJSON decodes a timestamp in any of the formats described on [Time].

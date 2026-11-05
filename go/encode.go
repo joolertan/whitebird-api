@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
+	"net/http"
 	"net/textproto"
 	"net/url"
 	"path/filepath"
@@ -21,6 +23,29 @@ import (
 // never sent; other zero values are skipped only with omitempty. Slices repeat the parameter.
 // In multipart bodies, the tag "mime" sets the content type of a part.
 
+// File is a file to upload, with the name and media type the server receives. Methods that
+// upload files take any [io.Reader]; a File adds a name and type to it:
+//
+//	f, err := os.Open("passport.jpg")
+//	...
+//	params.Document = whitebird.File{Name: "passport.jpg", ContentType: "image/jpeg", Body: f}
+//
+// Without a name, the name of an [os.File] is used, or else the name of the field. Without a
+// media type, the type is guessed from the extension of the name, then from the content.
+type File struct {
+	Name        string
+	ContentType string
+	Body        io.Reader
+}
+
+// Read reads from the body of f, so that a File can be passed where an [io.Reader] is expected.
+func (f File) Read(p []byte) (int, error) {
+	if f.Body == nil {
+		return 0, io.EOF
+	}
+	return f.Body.Read(p)
+}
+
 // encodeValues collects the fields of the struct v that carry tag.
 func encodeValues(v any, tag string) (url.Values, error) {
 	values := url.Values{}
@@ -33,10 +58,10 @@ func encodeValues(v any, tag string) (url.Values, error) {
 }
 
 // multipartBody encodes the "form" fields of the struct v as multipart/form-data. Readers
-// become file parts, named after the reader if it has a Name method like [os.File], and slices
-// of readers one part per reader. Structs and maps become JSON parts, as do other values whose
-// "mime" tag is a JSON media type, except strings, which are taken to be JSON already. Other
-// values become text parts.
+// become file parts (see [File]), and slices of readers one part per reader. Structs and maps
+// become JSON parts, as do other values whose "mime" tag is a JSON media type, except strings,
+// which are taken to be JSON already. With a "text/plain" tag, structs and maps are sent as
+// JSON text in a plain field, as the web application does. Other values become text parts.
 func multipartBody(v any) encoder {
 	return func() (string, []byte, error) {
 		var buf bytes.Buffer
@@ -66,8 +91,20 @@ func writePart(w *multipart.Writer, name, contentType string, field reflect.Valu
 	for field.Kind() == reflect.Pointer || field.Kind() == reflect.Interface {
 		field = field.Elem()
 	}
-	if contentType == "" && isObject(field.Type()) {
+	object := isObject(field.Type())
+	if contentType == "" && object {
 		contentType = "application/json"
+	}
+	if isPlainText(contentType) {
+		// A plain field, which carries no content type of its own.
+		contentType = ""
+		if object {
+			data, err := json.Marshal(field.Interface())
+			if err != nil {
+				return err
+			}
+			return writeField(w, name, "", data)
+		}
 	}
 	if isJSON(contentType) {
 		data := []byte(field.String())
@@ -103,20 +140,55 @@ func writeField(w *multipart.Writer, name, contentType string, data []byte) erro
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 func writeFile(w *multipart.Writer, name, contentType string, r io.Reader) error {
-	filename := name
-	if named, ok := r.(interface{ Name() string }); ok {
-		filename = filepath.Base(named.Name())
+	filename, body := name, r
+	var fileType string
+	switch f := r.(type) {
+	case File:
+		filename, fileType, body = cmp.Or(f.Name, filename), f.ContentType, f
+	case *File:
+		filename, fileType, body = cmp.Or(f.Name, filename), f.ContentType, f
+	case interface{ Name() string }:
+		filename = filepath.Base(f.Name())
+	}
+	switch {
+	case fileType != "":
+		contentType = fileType
+	case !isConcrete(contentType):
+		contentType = mime.TypeByExtension(filepath.Ext(filename))
+	}
+	if contentType == "" {
+		// Guess from the content, as the server may check it.
+		head := make([]byte, 512)
+		n, err := io.ReadFull(body, head)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return err
+		}
+		contentType = http.DetectContentType(head[:n])
+		body = io.MultiReader(bytes.NewReader(head[:n]), body)
 	}
 	header := textproto.MIMEHeader{
 		"Content-Disposition": {multipart.FileContentDisposition(name, filename)},
-		"Content-Type":        {cmp.Or(contentType, "application/octet-stream")},
+		"Content-Type":        {contentType},
 	}
 	part, err := w.CreatePart(header)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(part, r)
+	_, err = io.Copy(part, body)
 	return err
+}
+
+// isConcrete reports whether contentType names a specific type, rather than a range or the
+// generic binary type.
+func isConcrete(contentType string) bool {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+	mediaType = strings.TrimSpace(mediaType)
+	return mediaType != "" && !strings.Contains(mediaType, "*") && mediaType != "application/octet-stream"
+}
+
+func isPlainText(contentType string) bool {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+	return strings.TrimSpace(mediaType) == "text/plain"
 }
 
 var textMarshaler = reflect.TypeFor[encoding.TextMarshaler]()

@@ -82,10 +82,10 @@ type ReferralTransactionsResource struct {
 // ReferralTransactionsListParams holds the parameters of [ReferralTransactionsResource.List] and
 // [ReferralTransactionsResource.ListPage].
 type ReferralTransactionsListParams struct {
-	// Zero-based page index. The server defaults to 0.
-	Page int `json:"page,omitzero"`
-	// The server defaults to 20.
-	Size int `json:"size,omitzero"`
+	// Zero-based page index. Defaults to 0.
+	Page int `json:"page"`
+	// Defaults to 20.
+	Size int `json:"size"`
 }
 
 // List transfers from the referral balance to the wallet (see `referral.withdraw`).
@@ -107,6 +107,9 @@ func (r *ReferralTransactionsResource) List(ctx context.Context, params Referral
 // ListPage is like [ReferralTransactionsResource.List] but returns a single page, the one selected
 // by params.Page, along with the pagination metadata.
 func (r *ReferralTransactionsResource) ListPage(ctx context.Context, params ReferralTransactionsListParams, opts ...RequestOption) (*Page[ReferralTransaction], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
 	return call[*Page[ReferralTransaction]](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,

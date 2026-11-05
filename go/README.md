@@ -50,17 +50,19 @@ func main() {
 }
 ```
 
-- **Sessions:** the client signs in on the first call that needs it, refreshes the token before it
-  expires and keeps it in a `TokenStore`.
+- **Sessions:** the client signs in on the first call that needs it, as the web application does,
+  refreshes the token a minute before it expires and keeps it in a `TokenStore`;
+  `client.User.Logout` ends the session.
 - **Two-factor codes:** `WithCodeProvider` takes an `*otp.TOTP`, a `CodeFunc` that asks for the
   code, so the secret stays out of the program, or a `StaticCode`.
 - **Captcha:** `WithCaptchaSolver` answers the slider captcha of accounts without 2FA.
-- **Withdrawals:** with a code provider the client obtains the operation MFA token on its own;
-  `client.ConfirmOperation` does it explicitly.
+- **Withdrawals:** when the API asks for the operation MFA token, a client with a code provider
+  obtains it and sends the operation again; `client.ConfirmOperation` does it explicitly.
 - **Errors:** API errors are `*whitebird.APIError`; match classes with `errors.Is`
   (`whitebird.ErrNotFound`, `whitebird.ErrMFARequired`, ...).
 - **Streams:** `client.Notifications.Stream(ctx)` yields server-sent events and reconnects on its
   own.
+- **Uploads:** any `io.Reader`, or a `whitebird.File` with a file name and media type.
 - **Escape hatch:** `client.Request` calls endpoints the package does not cover yet.
 
 Documentation: <https://whitebird-api.readthedocs.io> ·

@@ -19,6 +19,14 @@ type AccountingAccountsResource struct {
 	core *core
 }
 
+// AccountingAccountsGetEnhancedParams holds the parameters of
+// [AccountingAccountsResource.GetEnhanced].
+type AccountingAccountsGetEnhancedParams struct {
+	Type AccountingAccountType `json:"type"`
+	// Asset codes to include; all assets when null.
+	Assets []string `json:"assets,omitzero"`
+}
+
 // AccountingAccountsGetParams holds the parameters of [AccountingAccountsResource.Get].
 type AccountingAccountsGetParams struct {
 	Type AccountingAccountType `json:"type"`
@@ -26,12 +34,22 @@ type AccountingAccountsGetParams struct {
 	Assets []string `json:"assets,omitzero"`
 }
 
-// AccountingAccountsGetEnhancedParams holds the parameters of
-// [AccountingAccountsResource.GetEnhanced].
-type AccountingAccountsGetEnhancedParams struct {
-	Type AccountingAccountType `json:"type"`
-	// Asset codes to include; all assets when null.
-	Assets []string `json:"assets,omitzero"`
+// GetEnhanced gets balances with USD valuation.
+//
+// Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for the
+// wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there `amount` is
+// the reserved amount). In the demo environment this reads the demo trading balances.
+//
+// It calls POST /api/v2/accounting/client/account/enhanced.
+//
+// This endpoint is experimental and may change without notice.
+func (r *AccountingAccountsResource) GetEnhanced(ctx context.Context, params AccountingAccountsGetEnhancedParams, opts ...RequestOption) (*AccountingEnhancedAccount, error) {
+	return call[*AccountingEnhancedAccount](ctx, r.core, &operation{
+		service: ServiceAccountingSpot,
+		method:  http.MethodPost,
+		path:    "/api/v2/accounting/client/account/enhanced",
+		body:    jsonBody(params),
+	}, opts)
 }
 
 // Get gets balances of a ledger account.
@@ -51,24 +69,6 @@ func (r *AccountingAccountsResource) Get(ctx context.Context, params AccountingA
 	}, opts)
 }
 
-// GetEnhanced gets balances with USD valuation.
-//
-// Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for the
-// wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there `amount` is
-// the reserved amount).
-//
-// It calls POST /api/v2/accounting/client/account/enhanced.
-//
-// This endpoint is experimental and may change without notice.
-func (r *AccountingAccountsResource) GetEnhanced(ctx context.Context, params AccountingAccountsGetEnhancedParams, opts ...RequestOption) (*AccountingEnhancedAccount, error) {
-	return call[*AccountingEnhancedAccount](ctx, r.core, &operation{
-		service: ServiceAPI,
-		method:  http.MethodPost,
-		path:    "/api/v2/accounting/client/account/enhanced",
-		body:    jsonBody(params),
-	}, opts)
-}
-
 // AccountingTransactionsResource holds the operations available as Client.Accounting.Transactions.
 type AccountingTransactionsResource struct {
 	core *core
@@ -78,11 +78,11 @@ type AccountingTransactionsResource struct {
 // and [AccountingTransactionsResource.ListPage].
 type AccountingTransactionsListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
-	// Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
-	Sort             []string                    `query:"sort" json:"-"`
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
+	// Sort criteria in the format `property,(asc|desc)`. Defaults to "creationDate,desc".
+	Sort             *string                     `query:"sort" json:"-"`
 	TransactionTypes []AccountingTransactionType `json:"transactionTypes,omitzero"`
 	AccountType      *AccountingAccountType      `json:"accountType,omitzero"`
 }
@@ -122,6 +122,12 @@ func (r *AccountingTransactionsResource) List(ctx context.Context, params Accoun
 // ListPage is like [AccountingTransactionsResource.List] but returns a single page, the one
 // selected by params.Page, along with the pagination metadata.
 func (r *AccountingTransactionsResource) ListPage(ctx context.Context, params AccountingTransactionsListParams, opts ...RequestOption) (*Page[AccountingTransaction], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[AccountingTransaction]](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,

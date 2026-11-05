@@ -2,11 +2,13 @@ package whitebird
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -119,6 +121,37 @@ func TestPaginationError(t *testing.T) {
 	}
 	if items != 5 || len(errs) != 1 || !errors.Is(errs[0], ErrServer) {
 		t.Errorf("got %d items and errors %v; want 5 items, then one ErrServer", items, errs)
+	}
+}
+
+func TestPaginationStopsWhenPageIgnored(t *testing.T) {
+	var requests atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /numbers", func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		// A server that ignores the page parameter answers the first page every time.
+		writeJSON(w, map[string]any{"content": []int{1, 2}, "totalPages": 5, "number": 0, "size": 2})
+	})
+	client := newTestClient(t, mux)
+	var got []int
+	for n, err := range numbers(client, pageParams{Size: 2}) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, n)
+	}
+	if !slices.Equal(got, []int{1, 2}) || requests.Load() != 2 {
+		t.Errorf("items = %v after %d requests, want [1 2] after 2", got, requests.Load())
+	}
+}
+
+func TestPageKeepsNumbers(t *testing.T) {
+	var page Page[map[string]any]
+	if err := decode([]byte(`{"content":[{"amount":0.1000000000000000055511151231257827}],"number":3}`), &page); err != nil {
+		t.Fatal(err)
+	}
+	if n, ok := page.Content[0]["amount"].(json.Number); !ok || n.String() != "0.1000000000000000055511151231257827" || page.Number != 3 || !page.numbered {
+		t.Errorf("page = %+v", page)
 	}
 }
 

@@ -22,6 +22,7 @@ type config struct {
 	maxRetries  int
 	timeout     time.Duration
 	userAgent   string
+	language    string
 }
 
 func defaultConfig() config {
@@ -73,8 +74,10 @@ func WithTokenStore(store TokenStore) Option {
 	}
 }
 
-// WithCodeProvider sets the source of TOTP codes for accounts with two-factor authentication.
-// It is not called for accounts without it. The [github.com/joolertan/whitebird-api/go/otp]
+// WithCodeProvider sets the source of TOTP codes for accounts with two-factor authentication:
+// the client asks it for a code when the server wants one at sign-in, and to confirm sensitive
+// operations such as withdrawals (see [Client.ConfirmOperation]). It is not called for
+// accounts without two-factor authentication. The [github.com/joolertan/whitebird-api/go/otp]
 // package computes codes from the secret.
 func WithCodeProvider(provider CodeProvider) Option {
 	return func(c *config) {
@@ -104,8 +107,10 @@ func WithCaptchaSolver(solve func(ctx context.Context, captcha Captcha) (int, er
 	}
 }
 
-// WithMaxRetries sets how many times an idempotent request is retried after a network error or
-// a 429, 502, 503 or 504 response. The default is 2; 0 disables retries.
+// WithMaxRetries sets how many times a request is retried. GET, HEAD and OPTIONS requests are
+// retried after a network error or a 429, 502, 503 or 504 response; other requests only when
+// the connection could not be established or after a 429 response, as they may have taken
+// effect otherwise. The default is 2; 0 disables retries.
 func WithMaxRetries(n int) Option {
 	return func(c *config) {
 		c.maxRetries = max(n, 0)
@@ -117,6 +122,14 @@ func WithMaxRetries(n int) Option {
 func WithTimeout(d time.Duration) Option {
 	return func(c *config) {
 		c.timeout = d
+	}
+}
+
+// WithLanguage sets the Accept-Language header of every request, such as "en" or "ru", which
+// selects the language of the messages the API answers.
+func WithLanguage(language string) Option {
+	return func(c *config) {
+		c.language = language
 	}
 }
 
@@ -168,8 +181,9 @@ func WithRequestMaxRetries(n int) RequestOption {
 	}
 }
 
-// WithIdempotent states whether the request is safe to retry. By default GET, HEAD, PUT, DELETE
-// and OPTIONS requests are retried and POST and PATCH requests are not.
+// WithIdempotent states whether the request is safe to retry after any transient failure, as
+// GET, HEAD and OPTIONS requests are by default. Other requests are retried only when they did
+// not reach the server or were rate limited.
 func WithIdempotent(idempotent bool) RequestOption {
 	return func(c *callConfig) {
 		c.idempotent = idempotent
@@ -186,7 +200,7 @@ func WithoutAuth() RequestOption {
 
 // WithRetcodeEnvelope unwraps a response of the form {"retCode", "retMsg", "result"}, as market
 // data endpoints answer, for a call through [Client.Request]: the result is decoded, and a
-// non-zero retCode fails the call with an [*APIError].
+// retCode other than 0 and 200 fails the call with an [*APIError].
 func WithRetcodeEnvelope() RequestOption {
 	return func(c *callConfig) {
 		c.envelope = true

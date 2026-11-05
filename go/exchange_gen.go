@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"iter"
 	"net/http"
-	"net/url"
 )
 
 // ExchangeResource holds the operations available as Client.Exchange.
@@ -28,18 +27,23 @@ type ExchangeAssetsResource struct {
 // ExchangeAssetsListParams holds the parameters of [ExchangeAssetsResource.List].
 type ExchangeAssetsListParams struct {
 	Destination *ExchangeDestination `query:"destination"`
-	MerchantID  *string              `query:"merchantId"`
+	// Defaults to "11111111-1111-1111-1111-111111111111".
+	MerchantID *string `query:"merchantId"`
 }
 
 // List lists assets available for a destination.
 //
-// Sent without a body. `merchantId` scopes the list to a merchant widget; the web app falls back
-// to `11111111-1111-1111-1111-111111111111` when embedded without one.
+// Sent without a body. `merchantId` scopes the list to a merchant widget; the web app always sends
+// one, `11111111-1111-1111-1111-111111111111` (Whitebird itself) unless embedded in a merchant's
+// widget.
 //
 // It calls POST /api/v2/exchange/client/assets.
 //
 // This endpoint is experimental and may change without notice.
 func (r *ExchangeAssetsResource) List(ctx context.Context, params ExchangeAssetsListParams, opts ...RequestOption) (*ExchangeAssets, error) {
+	if params.MerchantID == nil {
+		params.MerchantID = Ptr[string]("11111111-1111-1111-1111-111111111111")
+	}
 	return call[*ExchangeAssets](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,
@@ -130,6 +134,7 @@ type ExchangeOrdersRejectParams struct {
 
 // ExchangeOrdersCurrentParams holds the parameters of [ExchangeOrdersResource.Current].
 type ExchangeOrdersCurrentParams struct {
+	// Defaults to "EXCHANGE".
 	Destination *ExchangeDestination `query:"destination"`
 }
 
@@ -137,19 +142,23 @@ type ExchangeOrdersCurrentParams struct {
 // [ExchangeOrdersResource.HistoryPage].
 type ExchangeOrdersHistoryParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
-	// Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
-	Sort []string `query:"sort" json:"-"`
-	// The server defaults to 20.
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
+	// Sort criteria in the format `property,(asc|desc)`. Defaults to "creationDate,desc".
+	Sort *string `query:"sort" json:"-"`
+	// Defaults to 20.
 	Limit                *int                  `json:"limit,omitzero"`
 	InputAssets          []string              `json:"inputAssets,omitzero"`
 	OutputAssets         []string              `json:"outputAssets,omitzero"`
 	InputOperationTypes  []ExchangeLegType     `json:"inputOperationTypes,omitzero"`
 	OutputOperationTypes []ExchangeLegType     `json:"outputOperationTypes,omitzero"`
 	Statuses             []ExchangeOrderStatus `json:"statuses,omitzero"`
-	CreationDateFrame    *ExchangeDateFrame    `json:"creationDateFrame,omitzero"`
+	// Orders with one of these assets on either leg.
+	Assets []string `json:"assets,omitzero"`
+	// Orders with one of these leg types on either leg.
+	OperationTypes    []ExchangeLegType  `json:"operationTypes,omitzero"`
+	CreationDateFrame *ExchangeDateFrame `json:"creationDateFrame,omitzero"`
 }
 
 // Create accepts a quote. For a `FIAT_PROVIDER` input the response carries the payment step:
@@ -165,6 +174,10 @@ type ExchangeOrdersHistoryParams struct {
 // `INVALID_CORPORATE_CARD`, `SINGLE_OP_MAX_VOLUME_EXCEEDED`, `OP_MAX_VOLUME_FOR_PERIOD_REACHED`,
 // `OP_MAX_NUM_FOR_PERIOD_REACHED`, `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON`
 // (anti-fraud), `EXCHANGE_UNAVAILABLE`.
+//
+// Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED` (see
+// `user.antifraud` and `kyc.liveness`); after the check, send the same request again. If the quote
+// expired meanwhile it fails with `QUOTE_NOT_FOUND`: request a new quote.
 //
 // It calls POST /api/v3/exchange/client/order.
 //
@@ -185,9 +198,10 @@ func (r *ExchangeOrdersResource) Create(ctx context.Context, params ExchangeOrde
 // This endpoint is experimental and may change without notice.
 func (r *ExchangeOrdersResource) Get(ctx context.Context, orderID string, opts ...RequestOption) (*ExchangeOrder, error) {
 	return call[*ExchangeOrder](ctx, r.core, &operation{
-		service: ServiceAPI,
-		method:  http.MethodGet,
-		path:    "/api/v3/exchange/client/order/" + url.PathEscape(orderID),
+		service:    ServiceAPI,
+		method:     http.MethodGet,
+		path:       "/api/v3/exchange/client/order/{orderId}",
+		pathParams: []string{orderID},
 	}, opts)
 }
 
@@ -198,10 +212,11 @@ func (r *ExchangeOrdersResource) Get(ctx context.Context, orderID string, opts .
 // This endpoint is experimental and may change without notice.
 func (r *ExchangeOrdersResource) Reject(ctx context.Context, orderID string, params ExchangeOrdersRejectParams, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceAPI,
-		method:  http.MethodPost,
-		path:    "/api/v3/exchange/client/order/" + url.PathEscape(orderID) + "/reject",
-		body:    jsonBody(params),
+		service:    ServiceAPI,
+		method:     http.MethodPost,
+		path:       "/api/v3/exchange/client/order/{orderId}/reject",
+		pathParams: []string{orderID},
+		body:       jsonBody(params),
 	}, opts)
 }
 
@@ -212,6 +227,9 @@ func (r *ExchangeOrdersResource) Reject(ctx context.Context, orderID string, par
 //
 // This endpoint is experimental and may change without notice.
 func (r *ExchangeOrdersResource) Current(ctx context.Context, params ExchangeOrdersCurrentParams, opts ...RequestOption) (*ExchangeOrder, error) {
+	if params.Destination == nil {
+		params.Destination = Ptr[ExchangeDestination]("EXCHANGE")
+	}
 	return call[*ExchangeOrder](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodGet,
@@ -252,6 +270,15 @@ func (r *ExchangeOrdersResource) History(ctx context.Context, params ExchangeOrd
 // HistoryPage is like [ExchangeOrdersResource.History] but returns a single page, the one selected
 // by params.Page, along with the pagination metadata.
 func (r *ExchangeOrdersResource) HistoryPage(ctx context.Context, params ExchangeOrdersHistoryParams, opts ...RequestOption) (*Page[ExchangeOrder], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
 	return call[*Page[ExchangeOrder]](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,
@@ -282,8 +309,9 @@ type ExchangeQuotesCreateParams struct {
 // Prices a conversion between two legs. Each leg is an `INTERNAL_BALANCE` (Whitebird electronic
 // wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER` (bank card / bank
 // account of a payment provider). Set the amount on exactly one leg; the other one is computed.
-// The quote `id` is then passed to `exchange.orders.create`. The web app re-requests the quote
-// every 15 s while the form is open.
+// The quote `id` is then passed to `exchange.orders.create`. The quote is valid until
+// `expirationDate`; the web app requests a new one 2 s before that (`expirationDate` -
+// `creationDate` - 2 s), or every 15 s when the dates are missing.
 //
 // Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`,
 // `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.

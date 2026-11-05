@@ -90,6 +90,7 @@ func (c *Client) initResources() {
 	c.Market = &MarketResource{core: c.core}
 	c.Merchant = &MerchantResource{
 		APIKeys:    &MerchantAPIKeysResource{core: c.core},
+		Orders:     &MerchantOrdersResource{core: c.core},
 		Statistics: &MerchantStatisticsResource{core: c.core},
 		Webhooks:   &MerchantWebhooksResource{core: c.core},
 		core:       c.core,

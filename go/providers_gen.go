@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
 )
 
 // ProvidersResource holds the operations available as Client.Providers.
@@ -69,9 +68,10 @@ func (r *ProvidersAlfaResource) CardBindURL(ctx context.Context, params Provider
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersAlfaResource) UnbindCard(ctx context.Context, cardID string, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceAlfa,
-		method:  http.MethodPost,
-		path:    "/api/v1/customer/card/unbind/" + url.PathEscape(cardID),
+		service:    ServiceAlfa,
+		method:     http.MethodPost,
+		path:       "/api/v1/customer/card/unbind/{cardId}",
+		pathParams: []string{cardID},
 	}, opts)
 }
 
@@ -143,8 +143,9 @@ func (r *ProvidersAlfaCryptoCardResource) Validate(ctx context.Context, opts ...
 //
 // Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set, the
 // user identifies through MSI (the Belarusian interbank identification system) by opening
-// `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check in its own UI and
-// then calls `client_info` to get the bank's application page.
+// `redirectUrl` in a browser. Otherwise the web app runs a SumSub liveness check (WebSDK with a
+// token from `kyc.sumsub.token` with `levelType=LIVENESS`) and then calls `client_info` to get the
+// bank's application page.
 //
 // It calls POST /api/v1/release/partner/init.
 //
@@ -181,7 +182,7 @@ type ProvidersAssistResource struct {
 // ProvidersAssistCardBindFormParams holds the parameters of
 // [ProvidersAssistResource.CardBindForm].
 type ProvidersAssistCardBindFormParams struct {
-	// Binding owner type; the web app always sends `CLIENT`. The server defaults to "CLIENT".
+	// Binding owner type; the web app always sends `CLIENT`. Defaults to "CLIENT".
 	Type *AssistCardBindType `query:"type"`
 	// Where Assist sends the browser after the binding.
 	ReturnURL string `query:"returnUrl"`
@@ -189,7 +190,7 @@ type ProvidersAssistCardBindFormParams struct {
 
 // ProvidersAssistCardBindURLParams holds the parameters of [ProvidersAssistResource.CardBindURL].
 type ProvidersAssistCardBindURLParams struct {
-	// Binding owner type; the web app always sends `CLIENT`. The server defaults to "CLIENT".
+	// Binding owner type; the web app always sends `CLIENT`. Defaults to "CLIENT".
 	Type *AssistCardBindType `query:"type"`
 	// Where Assist sends the browser after the binding.
 	ReturnURL string `query:"returnUrl"`
@@ -205,12 +206,16 @@ type ProvidersAssistCardBindURLParams struct {
 //
 // The user enters the card details and passes 3-D Secure on the Assist page, then the browser is
 // sent back to `returnUrl`. The web app passes
-// `https://whitebird.io/account/payments?card_bind=success`.
+// `https://whitebird.io/account/payments?card_bind=success`. Assist appends `billnumber` to it,
+// and reaching that page does not prove the card was bound: check `payments.methods.list`.
 //
 // It calls GET /api/v1/card/bind/post-form.
 //
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersAssistResource) CardBindForm(ctx context.Context, params ProvidersAssistCardBindFormParams, opts ...RequestOption) (*AssistCardBindForm, error) {
+	if params.Type == nil {
+		params.Type = Ptr[AssistCardBindType]("CLIENT")
+	}
 	return call[*AssistCardBindForm](ctx, r.core, &operation{
 		service: ServiceAssist,
 		method:  http.MethodGet,
@@ -221,14 +226,17 @@ func (r *ProvidersAssistResource) CardBindForm(ctx context.Context, params Provi
 
 // CardBindURL gets an Assist card binding URL.
 //
-// Older variant of `card_bind_form`. The current web app only references it from unused legacy
-// code and never reads the response; it presumably returns a URL of the Assist binding page to
-// open in a browser, which sends the user back to `returnUrl`.
+// Older variant of `card_bind_form`. The current web app only builds this request in unused legacy
+// code and never sends it; it presumably returns a URL of the Assist binding page to open in a
+// browser, which sends the user back to `returnUrl`.
 //
 // It calls GET /api/v1/card/bind/url.
 //
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersAssistResource) CardBindURL(ctx context.Context, params ProvidersAssistCardBindURLParams, opts ...RequestOption) (json.RawMessage, error) {
+	if params.Type == nil {
+		params.Type = Ptr[AssistCardBindType]("CLIENT")
+	}
 	return call[json.RawMessage](ctx, r.core, &operation{
 		service: ServiceAssist,
 		method:  http.MethodGet,
@@ -244,9 +252,10 @@ func (r *ProvidersAssistResource) CardBindURL(ctx context.Context, params Provid
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersAssistResource) UnbindCard(ctx context.Context, cardID string, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceAssist,
-		method:  http.MethodPost,
-		path:    "/api/v1/card/unbind/" + url.PathEscape(cardID),
+		service:    ServiceAssist,
+		method:     http.MethodPost,
+		path:       "/api/v1/card/unbind/{cardId}",
+		pathParams: []string{cardID},
 	}, opts)
 }
 
@@ -263,9 +272,9 @@ type ProvidersBepaidCardBindURLParams struct {
 
 // CardBindURL gets a bePaid card binding URL.
 //
-// Legacy: the current web app never reads the response. Like the other binding endpoints it
-// presumably returns the URL of the bePaid page where the user enters the card details and passes
-// 3-D Secure in a browser before being sent back to `returnUrl`.
+// Legacy: the current web app only builds this request in unused code and never sends it. Like the
+// other binding endpoints it presumably returns the URL of the bePaid page where the user enters
+// the card details and passes 3-D Secure in a browser before being sent back to `returnUrl`.
 //
 // It calls GET /api/v1/card/bind/url.
 //
@@ -344,9 +353,10 @@ func (r *ProvidersMtsResource) BindCard(ctx context.Context, params ProvidersMts
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersMtsResource) UnbindCard(ctx context.Context, cardID string, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceMts,
-		method:  http.MethodPost,
-		path:    "/api/v1/card/unbind/" + url.PathEscape(cardID),
+		service:    ServiceMts,
+		method:     http.MethodPost,
+		path:       "/api/v1/card/unbind/{cardId}",
+		pathParams: []string{cardID},
 	}, opts)
 }
 
@@ -365,12 +375,12 @@ func (r *ProvidersMtsResource) Countries(ctx context.Context, opts ...RequestOpt
 	}, opts)
 }
 
-// PendingDepositNumber gets the order number of a pending MTS deposit.
+// PendingDepositNumber gets the number of a pending MTS deposit.
 //
 // Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
-// (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the cashier or
-// enters in the transfer form. This endpoint returns the number of the client's pending deposit.
-// The response shape is unknown: the web app declares the call but never reads the result.
+// (`MTS_MULTITRANSFER`) are matched by a number that the client gives to the cashier or enters in
+// the transfer form. The web app declares this call (as a phone number code of the pending
+// deposit) but never sends it, so the meaning and shape of the answer are unknown.
 //
 // It calls GET /api/v1/operations/deposit/pending-number.
 //
@@ -414,9 +424,11 @@ type ProvidersMtsQRCommissionParams struct {
 //  2. For a static QR code (`payments[0].qrType == "static"`) the payer chooses the amount
 //     and gets the amount to pay from `commission`; otherwise the amount is
 //     `payments[0].settlementAmount`.
-//  3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
-//     (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or by
-//     selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+//  3. Pay through the exchange API: from a RUB balance, first
+//     `balance.withdrawals.calculate_fiat` with `fiatProviderType: MTS_QR`,
+//     `paymentToken: qrTicketId`, `commissionType: ADD` and the amount, then
+//     `balance.withdrawals.create_fiat` with the same fields plus `accountType`; or by selling
+//     crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
 //     token: qrTicketId}`.
 //
 // This endpoint is experimental and may change without notice.
@@ -516,9 +528,10 @@ func (r *ProvidersStatusbankResource) RegisterCard(ctx context.Context, params P
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersStatusbankResource) CardDetails(ctx context.Context, cardID string, opts ...RequestOption) (*StatusbankCardDetails, error) {
 	return call[*StatusbankCardDetails](ctx, r.core, &operation{
-		service: ServiceStatusbank,
-		method:  http.MethodGet,
-		path:    "/api/v1/statusbank/card/" + url.PathEscape(cardID),
+		service:    ServiceStatusbank,
+		method:     http.MethodGet,
+		path:       "/api/v1/statusbank/card/{cardId}",
+		pathParams: []string{cardID},
 	}, opts)
 }
 
@@ -557,7 +570,7 @@ type ProvidersVtbCortiMilliRateParams struct {
 	// Recipient's 16-digit Corti Milli card number, digits only. The web app also sends the card token
 	// of an existing quote's output here.
 	Card string `json:"card"`
-	// The server defaults to "EXCHANGE".
+	// Defaults to "EXCHANGE".
 	ServiceType *VtbCortiMilliServiceType `json:"serviceType,omitzero"`
 }
 
@@ -570,6 +583,9 @@ type ProvidersVtbCortiMilliRateParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *ProvidersVtbCortiMilliResource) Rate(ctx context.Context, params ProvidersVtbCortiMilliRateParams, opts ...RequestOption) (*VtbCortiMilliRate, error) {
+	if params.ServiceType == nil {
+		params.ServiceType = Ptr[VtbCortiMilliServiceType]("EXCHANGE")
+	}
 	return call[*VtbCortiMilliRate](ctx, r.core, &operation{
 		service: ServiceVtb,
 		method:  http.MethodPost,

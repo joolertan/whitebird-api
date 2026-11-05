@@ -33,7 +33,7 @@ type KYCAgreeOfferParams struct {
 
 // KYCGetParams holds the parameters of [KYCResource.Get].
 type KYCGetParams struct {
-	// Verification provider; the web app defaults to `SUMSUB`.
+	// Verification provider. Defaults to "SUMSUB".
 	Provider *KYCProvider `query:"provider"`
 }
 
@@ -55,9 +55,8 @@ type KYCSubmitParams struct {
 
 // AgreeOffer accepts the public offer.
 //
-// Sent before verification when the user profile has no `offerAgreement` yet. The web app retries
-// a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the client record is
-// still being created.
+// Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
+// `kyc.submit` answered `firstStageConfirmed: true`, for MSI before `kyc.msi.authenticate`.
 //
 // It calls POST /api/v2/kyc/client/agreed-offer.
 func (r *KYCResource) AgreeOffer(ctx context.Context, params KYCAgreeOfferParams, opts ...RequestOption) (json.RawMessage, error) {
@@ -79,6 +78,9 @@ func (r *KYCResource) AgreeOffer(ctx context.Context, params KYCAgreeOfferParams
 //
 // This endpoint is experimental and may change without notice.
 func (r *KYCResource) Get(ctx context.Context, params KYCGetParams, opts ...RequestOption) (*KYCVerification, error) {
+	if params.Provider == nil {
+		params.Provider = Ptr[KYCProvider]("SUMSUB")
+	}
 	return call[*KYCVerification](ctx, r.core, &operation{
 		service: ServiceKYC,
 		method:  http.MethodGet,
@@ -275,12 +277,16 @@ type KYCMsiResource struct {
 
 // KYCMsiAuthenticateParams holds the parameters of [KYCMsiResource.Authenticate].
 type KYCMsiAuthenticateParams struct {
-	// Legal entity identification; the web app always sends `false`.
-	IsUl          *bool   `query:"isUl"`
-	RedirectURL   *string `query:"redirectUrl"`
-	DuplicateURL  *string `query:"duplicateUrl"`
-	FailureURL    *string `query:"failureUrl"`
-	DocExpiredURL *string `query:"docExpiredUrl"`
+	// Legal entity identification. Defaults to false.
+	IsUl *bool `query:"isUl"`
+	// Page MSI returns to after a successful identification.
+	RedirectURL string `query:"redirectUrl"`
+	// Page MSI returns to when the person is already identified for another account.
+	DuplicateURL string `query:"duplicateUrl"`
+	// Page MSI returns to when the identification failed.
+	FailureURL string `query:"failureUrl"`
+	// Page MSI returns to when the identity document has expired.
+	DocExpiredURL string `query:"docExpiredUrl"`
 }
 
 // Authenticate returns the URL of the Belarusian interbank identification system (MSI) to send the
@@ -291,6 +297,9 @@ type KYCMsiAuthenticateParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *KYCMsiResource) Authenticate(ctx context.Context, params KYCMsiAuthenticateParams, opts ...RequestOption) (*KYCMsiRedirect, error) {
+	if params.IsUl == nil {
+		params.IsUl = Ptr[bool](false)
+	}
 	return call[*KYCMsiRedirect](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodGet,

@@ -51,6 +51,25 @@ func TestEventReader(t *testing.T) {
 	}
 }
 
+func TestEventReaderLastIDOnDispatch(t *testing.T) {
+	// The connection drops in the middle of event 2: a reconnection must ask for it again.
+	r := newEventReader(strings.NewReader("id: 1\ndata: a\n\nid: 2\ndata: b"))
+	if event, err := r.next(); err != nil || event.id != "1" {
+		t.Fatalf("next() = %+v, %v", event, err)
+	}
+	if _, err := r.next(); !errors.Is(err, io.EOF) {
+		t.Fatalf("next() = %v, want io.EOF", err)
+	}
+	if r.lastID != "1" {
+		t.Errorf("last ID = %q, want the ID of the last event dispatched", r.lastID)
+	}
+}
+
+// eventStream writes the headers of an event stream.
+func eventStream(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+}
+
 type notification struct {
 	Order string `json:"order"`
 }
@@ -68,7 +87,7 @@ func TestStreamReconnects(t *testing.T) {
 		mu.Lock()
 		lastIDs = append(lastIDs, r.Header.Get("Last-Event-ID"))
 		mu.Unlock()
-		w.Header().Set("Content-Type", "text/event-stream")
+		eventStream(w)
 		switch connections.Add(1) {
 		case 1:
 			fmt.Fprint(w, "retry: 10\n\nevent: order-updates\nid: 1\ndata: {\"order\":\"a\"}\n\n")
@@ -133,7 +152,7 @@ func TestStreamStopsOnRejectedToken(t *testing.T) {
 	if len(errs) != 1 || !errors.Is(errs[0], ErrAuthentication) {
 		t.Errorf("errors = %v, want a single ErrAuthentication", errs)
 	}
-	if connections.Load() != 2 || len(auth.grants()) != 2 {
+	if connections.Load() != 2 || !slices.Equal(auth.grants(), []string{"password", "password", "refresh_token"}) {
 		t.Errorf("connections = %d, grants = %v; want 2 connections around one refresh", connections.Load(), auth.grants())
 	}
 }
@@ -153,35 +172,28 @@ func TestStreamFailsFirstConnection(t *testing.T) {
 	}
 }
 
-func TestStreamDecodeError(t *testing.T) {
+func TestStreamSkipsUndecodableEvents(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprint(w, "event: sse-status\ndata: connected\n\ndata: {\"order\":\"a\"}\n\n")
+		eventStream(w)
+		fmt.Fprint(w, "event: sse-status\ndata: connected\n\ndata:\n\ndata: {\"order\":\"a\"}\n\n")
 	})
 	client := newTestClient(t, mux)
 	op := testOperation(http.MethodGet, "/sse")
 	op.public = true
 
-	var events []StreamEvent[notification]
-	var errs []error
 	for event, err := range stream[notification](context.Background(), client.core, op, nil) {
-		events = append(events, event)
-		errs = append(errs, err)
-		if len(events) == 2 {
-			break
+		if err != nil || event.Data.Order != "a" {
+			t.Errorf("first event = %+v, %v; want the order, the keep-alives skipped", event, err)
 		}
-	}
-	if errs[0] == nil || string(events[0].Raw) != "connected" || events[0].Name != "sse-status" {
-		t.Errorf("first event = %+v, %v; want the raw data and a decoding error", events[0], errs[0])
-	}
-	if errs[1] != nil || events[1].Data.Order != "a" {
-		t.Errorf("second event = %+v, %v", events[1], errs[1])
+		break
 	}
 }
 
-func TestStreamEndsWithContext(t *testing.T) {
+func TestStreamEndsQuietlyWithContext(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, r *http.Request) {
+		eventStream(w)
 		fmt.Fprint(w, "data: {}\n\n")
 		w.(http.Flusher).Flush()
 		<-r.Context().Done()
@@ -197,7 +209,79 @@ func TestStreamEndsWithContext(t *testing.T) {
 		errs = append(errs, err)
 		cancel()
 	}
-	if len(errs) != 2 || errs[0] != nil || !errors.Is(errs[1], context.Canceled) {
-		t.Errorf("errors = %v, want an event, then context.Canceled", errs)
+	if len(errs) != 1 || errs[0] != nil {
+		t.Errorf("errors = %v, want one event and no error", errs)
+	}
+}
+
+func TestStreamEndsOnNoContent(t *testing.T) {
+	var connections atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, _ *http.Request) {
+		if connections.Add(1) == 1 {
+			eventStream(w)
+			fmt.Fprint(w, "data: {\"order\":\"a\"}\n\n")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	client := newTestClient(t, mux)
+	op := testOperation(http.MethodGet, "/sse")
+	op.public = true
+
+	var events []error
+	for _, err := range stream[notification](context.Background(), client.core, op, nil) {
+		events = append(events, err)
+	}
+	if len(events) != 1 || events[0] != nil || connections.Load() != 2 {
+		t.Errorf("events = %v after %d connections, want one event, then the end", events, connections.Load())
+	}
+}
+
+func TestStreamRetriesWrongContentType(t *testing.T) {
+	var connections atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, _ *http.Request) {
+		switch connections.Add(1) {
+		case 2:
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, "<html>maintenance</html>")
+		default:
+			eventStream(w)
+			fmt.Fprintf(w, "data: {\"order\":\"%d\"}\n\n", connections.Load())
+		}
+	})
+	client := newTestClient(t, mux)
+	op := testOperation(http.MethodGet, "/sse")
+	op.public = true
+
+	var orders []string
+	for event, err := range stream[notification](context.Background(), client.core, op, nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if orders = append(orders, event.Data.Order); len(orders) == 2 {
+			break
+		}
+	}
+	if !slices.Equal(orders, []string{"1", "3"}) {
+		t.Errorf("orders = %v, want the page without events skipped", orders)
+	}
+
+	// The first connection must succeed, so that a wrong URL does not go unnoticed.
+	connections.Store(1)
+	for _, err := range stream[notification](context.Background(), client.core, op, nil) {
+		if !errors.Is(err, ErrServer) {
+			t.Errorf("error = %v, want ErrServer", err)
+		}
+		break
+	}
+}
+
+func TestStreamBackoffDoesNotOverflow(t *testing.T) {
+	for n := range 200 {
+		if d := jitter(backoff(time.Second, maxReconnectDelay, n)); d < 0 || d > maxReconnectDelay {
+			t.Fatalf("delay after %d failures = %v", n, d)
+		}
 	}
 }

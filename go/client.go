@@ -3,7 +3,7 @@ package whitebird
 import (
 	"context"
 	"net/http"
-	"time"
+	"strings"
 )
 
 // NewClient returns a client configured by opts. A client without credentials can call public
@@ -20,7 +20,7 @@ func NewClient(opts ...Option) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Client{core: &core{cfg: cfg, baseURLs: baseURLs, now: time.Now, sleep: sleep}}
+	c := &Client{core: newCore(cfg, baseURLs)}
 	c.initResources()
 	return c, nil
 }
@@ -28,6 +28,11 @@ func NewClient(opts ...Option) (*Client, error) {
 // Login makes sure the client holds a valid access token: it loads one from the token store,
 // refreshes it if it is about to expire, or logs in with the credentials. Calling Login is
 // optional, as the first call that needs a token does the same; it is a way to fail early.
+//
+// A password login follows the web application: the client asks whether the account has
+// two-factor authentication, then sends the password, and the TOTP code from the code provider
+// when the server asks for it. Accounts without two-factor authentication answer a captcha
+// instead (see [WithCaptchaSolver]).
 func (c *Client) Login(ctx context.Context) error {
 	_, err := c.core.accessToken(ctx)
 	return err
@@ -37,14 +42,15 @@ func (c *Client) Login(ctx context.Context) error {
 // such as withdrawals require, sets it on the client like [Client.SetMFAToken] and returns it.
 // With an empty code, the code comes from the provider set with [WithCodeProvider].
 //
-// The generated methods of these operations call ConfirmOperation on their own when the client
-// has a code provider: before the first request if no token is set, and again if the API refuses
-// the token. Without a code provider, confirm the operation before calling them:
+// The generated methods of these operations confirm on their own when the client has a code
+// provider: if the API refuses the operation for want of a valid token, they get one and send
+// the operation again. Without a code provider, they fail with [ErrMFARequired]; confirm the
+// operation and call them again:
 //
 //	if _, err := client.ConfirmOperation(ctx, "WITHDRAWAL", code); err != nil {
 //		return err
 //	}
-//	err := client.Balance.Withdrawals.CreateCrypto(ctx, params)
+//	withdrawal, err := client.Balance.Withdrawals.CreateCrypto(ctx, params)
 func (c *Client) ConfirmOperation(ctx context.Context, operation, code string) (string, error) {
 	return c.core.confirmOperation(ctx, operation, code)
 }
@@ -53,7 +59,7 @@ func (c *Client) ConfirmOperation(ctx context.Context, operation, code string) (
 // require. The client sends it in the x-mfa-token header of every request until it is replaced
 // or cleared with an empty token.
 func (c *Client) SetMFAToken(token string) {
-	if token == "" {
+	if token = strings.TrimSpace(token); token == "" {
 		c.core.mfaToken.Store(nil)
 		return
 	}
@@ -70,9 +76,9 @@ func (c *Client) SetMFAToken(token string) {
 // *[]byte, which receives the raw body. [WithRetcodeEnvelope] unwraps the envelope of market
 // data responses first:
 //
-//	var out struct{ List []json.RawMessage }
+//	var instruments []json.RawMessage
 //	err := client.Request(ctx, whitebird.ServiceMarketData, http.MethodGet, "/api/v1/market/instruments",
-//		nil, &out, whitebird.WithoutAuth(), whitebird.WithRetcodeEnvelope())
+//		nil, &instruments, whitebird.WithoutAuth(), whitebird.WithRetcodeEnvelope())
 func (c *Client) Request(ctx context.Context, service Service, method, path string, body, result any, opts ...RequestOption) error {
 	op := &operation{service: service, method: method, path: path, body: anyBody(body)}
 	data, err := c.core.send(ctx, op, "application/json", opts)
@@ -83,5 +89,5 @@ func (c *Client) Request(ctx context.Context, service Service, method, path stri
 		*raw = data
 		return nil
 	}
-	return decode(data, result)
+	return decodeResult(data, result)
 }

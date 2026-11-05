@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
 )
 
 // CurrentAccountResource holds the operations available as Client.CurrentAccount.
@@ -25,9 +24,10 @@ type CurrentAccountResource struct {
 // This endpoint is experimental and may change without notice.
 func (r *CurrentAccountResource) Delete(ctx context.Context, accountID string, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceCurrentAccount,
-		method:  http.MethodDelete,
-		path:    "/api/v1/currentAccount/" + url.PathEscape(accountID),
+		service:    ServiceCurrentAccount,
+		method:     http.MethodDelete,
+		path:       "/api/v1/currentAccount/{accountId}",
+		pathParams: []string{accountID},
 	}, opts)
 }
 
@@ -39,37 +39,29 @@ type CurrentAccountInvoicesResource struct {
 // CurrentAccountInvoicesDownloadParams holds the parameters of
 // [CurrentAccountInvoicesResource.Download].
 type CurrentAccountInvoicesDownloadParams struct {
-	Limit               *int                     `json:"limit,omitzero"`
-	CompletionDateFrame *CurrentAccountDateFrame `json:"completionDateFrame,omitzero"`
-	Type                *string                  `json:"type,omitzero"`
-	Format              *string                  `json:"format,omitzero"`
+	// Document type; its code path could send it, but never does for invoices.
+	Type *string `json:"type,omitzero"`
 }
 
 // CurrentAccountInvoicesEmailParams holds the parameters of
 // [CurrentAccountInvoicesResource.Email].
 type CurrentAccountInvoicesEmailParams struct {
-	Limit               *int                     `json:"limit,omitzero"`
-	CompletionDateFrame *CurrentAccountDateFrame `json:"completionDateFrame,omitzero"`
-	Type                *string                  `json:"type,omitzero"`
-	Format              *string                  `json:"format,omitzero"`
+	// Document type; its code path could send it, but never does for invoices.
+	Type *string `json:"type,omitzero"`
 }
 
 // CurrentAccountInvoicesDownloadDepositParams holds the parameters of
 // [CurrentAccountInvoicesResource.DownloadDeposit].
 type CurrentAccountInvoicesDownloadDepositParams struct {
-	Limit               *int                     `json:"limit,omitzero"`
-	CompletionDateFrame *CurrentAccountDateFrame `json:"completionDateFrame,omitzero"`
-	Type                *string                  `json:"type,omitzero"`
-	Format              *string                  `json:"format,omitzero"`
+	// Document type; its code path could send it, but never does for invoices.
+	Type *string `json:"type,omitzero"`
 }
 
 // CurrentAccountInvoicesEmailDepositParams holds the parameters of
 // [CurrentAccountInvoicesResource.EmailDeposit].
 type CurrentAccountInvoicesEmailDepositParams struct {
-	Limit               *int                     `json:"limit,omitzero"`
-	CompletionDateFrame *CurrentAccountDateFrame `json:"completionDateFrame,omitzero"`
-	Type                *string                  `json:"type,omitzero"`
-	Format              *string                  `json:"format,omitzero"`
+	// Document type; its code path could send it, but never does for invoices.
+	Type *string `json:"type,omitzero"`
 }
 
 // CurrentAccountInvoicesDownloadByTokenParams holds the parameters of
@@ -88,10 +80,11 @@ type CurrentAccountInvoicesDownloadByTokenParams struct {
 // This endpoint is experimental and may change without notice.
 func (r *CurrentAccountInvoicesResource) Download(ctx context.Context, invoiceID string, params CurrentAccountInvoicesDownloadParams, opts ...RequestOption) ([]byte, error) {
 	return r.core.binary(ctx, &operation{
-		service: ServiceCurrentAccount,
-		method:  http.MethodPost,
-		path:    "/api/v1/currentAccount/order/" + url.PathEscape(invoiceID) + "/invoice",
-		body:    jsonBody(params),
+		service:    ServiceCurrentAccount,
+		method:     http.MethodPost,
+		path:       "/api/v1/currentAccount/order/{invoiceId}/invoice",
+		pathParams: []string{invoiceID},
+		body:       jsonBody(params),
 	}, opts)
 }
 
@@ -102,10 +95,11 @@ func (r *CurrentAccountInvoicesResource) Download(ctx context.Context, invoiceID
 // This endpoint is experimental and may change without notice.
 func (r *CurrentAccountInvoicesResource) Email(ctx context.Context, invoiceID string, params CurrentAccountInvoicesEmailParams, opts ...RequestOption) error {
 	return r.core.exec(ctx, &operation{
-		service: ServiceCurrentAccount,
-		method:  http.MethodPost,
-		path:    "/api/v1/currentAccount/order/" + url.PathEscape(invoiceID) + "/email/invoice",
-		body:    jsonBody(params),
+		service:    ServiceCurrentAccount,
+		method:     http.MethodPost,
+		path:       "/api/v1/currentAccount/order/{invoiceId}/email/invoice",
+		pathParams: []string{invoiceID},
+		body:       jsonBody(params),
 	}, opts)
 }
 
@@ -119,10 +113,11 @@ func (r *CurrentAccountInvoicesResource) Email(ctx context.Context, invoiceID st
 // This endpoint is experimental and may change without notice.
 func (r *CurrentAccountInvoicesResource) DownloadDeposit(ctx context.Context, invoiceID string, params CurrentAccountInvoicesDownloadDepositParams, opts ...RequestOption) ([]byte, error) {
 	return r.core.binary(ctx, &operation{
-		service: ServiceCurrentAccount,
-		method:  http.MethodPost,
-		path:    "/api/v1/currentAccount/order/deposit/invoice/" + url.PathEscape(invoiceID),
-		body:    jsonBody(params),
+		service:    ServiceCurrentAccount,
+		method:     http.MethodPost,
+		path:       "/api/v1/currentAccount/order/deposit/invoice/{invoiceId}",
+		pathParams: []string{invoiceID},
+		body:       jsonBody(params),
 	}, opts)
 }
 
@@ -133,10 +128,11 @@ func (r *CurrentAccountInvoicesResource) DownloadDeposit(ctx context.Context, in
 // This endpoint is experimental and may change without notice.
 func (r *CurrentAccountInvoicesResource) EmailDeposit(ctx context.Context, invoiceID string, params CurrentAccountInvoicesEmailDepositParams, opts ...RequestOption) error {
 	return r.core.exec(ctx, &operation{
-		service: ServiceCurrentAccount,
-		method:  http.MethodPost,
-		path:    "/api/v1/currentAccount/order/deposit/email/invoice/" + url.PathEscape(invoiceID),
-		body:    jsonBody(params),
+		service:    ServiceCurrentAccount,
+		method:     http.MethodPost,
+		path:       "/api/v1/currentAccount/order/deposit/email/invoice/{invoiceId}",
+		pathParams: []string{invoiceID},
+		body:       jsonBody(params),
 	}, opts)
 }
 

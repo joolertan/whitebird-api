@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Sentinel errors classify an [*APIError]; test for them with [errors.Is]. An error matches its
@@ -31,8 +32,8 @@ var (
 // APIError is an error answered by the API.
 //
 // Services answer errors as {"code", "status", "subStatus", "message", "fields"}, the
-// authorization server as {"error", "error_description"}, and market data with a non-zero
-// retCode in an HTTP 200 response.
+// authorization server as {"error", "error_description"}, and market data as {"retCode",
+// "retMsg"}, also in HTTP 200 responses.
 type APIError struct {
 	// StatusCode is the HTTP status code.
 	StatusCode int
@@ -55,6 +56,8 @@ type APIError struct {
 	// sentinel is the class of an error that the client recognizes from the context of the
 	// request rather than from the response alone.
 	sentinel error
+	// status is the "status" field as sent, which some services fill with a sentence.
+	status string
 }
 
 func (e *APIError) Error() string {
@@ -103,8 +106,7 @@ func (e *APIError) class() error {
 		return e.sentinel
 	case e.ErrorCode == "SMS_VERIFICATION_REQUIRED" || e.ErrorCode == "LIVENESS_VERIFICATION_REQUIRED":
 		return ErrVerificationRequired
-	case e.ErrorCode == "MFA_CHECKING_REQUIRED" || e.ErrorCode == errorCodeMFARequired ||
-		strings.Contains(strings.ToLower(e.Message), "requires mfa checking"):
+	case e.ErrorCode == errorCodeMFARequired || isMFARefusal(e.Message) || isMFARefusal(e.status):
 		return ErrMFARequired
 	case e.StatusCode == http.StatusUnauthorized || e.ErrorCode == "invalid_grant":
 		return ErrAuthentication
@@ -128,6 +130,15 @@ func (e *APIError) class() error {
 // server has no dedicated error for it, so the client uses the name common to OAuth servers.
 const errorCodeMFARequired = "mfa_required"
 
+// isMFARefusal reports whether text is the refusal of an operation that needs an operation MFA
+// token: "Operation denied, requires mfa checking".
+func isMFARefusal(text string) bool {
+	return strings.Contains(strings.ToLower(text), "requires mfa checking")
+}
+
+// maxErrorText is the length of a non-JSON error body kept as the message.
+const maxErrorText = 300
+
 func newAPIError(r *reply) *APIError {
 	e := &APIError{StatusCode: r.status, Body: r.body}
 	if r.status == http.StatusTooManyRequests || r.status == http.StatusServiceUnavailable {
@@ -135,23 +146,57 @@ func newAPIError(r *reply) *APIError {
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(r.body, &fields); err != nil {
-		if text := strings.TrimSpace(string(r.body)); len(text) <= 200 && !strings.HasPrefix(text, "<") {
-			e.Message = text
-		}
+		e.Message = errorText(r.body)
 		return e
 	}
 	e.Code = jsonInt(fields["code"])
-	e.ErrorCode = firstString(fields, "status", "error")
-	if strings.Contains(e.ErrorCode, " ") {
-		// Spring's default error body puts the reason phrase in "error".
-		e.ErrorCode = ""
+	if e.Code == 0 {
+		e.Code = jsonInt(fields["retCode"])
+	}
+	e.status = firstString(fields, "status")
+	e.Message = firstString(fields, "message", "error_description", "retMsg", "detail")
+	for _, key := range []string{"status", "error"} {
+		value := firstString(fields, key)
+		if !strings.Contains(value, " ") {
+			if e.ErrorCode = value; value != "" {
+				break
+			}
+			continue
+		}
+		// A sentence, not a code: Spring's default error body puts the reason phrase in
+		// "error", and some services explain the error in "status".
+		if e.Message == "" {
+			e.Message = value
+		}
 	}
 	e.SubStatus = firstString(fields, "subStatus")
-	e.Message = firstString(fields, "message", "error_description", "detail")
 	if f := fields["fields"]; len(f) > 0 && !bytes.Equal(f, []byte("null")) {
 		e.Fields = f
 	}
 	return e
+}
+
+// errorText returns the text of a non-JSON error body: the title of an HTML page, or the text
+// itself, shortened.
+func errorText(body []byte) string {
+	text := strings.TrimSpace(string(body))
+	if strings.HasPrefix(text, "<") {
+		lower := strings.ToLower(text)
+		start, end := strings.Index(lower, "<title>"), strings.Index(lower, "</title>")
+		if start < 0 || end < start {
+			return ""
+		}
+		text = strings.TrimSpace(text[start+len("<title>") : end])
+	}
+	text = strings.Join(strings.Fields(text), " ")
+	if len(text) > maxErrorText {
+		cut := maxErrorText
+		for cut > 0 && !utf8.RuneStart(text[cut]) {
+			cut--
+		}
+		text = text[:cut] + "…"
+	}
+	return text
 }
 
 func firstString(fields map[string]json.RawMessage, keys ...string) string {

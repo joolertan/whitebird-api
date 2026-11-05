@@ -6,7 +6,6 @@ import (
 	"context"
 	"iter"
 	"net/http"
-	"net/url"
 )
 
 // BrokerageResource holds the operations available as Client.Brokerage.
@@ -72,30 +71,37 @@ type BrokerageBalanceOrdersConfirmCryptoWithdrawalParams struct {
 // BrokerageBalanceOrdersCreateFiatDepositParams holds the parameters of
 // [BrokerageBalanceOrdersResource.CreateFiatDeposit].
 type BrokerageBalanceOrdersCreateFiatDepositParams struct {
-	SubaccountID     string       `json:"subaccountId"`
+	SubaccountID string `json:"subaccountId"`
+	// The web app sends `CA` (current account).
 	FiatProviderType ProviderType `json:"fiatProviderType"`
-	InternalToken    *string      `json:"internalToken,omitzero"`
-	AssetCode        string       `json:"assetCode"`
-	Amount           Decimal      `json:"amount"`
+	// Settlement account to deposit from, the `id` of an account from
+	// `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
+	InternalToken *string `json:"internalToken,omitzero"`
+	// The web app sends `RUB`.
+	AssetCode string  `json:"assetCode"`
+	Amount    Decimal `json:"amount"`
 }
 
 // BrokerageBalanceOrdersCreateFiatWithdrawalParams holds the parameters of
 // [BrokerageBalanceOrdersResource.CreateFiatWithdrawal].
 type BrokerageBalanceOrdersCreateFiatWithdrawalParams struct {
-	SubaccountID     string       `json:"subaccountId"`
+	SubaccountID string `json:"subaccountId"`
+	// The web app sends `CA` (current account).
 	FiatProviderType ProviderType `json:"fiatProviderType"`
-	PaymentToken     *string      `json:"paymentToken,omitzero"`
-	AssetCode        *string      `json:"assetCode,omitzero"`
-	Amount           Decimal      `json:"amount"`
+	// Bank account to withdraw to, the `id` of a method from `brokerage.payments.methods`.
+	PaymentToken *string `json:"paymentToken,omitzero"`
+	// The web app sends `RUB`.
+	AssetCode *string `json:"assetCode,omitzero"`
+	Amount    Decimal `json:"amount"`
 }
 
 // BrokerageBalanceOrdersListParams holds the parameters of [BrokerageBalanceOrdersResource.List]
 // and [BrokerageBalanceOrdersResource.ListPage].
 type BrokerageBalanceOrdersListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
 	// Sort criteria in the format `property,(asc|desc)`.
 	Sort                []string            `query:"sort" json:"-"`
 	UUID                *string             `json:"uuid,omitzero"`
@@ -134,7 +140,9 @@ func (r *BrokerageBalanceOrdersResource) CancelCryptoDeposit(ctx context.Context
 	}, opts)
 }
 
-// CreateCryptoWithdrawal creates a crypto withdrawal balance order.
+// CreateCryptoWithdrawal creates a crypto withdrawal balance order. The order stays
+// `AWAITING_CLIENT_CONFIRMATION` until the client confirms it with the token emailed to them
+// (`confirm_crypto_withdrawal`); it then moves to `AWAITING_ADMIN_CONFIRMATION`.
 //
 // It calls POST /api/v1/brokerage/balance-order/crypto/withdrawal.
 func (r *BrokerageBalanceOrdersResource) CreateCryptoWithdrawal(ctx context.Context, params BrokerageBalanceOrdersCreateCryptoWithdrawalParams, opts ...RequestOption) (*BalanceOrderResponse, error) {
@@ -147,7 +155,7 @@ func (r *BrokerageBalanceOrdersResource) CreateCryptoWithdrawal(ctx context.Cont
 }
 
 // ConfirmCryptoWithdrawal calls POST
-// /api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client.
+// /api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client without authentication.
 //
 // Client confirmation step for crypto withdrawal by token (public).
 func (r *BrokerageBalanceOrdersResource) ConfirmCryptoWithdrawal(ctx context.Context, params BrokerageBalanceOrdersConfirmCryptoWithdrawalParams, opts ...RequestOption) (*BalanceOrderResponse, error) {
@@ -155,6 +163,7 @@ func (r *BrokerageBalanceOrdersResource) ConfirmCryptoWithdrawal(ctx context.Con
 		service: ServiceBrokerage,
 		method:  http.MethodPost,
 		path:    "/api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client",
+		public:  true,
 		body:    jsonBody(params),
 	}, opts)
 }
@@ -200,6 +209,9 @@ func (r *BrokerageBalanceOrdersResource) List(ctx context.Context, params Broker
 // ListPage is like [BrokerageBalanceOrdersResource.List] but returns a single page, the one
 // selected by params.Page, along with the pagination metadata.
 func (r *BrokerageBalanceOrdersResource) ListPage(ctx context.Context, params BrokerageBalanceOrdersListParams, opts ...RequestOption) (*Page[BalanceOrderResponse], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
 	return call[*Page[BalanceOrderResponse]](ctx, r.core, &operation{
 		service: ServiceBrokerage,
 		method:  http.MethodPost,
@@ -233,7 +245,9 @@ func (r *BrokerageCryptoAddressesResource) List(ctx context.Context, opts ...Req
 	}, opts)
 }
 
-// Create adds a crypto address for the current subaccount.
+// Create adds a crypto address for the current subaccount. Errors: 403 when the account has no
+// two-factor authentication (the web app asks to enable it), 400 `INVALID_ADDRESS` or
+// `MAX_NUMBER_REACHED`.
 //
 // It calls POST /api/v1/brokerage/crypto-address.
 func (r *BrokerageCryptoAddressesResource) Create(ctx context.Context, params BrokerageCryptoAddressesCreateParams, opts ...RequestOption) (*CryptoAddressResponse, error) {
@@ -252,9 +266,10 @@ func (r *BrokerageCryptoAddressesResource) Create(ctx context.Context, params Br
 // It calls DELETE /api/v1/brokerage/crypto-address/{addressId}.
 func (r *BrokerageCryptoAddressesResource) Delete(ctx context.Context, addressID string, opts ...RequestOption) error {
 	return r.core.exec(ctx, &operation{
-		service: ServiceBrokerage,
-		method:  http.MethodDelete,
-		path:    "/api/v1/brokerage/crypto-address/" + url.PathEscape(addressID),
+		service:    ServiceBrokerage,
+		method:     http.MethodDelete,
+		path:       "/api/v1/brokerage/crypto-address/{addressId}",
+		pathParams: []string{addressID},
 	}, opts)
 }
 
@@ -263,9 +278,10 @@ func (r *BrokerageCryptoAddressesResource) Delete(ctx context.Context, addressID
 // It calls GET /api/v1/brokerage/crypto-address/{subaccountId}/list.
 func (r *BrokerageCryptoAddressesResource) ListForSubaccount(ctx context.Context, subaccountID string, opts ...RequestOption) ([]CryptoAddressResponse, error) {
 	return call[[]CryptoAddressResponse](ctx, r.core, &operation{
-		service: ServiceBrokerage,
-		method:  http.MethodGet,
-		path:    "/api/v1/brokerage/crypto-address/" + url.PathEscape(subaccountID) + "/list",
+		service:    ServiceBrokerage,
+		method:     http.MethodGet,
+		path:       "/api/v1/brokerage/crypto-address/{subaccountId}/list",
+		pathParams: []string{subaccountID},
 	}, opts)
 }
 
@@ -278,9 +294,9 @@ type BrokerageOrdersResource struct {
 // [BrokerageOrdersResource.ListPage].
 type BrokerageOrdersListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
 	// Sort criteria in the format `property,(asc|desc)`.
 	Sort           []string                    `query:"sort" json:"-"`
 	UUID           *string                     `json:"uuid,omitzero"`
@@ -332,6 +348,9 @@ func (r *BrokerageOrdersResource) List(ctx context.Context, params BrokerageOrde
 // ListPage is like [BrokerageOrdersResource.List] but returns a single page, the one selected by
 // params.Page, along with the pagination metadata.
 func (r *BrokerageOrdersResource) ListPage(ctx context.Context, params BrokerageOrdersListParams, opts ...RequestOption) (*Page[OrderUnifiedResponse], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
 	return call[*Page[OrderUnifiedResponse]](ctx, r.core, &operation{
 		service: ServiceBrokerage,
 		method:  http.MethodPost,
@@ -391,9 +410,9 @@ type BrokerageOTCOrdersConfirmParams struct {
 // [BrokerageOTCOrdersResource.ListPage].
 type BrokerageOTCOrdersListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
 	// Sort criteria in the format `property,(asc|desc)`.
 	Sort                []string        `query:"sort" json:"-"`
 	UUID                *string         `json:"uuid,omitzero"`
@@ -463,6 +482,9 @@ func (r *BrokerageOTCOrdersResource) List(ctx context.Context, params BrokerageO
 // ListPage is like [BrokerageOTCOrdersResource.List] but returns a single page, the one selected
 // by params.Page, along with the pagination metadata.
 func (r *BrokerageOTCOrdersResource) ListPage(ctx context.Context, params BrokerageOTCOrdersListParams, opts ...RequestOption) (*Page[OTCOrderResponse], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
 	return call[*Page[OTCOrderResponse]](ctx, r.core, &operation{
 		service: ServiceBrokerage,
 		method:  http.MethodPost,
@@ -482,9 +504,10 @@ type BrokeragePaymentsResource struct {
 // It calls POST /api/v1/brokerage/payment/invoice/{balanceOrderId}/download-token.
 func (r *BrokeragePaymentsResource) InvoiceDownloadToken(ctx context.Context, balanceOrderID string, opts ...RequestOption) (*DownloadTokenResponse, error) {
 	return call[*DownloadTokenResponse](ctx, r.core, &operation{
-		service: ServiceBrokerage,
-		method:  http.MethodPost,
-		path:    "/api/v1/brokerage/payment/invoice/" + url.PathEscape(balanceOrderID) + "/download-token",
+		service:    ServiceBrokerage,
+		method:     http.MethodPost,
+		path:       "/api/v1/brokerage/payment/invoice/{balanceOrderId}/download-token",
+		pathParams: []string{balanceOrderID},
 	}, opts)
 }
 
@@ -567,14 +590,16 @@ type BrokerageSubaccountsCreateOrganizationParams struct {
 // [BrokerageSubaccountsResource.ListPage].
 type BrokerageSubaccountsListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty"`
+	Page int `query:"page"`
+	// Page size. Defaults to 20.
+	Size int `query:"size"`
 	// Sort criteria in the format `property,(asc|desc)`.
 	Sort []string `query:"sort"`
 }
 
-// CreateIndividual adds an Individual subaccount for current broker.
+// CreateIndividual adds an Individual subaccount for current broker. Errors: status `USER_EXISTS`
+// (the email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field
+// errors in `fields[]`.
 //
 // It calls POST /api/v1/brokerage/subaccount/add/individual.
 func (r *BrokerageSubaccountsResource) CreateIndividual(ctx context.Context, params BrokerageSubaccountsCreateIndividualParams, opts ...RequestOption) (*SubaccountResponse, error) {
@@ -587,6 +612,8 @@ func (r *BrokerageSubaccountsResource) CreateIndividual(ctx context.Context, par
 }
 
 // CreateIndividualEntrepreneur adds an Individual Entrepreneur subaccount for current broker.
+// Errors: status `USER_EXISTS` (the email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the
+// `customId` is taken), and per-field errors in `fields[]`.
 //
 // It calls POST /api/v1/brokerage/subaccount/add/individual-entrepreneur.
 func (r *BrokerageSubaccountsResource) CreateIndividualEntrepreneur(ctx context.Context, params BrokerageSubaccountsCreateIndividualEntrepreneurParams, opts ...RequestOption) (*SubaccountResponse, error) {
@@ -598,7 +625,9 @@ func (r *BrokerageSubaccountsResource) CreateIndividualEntrepreneur(ctx context.
 	}, opts)
 }
 
-// CreateOrganization adds an Organization subaccount for current broker.
+// CreateOrganization adds an Organization subaccount for current broker. Errors: status
+// `USER_EXISTS` (the email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken),
+// and per-field errors in `fields[]`.
 //
 // It calls POST /api/v1/brokerage/subaccount/add/organization.
 func (r *BrokerageSubaccountsResource) CreateOrganization(ctx context.Context, params BrokerageSubaccountsCreateOrganizationParams, opts ...RequestOption) (*SubaccountResponse, error) {
@@ -638,6 +667,9 @@ func (r *BrokerageSubaccountsResource) List(ctx context.Context, params Brokerag
 // ListPage is like [BrokerageSubaccountsResource.List] but returns a single page, the one selected
 // by params.Page, along with the pagination metadata.
 func (r *BrokerageSubaccountsResource) ListPage(ctx context.Context, params BrokerageSubaccountsListParams, opts ...RequestOption) (*Page[SubaccountResponse], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
 	return call[*Page[SubaccountResponse]](ctx, r.core, &operation{
 		service: ServiceBrokerage,
 		method:  http.MethodGet,
@@ -651,9 +683,10 @@ func (r *BrokerageSubaccountsResource) ListPage(ctx context.Context, params Brok
 // It calls GET /api/v1/brokerage/subaccount/{id}.
 func (r *BrokerageSubaccountsResource) Get(ctx context.Context, id string, opts ...RequestOption) (*SubaccountResponse, error) {
 	return call[*SubaccountResponse](ctx, r.core, &operation{
-		service: ServiceBrokerage,
-		method:  http.MethodGet,
-		path:    "/api/v1/brokerage/subaccount/" + url.PathEscape(id),
+		service:    ServiceBrokerage,
+		method:     http.MethodGet,
+		path:       "/api/v1/brokerage/subaccount/{id}",
+		pathParams: []string{id},
 	}, opts)
 }
 
@@ -662,8 +695,9 @@ func (r *BrokerageSubaccountsResource) Get(ctx context.Context, id string, opts 
 // It calls GET /api/v1/brokerage/subaccount/{id}/details.
 func (r *BrokerageSubaccountsResource) Details(ctx context.Context, id string, opts ...RequestOption) (*SubaccountDetailsResponse, error) {
 	return call[*SubaccountDetailsResponse](ctx, r.core, &operation{
-		service: ServiceBrokerage,
-		method:  http.MethodGet,
-		path:    "/api/v1/brokerage/subaccount/" + url.PathEscape(id) + "/details",
+		service:    ServiceBrokerage,
+		method:     http.MethodGet,
+		path:       "/api/v1/brokerage/subaccount/{id}/details",
+		pathParams: []string{id},
 	}, opts)
 }

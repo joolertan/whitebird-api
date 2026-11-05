@@ -15,6 +15,7 @@ type ClientResource struct {
 
 // ClientFeaturesParams holds the parameters of [ClientResource.Features].
 type ClientFeaturesParams struct {
+	// Defaults to "11111111-1111-1111-1111-111111111111".
 	MerchantID *string `query:"merchantId"`
 }
 
@@ -61,6 +62,9 @@ func (r *ClientResource) CompleteTesting(ctx context.Context, opts ...RequestOpt
 //
 // This endpoint is experimental and may change without notice.
 func (r *ClientResource) Features(ctx context.Context, params ClientFeaturesParams, opts ...RequestOption) ([]ClientFeature, error) {
+	if params.MerchantID == nil {
+		params.MerchantID = Ptr[string]("11111111-1111-1111-1111-111111111111")
+	}
 	return call[[]ClientFeature](ctx, r.core, &operation{
 		service: ServiceExchange,
 		method:  http.MethodGet,

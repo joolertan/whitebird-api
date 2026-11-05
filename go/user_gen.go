@@ -39,12 +39,16 @@ func (r *UserResource) Me(ctx context.Context, opts ...RequestOption) (*UserProf
 
 // Logout signs out and revoke the current tokens.
 //
+// The client forgets its session (tokens, operation MFA token and the token store) after the call,
+// also when the call fails, as the web app does.
+//
 // It calls POST /api/v1/user/logout.
 func (r *UserResource) Logout(ctx context.Context, opts ...RequestOption) error {
 	return r.core.exec(ctx, &operation{
 		service: ServiceAuth,
 		method:  http.MethodPost,
 		path:    "/api/v1/user/logout",
+		session: sessionEnd,
 	}, opts)
 }
 
@@ -150,7 +154,7 @@ func (r *UserEmailResource) SendCode(ctx context.Context, params UserEmailSendCo
 
 // VerifyCode confirms the new email address with the emailed code.
 //
-// The web app signs the user out after a successful change.
+// The web app signs the user out after a successful change; sign in again with the new address.
 //
 // It calls POST /api/v1/user/email/change/verify.
 //
@@ -255,9 +259,10 @@ type UserPasswordResetParams struct {
 
 // Change changes the password and get new tokens.
 //
-// The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS` (wrong old
-// password), `BAD_REQUEST` with `fields[].fieldName = newPassword` and message `INVALID_PASSWORD`
-// (weak new password), `INVALID_CODE` (2FA code missing or wrong).
+// The previous tokens stop working; the client stores the returned pair as its session and uses
+// `newPassword` for later sign-ins. Errors: `BAD_CREDENTIALS` (wrong old password), `BAD_REQUEST`
+// with `fields[].fieldName = newPassword` and message `INVALID_PASSWORD` (weak new password),
+// `INVALID_CODE` (2FA code missing or wrong).
 //
 // It calls POST /api/v1/user/password/change-and-reauthorize.
 //
@@ -268,6 +273,7 @@ func (r *UserPasswordResource) Change(ctx context.Context, params UserPasswordCh
 		method:  http.MethodPost,
 		path:    "/api/v1/user/password/change-and-reauthorize",
 		body:    jsonBody(params),
+		session: sessionReplace,
 	}, opts)
 }
 
@@ -312,7 +318,8 @@ type UserPhoneSetNotificationsParams struct {
 
 // UserPhoneChangeParams holds the parameters of [UserPhoneResource.Change].
 type UserPhoneChangeParams struct {
-	// Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`).
+	// Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`, or `SETTINGS_CHANGE_PHONE_MFA`
+	// when repeating the call with `mfaSecret`).
 	Recaptcha *string `header:"recaptcha" json:"-"`
 	// ISO 3166-1 alpha-2 country of the number.
 	CountryCode string `json:"countryCode"`

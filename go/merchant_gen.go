@@ -4,13 +4,14 @@ package whitebird
 
 import (
 	"context"
+	"iter"
 	"net/http"
-	"net/url"
 )
 
 // MerchantResource holds the operations available as Client.Merchant.
 type MerchantResource struct {
 	APIKeys    *MerchantAPIKeysResource
+	Orders     *MerchantOrdersResource
 	Statistics *MerchantStatisticsResource
 	Webhooks   *MerchantWebhooksResource
 
@@ -115,9 +116,74 @@ func (r *MerchantAPIKeysResource) Create(ctx context.Context, opts ...RequestOpt
 // This endpoint is experimental and may change without notice.
 func (r *MerchantAPIKeysResource) Delete(ctx context.Context, apiKeyID string, opts ...RequestOption) (*Merchant, error) {
 	return call[*Merchant](ctx, r.core, &operation{
-		service: ServiceExchange,
+		service:    ServiceExchange,
+		method:     http.MethodPost,
+		path:       "/api/v1/merchant/current/remove/apiKey/{apiKeyId}",
+		pathParams: []string{apiKeyID},
+	}, opts)
+}
+
+// MerchantOrdersResource holds the operations available as Client.Merchant.Orders.
+type MerchantOrdersResource struct {
+	core *core
+}
+
+// MerchantOrdersHistoryParams holds the parameters of [MerchantOrdersResource.History] and
+// [MerchantOrdersResource.HistoryPage].
+type MerchantOrdersHistoryParams struct {
+	// Zero-based page index.
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
+	// Sort criteria in the format `property,(asc|desc)`. Defaults to "creationDate,desc".
+	Sort *string `query:"sort" json:"-"`
+	// Defaults to 20.
+	Limit             *int                  `json:"limit,omitzero"`
+	CreationDateFrame *ExchangeDateFrame    `json:"creationDateFrame,omitzero"`
+	Statuses          []ExchangeOrderStatus `json:"statuses,omitzero"`
+	Assets            []string              `json:"assets,omitzero"`
+	// Only the orders of this client.
+	ClientID *string `json:"clientId,omitzero"`
+}
+
+// History lists orders made through the merchant's widget.
+//
+// For accounts with the `MERCHANT` role: orders of the merchant's clients, newest first. The web
+// app filters by creation date, statuses, assets and client id, the same filter as
+// `merchant.download_report`.
+//
+// It calls POST /api/v3/exchange/merchant-admin/order/history.
+//
+// The iterator fetches pages as the loop advances, starting with params.Page, and stops after the
+// last one. [MerchantOrdersResource.HistoryPage] fetches a single page.
+//
+// This endpoint is experimental and may change without notice.
+func (r *MerchantOrdersResource) History(ctx context.Context, params MerchantOrdersHistoryParams, opts ...RequestOption) iter.Seq2[MerchantOrder, error] {
+	return paginate(params.Page, func(page int) (*Page[MerchantOrder], error) {
+		p := params
+		p.Page = page
+		return r.HistoryPage(ctx, p, opts...)
+	})
+}
+
+// HistoryPage is like [MerchantOrdersResource.History] but returns a single page, the one selected
+// by params.Page, along with the pagination metadata.
+func (r *MerchantOrdersResource) HistoryPage(ctx context.Context, params MerchantOrdersHistoryParams, opts ...RequestOption) (*Page[MerchantOrder], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
+	return call[*Page[MerchantOrder]](ctx, r.core, &operation{
+		service: ServiceAPI,
 		method:  http.MethodPost,
-		path:    "/api/v1/merchant/current/remove/apiKey/" + url.PathEscape(apiKeyID),
+		path:    "/api/v3/exchange/merchant-admin/order/history",
+		params:  params,
+		body:    jsonBody(params),
 	}, opts)
 }
 

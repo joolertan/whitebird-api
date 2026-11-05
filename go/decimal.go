@@ -1,7 +1,6 @@
 package whitebird
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -100,31 +99,39 @@ func (d Decimal) MarshalJSON() ([]byte, error) {
 	return []byte(d.s), nil
 }
 
-// UnmarshalJSON decodes a JSON number or a string holding one. Null and "" give the zero
-// Decimal.
+// UnmarshalJSON decodes a JSON number or a string holding one. Null, "" and values that are not
+// numbers give the zero Decimal, so that one odd value does not fail a whole response.
 func (d *Decimal) UnmarshalJSON(data []byte) error {
-	if bytes.Equal(data, []byte("null")) {
-		*d = Decimal{}
-		return nil
-	}
-	var s string
+	text := string(data)
 	if len(data) > 0 && data[0] == '"' {
-		if err := json.Unmarshal(data, &s); err != nil {
+		if err := json.Unmarshal(data, &text); err != nil {
 			return err
 		}
-		if s == "" {
-			*d = Decimal{}
-			return nil
-		}
-	} else {
-		s = string(data)
 	}
-	parsed, err := NewDecimal(s)
+	parsed, err := NewDecimal(text)
 	if err != nil {
-		return err
+		parsed = Decimal{}
 	}
 	*d = parsed
 	return nil
+}
+
+// Cmp compares d and e numerically, returning -1, 0 or +1. The zero Decimal compares as 0.
+func (d Decimal) Cmp(e Decimal) int {
+	a, b := d.Rat(), e.Rat()
+	if a == nil {
+		a = new(big.Rat)
+	}
+	if b == nil {
+		b = new(big.Rat)
+	}
+	return a.Cmp(b)
+}
+
+// Equal reports whether d and e are the same number, such as "1.0" and "1". Use it rather than
+// ==, which compares the digits as written.
+func (d Decimal) Equal(e Decimal) bool {
+	return d.Cmp(e) == 0
 }
 
 // MarshalText encodes d as its string form, for query parameters.

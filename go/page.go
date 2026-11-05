@@ -1,6 +1,10 @@
 package whitebird
 
-import "iter"
+import (
+	"bytes"
+	"encoding/json"
+	"iter"
+)
 
 // Page is one page of a paginated listing, as returned by the methods ending in Page. The
 // methods without that suffix iterate over the items of all pages instead.
@@ -18,6 +22,27 @@ type Page[T any] struct {
 	First            bool `json:"first"`
 	Last             bool `json:"last"`
 	Empty            bool `json:"empty"`
+
+	// numbered is set when the response carried the page number.
+	numbered bool
+}
+
+// pageFields has the fields of Page without its methods, to decode them.
+type pageFields[T any] Page[T]
+
+// UnmarshalJSON decodes a page, keeping numbers in untyped values as json.Number.
+func (p *Page[T]) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode((*pageFields[T])(p)); err != nil {
+		return err
+	}
+	var probe struct {
+		Number json.RawMessage `json:"number"`
+	}
+	_ = json.Unmarshal(data, &probe)
+	p.numbered = !isNull(probe.Number)
+	return nil
 }
 
 // HasNext reports whether another page follows this one.
@@ -35,7 +60,8 @@ func (p *Page[T]) HasNext() bool {
 
 // paginate iterates over the items of the pages returned by fetch, starting from page first.
 // Pages are fetched as the consumer advances; iteration stops after the last page, at the
-// first error or when the consumer breaks out of the loop.
+// first error, when the server answers another page than the one asked for (it ignores the
+// page parameter) or when the consumer breaks out of the loop.
 func paginate[T any](first int, fetch func(page int) (*Page[T], error)) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		for n := first; ; n++ {
@@ -43,6 +69,9 @@ func paginate[T any](first int, fetch func(page int) (*Page[T], error)) iter.Seq
 			if err != nil {
 				var zero T
 				yield(zero, err)
+				return
+			}
+			if page == nil || page.numbered && page.Number != n {
 				return
 			}
 			for _, item := range page.Content {

@@ -4,6 +4,7 @@ package whitebird
 
 import (
 	"context"
+	"encoding/json"
 	"iter"
 	"net/http"
 )
@@ -79,15 +80,17 @@ type TradingDemoDepositParams struct {
 // Deposit calls POST /api/v1/demo/balance/deposit.
 //
 // Credits virtual funds to the trading account. Meant for the demo environment
-// (`trading-demo-service`); a deposit limit applies.
+// (`trading-demo-service`); a deposit limit applies. The answer is a `retCode` envelope like the
+// order management responses; the web app ignores its `result`.
 //
 // This endpoint is experimental and may change without notice.
-func (r *TradingDemoResource) Deposit(ctx context.Context, params TradingDemoDepositParams, opts ...RequestOption) error {
-	return r.core.exec(ctx, &operation{
-		service: ServiceTrading,
-		method:  http.MethodPost,
-		path:    "/api/v1/demo/balance/deposit",
-		body:    jsonBody(params),
+func (r *TradingDemoResource) Deposit(ctx context.Context, params TradingDemoDepositParams, opts ...RequestOption) (json.RawMessage, error) {
+	return call[json.RawMessage](ctx, r.core, &operation{
+		service:  ServiceTrading,
+		method:   http.MethodPost,
+		path:     "/api/v1/demo/balance/deposit",
+		body:     jsonBody(params),
+		envelope: true,
 	}, opts)
 }
 
@@ -103,7 +106,7 @@ type TradingExecutionsListParams struct {
 	StartTime *int64 `query:"startTime"`
 	// Epoch milliseconds.
 	EndTime *int64 `query:"endTime"`
-	// The web app asks for 1000.
+	// Maximum number of executions. Defaults to 1000.
 	Limit *int `query:"limit"`
 }
 
@@ -113,6 +116,9 @@ type TradingExecutionsListParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *TradingExecutionsResource) List(ctx context.Context, params TradingExecutionsListParams, opts ...RequestOption) ([]TradingExecution, error) {
+	if params.Limit == nil {
+		params.Limit = Ptr[int](1000)
+	}
 	return call[[]TradingExecution](ctx, r.core, &operation{
 		service:  ServiceOrderManagement,
 		method:   http.MethodGet,
@@ -143,7 +149,7 @@ type TradingOrdersAmendParams struct {
 	SlOrderType  *TradingOrderType `json:"slOrderType,omitzero"`
 	TpLimitPrice *string           `json:"tpLimitPrice,omitzero"`
 	SlLimitPrice *string           `json:"slLimitPrice,omitzero"`
-	// The server defaults to "spot".
+	// Defaults to "spot".
 	Category *TradingCategory `json:"category,omitzero"`
 }
 
@@ -157,7 +163,8 @@ type TradingOrdersCreateParams struct {
 	Qty string `json:"qty"`
 	// Limit price; leave out for market orders.
 	Price *string `json:"price,omitzero"`
-	// The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders.
+	// `PostOnly` for maker-only limit orders. The web terminal sends `GTC` also for market orders.
+	// Defaults to "GTC".
 	TimeInForce *TradingTimeInForce `json:"timeInForce,omitzero"`
 	// Client order id.
 	OrderLinkID *string `json:"orderLinkId,omitzero"`
@@ -172,7 +179,7 @@ type TradingOrdersCreateParams struct {
 	TpLimitPrice *string `json:"tpLimitPrice,omitzero"`
 	// Limit price of the stop-loss order when `slOrderType` is `Limit`.
 	SlLimitPrice *string `json:"slLimitPrice,omitzero"`
-	// The server defaults to "spot".
+	// Defaults to "spot".
 	Category *TradingCategory `json:"category,omitzero"`
 }
 
@@ -182,7 +189,7 @@ type TradingOrdersCancelParams struct {
 	ID string `query:"id"`
 	// Instrument symbol without separator, e.g. `BTCUSDT`.
 	Symbol string `query:"symbol"`
-	// The server defaults to "spot".
+	// Defaults to "spot".
 	Category *TradingCategory `query:"category"`
 }
 
@@ -201,9 +208,8 @@ type TradingOrdersHistoryParams struct {
 	// Epoch milliseconds.
 	StartTime *int64 `query:"startTime"`
 	// Epoch milliseconds.
-	EndTime *int64  `query:"endTime"`
-	Limit   *int    `query:"limit"`
-	Cursor  *string `query:"cursor"`
+	EndTime *int64 `query:"endTime"`
+	Limit   *int   `query:"limit"`
 }
 
 // TradingOrdersListParams holds the parameters of [TradingOrdersResource.List] and
@@ -214,11 +220,12 @@ type TradingOrdersListParams struct {
 	StartTime *int64 `query:"startTime"`
 	// Epoch milliseconds.
 	EndTime *int64 `query:"endTime"`
-	Page    int    `query:"page,omitempty"`
-	// The server defaults to 30.
-	Size int `query:"size,omitempty"`
-	// Sort field; the web terminal uses `exchangeTime`.
-	SortBy  *string               `query:"sortBy"`
+	Page    int    `query:"page"`
+	// Defaults to 30.
+	Size int `query:"size"`
+	// Sort field, e.g. `exchangeTime` (creation time). Defaults to "exchangeTime".
+	SortBy *string `query:"sortBy"`
+	// Defaults to "DESC".
 	SortDir *TradingSortDirection `query:"sortDir"`
 }
 
@@ -229,6 +236,9 @@ type TradingOrdersListParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *TradingOrdersResource) Amend(ctx context.Context, params TradingOrdersAmendParams, opts ...RequestOption) (*TradingOrderAck, error) {
+	if params.Category == nil {
+		params.Category = Ptr[TradingCategory]("spot")
+	}
 	return call[*TradingOrderAck](ctx, r.core, &operation{
 		service:  ServiceOrderManagement,
 		method:   http.MethodPut,
@@ -244,6 +254,12 @@ func (r *TradingOrdersResource) Amend(ctx context.Context, params TradingOrdersA
 //
 // This endpoint is experimental and may change without notice.
 func (r *TradingOrdersResource) Create(ctx context.Context, params TradingOrdersCreateParams, opts ...RequestOption) (*TradingOrderAck, error) {
+	if params.TimeInForce == nil {
+		params.TimeInForce = Ptr[TradingTimeInForce]("GTC")
+	}
+	if params.Category == nil {
+		params.Category = Ptr[TradingCategory]("spot")
+	}
 	return call[*TradingOrderAck](ctx, r.core, &operation{
 		service:  ServiceOrderManagement,
 		method:   http.MethodPost,
@@ -259,6 +275,9 @@ func (r *TradingOrdersResource) Create(ctx context.Context, params TradingOrders
 //
 // This endpoint is experimental and may change without notice.
 func (r *TradingOrdersResource) Cancel(ctx context.Context, params TradingOrdersCancelParams, opts ...RequestOption) (*TradingOrderAck, error) {
+	if params.Category == nil {
+		params.Category = Ptr[TradingCategory]("spot")
+	}
 	return call[*TradingOrderAck](ctx, r.core, &operation{
 		service:  ServiceOrderManagement,
 		method:   http.MethodDelete,
@@ -284,6 +303,9 @@ func (r *TradingOrdersResource) Active(ctx context.Context, params TradingOrders
 }
 
 // History lists closed orders in a time range.
+//
+// The web app only sends `startTime` and `endTime`; the other filters follow the Bybit convention
+// and are not verified. The result is a plain list without a cursor.
 //
 // It calls GET /api/v1/orders/history.
 //
@@ -317,6 +339,15 @@ func (r *TradingOrdersResource) List(ctx context.Context, params TradingOrdersLi
 // ListPage is like [TradingOrdersResource.List] but returns a single page, the one selected by
 // params.Page, along with the pagination metadata.
 func (r *TradingOrdersResource) ListPage(ctx context.Context, params TradingOrdersListParams, opts ...RequestOption) (*Page[TradingOrderRecord], error) {
+	if params.Size == 0 {
+		params.Size = 30
+	}
+	if params.SortBy == nil {
+		params.SortBy = Ptr[string]("exchangeTime")
+	}
+	if params.SortDir == nil {
+		params.SortDir = Ptr[TradingSortDirection]("DESC")
+	}
 	return call[*Page[TradingOrderRecord]](ctx, r.core, &operation{
 		service: ServiceOrderManagement,
 		method:  http.MethodGet,
@@ -336,7 +367,7 @@ type TradingReportsOperationsParams struct {
 	StartTime int64 `json:"startTime"`
 	// Epoch milliseconds.
 	EndTime int64 `json:"endTime"`
-	// The server defaults to "PDF".
+	// Defaults to "PDF".
 	Format *TradingReportFormat `json:"format,omitzero"`
 }
 
@@ -346,6 +377,9 @@ type TradingReportsOperationsParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *TradingReportsResource) Operations(ctx context.Context, params TradingReportsOperationsParams, opts ...RequestOption) ([]byte, error) {
+	if params.Format == nil {
+		params.Format = Ptr[TradingReportFormat]("PDF")
+	}
 	return r.core.binary(ctx, &operation{
 		service: ServiceOrderManagement,
 		method:  http.MethodPost,

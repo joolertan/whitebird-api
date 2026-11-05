@@ -80,7 +80,8 @@ type BalanceDepositsCalculateFiatParams struct {
 
 // CreateCrypto returns the Whitebird address to send the crypto to (`depositCryptoAddress`).
 // Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already
-// uses the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+// uses the network), `INVALID_CRYPTO_ADDRESS`, `INVALID_MFA_STATUS` (two-factor authentication
+// must be enabled), `EXCHANGE_UNAVAILABLE`.
 //
 // It calls POST /api/v2/exchange/client/balance/crypto/deposit.
 //
@@ -99,7 +100,8 @@ func (r *BalanceDepositsResource) CreateCrypto(ctx context.Context, params Balan
 // `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice (see
 // `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
 // `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
-// `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+// `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `INVALID_MFA_STATUS` (two-factor authentication must be
+// enabled), `EXCHANGE_UNAVAILABLE`.
 //
 // It calls POST /api/v2/exchange/client/balance/fiat/deposit.
 //
@@ -150,30 +152,31 @@ type BalanceOperationsResource struct {
 // [BalanceOperationsResource.RejectCrypto].
 type BalanceOperationsRejectCryptoParams struct {
 	TransactionID string `json:"transactionId"`
-	// Same as the path segment (`crypto` or `fiat`).
-	OperationType *BalanceRejectRequestOperationType `json:"operationType,omitzero"`
+	// Same as the path segment. Defaults to "crypto".
+	OperationType *BalanceRejectOperationType `json:"operationType,omitzero"`
 }
 
 // BalanceOperationsRejectFiatParams holds the parameters of
 // [BalanceOperationsResource.RejectFiat].
 type BalanceOperationsRejectFiatParams struct {
 	TransactionID string `json:"transactionId"`
-	// Same as the path segment (`crypto` or `fiat`).
-	OperationType *BalanceRejectRequestOperationType `json:"operationType,omitzero"`
+	// Same as the path segment. Defaults to "fiat".
+	OperationType *BalanceRejectOperationType `json:"operationType,omitzero"`
 }
 
 // BalanceOperationsListParams holds the parameters of [BalanceOperationsResource.List] and
 // [BalanceOperationsResource.ListPage].
 type BalanceOperationsListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
-	// Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
-	Sort []string `query:"sort" json:"-"`
-	// The server defaults to 20.
-	Limit                  *int                     `json:"limit,omitzero"`
-	TransactionTypes       []BalanceOperationType   `json:"transactionTypes,omitzero"`
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
+	// Sort criteria in the format `property,(asc|desc)`. Defaults to "creationDate,desc".
+	Sort *string `query:"sort" json:"-"`
+	// Defaults to 20.
+	Limit *int `json:"limit,omitzero"`
+	// Operation types to list; pass all three for no filter.
+	TransactionTypes       []BalanceOperationType   `json:"transactionTypes"`
 	Statuses               []BalanceOperationStatus `json:"statuses,omitzero"`
 	Currencies             []string                 `json:"currencies,omitzero"`
 	From                   Date                     `json:"from,omitzero"`
@@ -187,6 +190,9 @@ type BalanceOperationsListParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *BalanceOperationsResource) RejectCrypto(ctx context.Context, params BalanceOperationsRejectCryptoParams, opts ...RequestOption) (json.RawMessage, error) {
+	if params.OperationType == nil {
+		params.OperationType = Ptr[BalanceRejectOperationType]("crypto")
+	}
 	return call[json.RawMessage](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,
@@ -201,6 +207,9 @@ func (r *BalanceOperationsResource) RejectCrypto(ctx context.Context, params Bal
 //
 // This endpoint is experimental and may change without notice.
 func (r *BalanceOperationsResource) RejectFiat(ctx context.Context, params BalanceOperationsRejectFiatParams, opts ...RequestOption) (json.RawMessage, error) {
+	if params.OperationType == nil {
+		params.OperationType = Ptr[BalanceRejectOperationType]("fiat")
+	}
 	return call[json.RawMessage](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,
@@ -228,6 +237,15 @@ func (r *BalanceOperationsResource) List(ctx context.Context, params BalanceOper
 // ListPage is like [BalanceOperationsResource.List] but returns a single page, the one selected by
 // params.Page, along with the pagination metadata.
 func (r *BalanceOperationsResource) ListPage(ctx context.Context, params BalanceOperationsListParams, opts ...RequestOption) (*Page[BalanceOperation], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
+	if params.Limit == nil {
+		params.Limit = Ptr[int](20)
+	}
 	return call[*Page[BalanceOperation]](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,
@@ -284,8 +302,10 @@ type BalanceWithdrawalsCalculateFiatParams struct {
 //
 // Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount and
 // network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without it the
-// service answers "Operation denied, requires mfa checking". Errors: `INVALID_CALCULATION`
-// (calculation expired, calculate again), `ACTIVE_WITHDRAWAL_REQUEST_FOUND`,
+// service answers "Operation denied, requires mfa checking" in `message` or in `status`.
+// Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or `LIVENESS_VERIFICATION_REQUIRED`; after
+// the check, send the same request again (calculate again on `INVALID_CALCULATION`). Errors:
+// `INVALID_CALCULATION` (calculation expired, calculate again), `ACTIVE_WITHDRAWAL_REQUEST_FOUND`,
 // `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`,
 // `INVALID_AMOUNT` (commission exceeds the amount), `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
 // `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`, `AML_FRAUD_VALIDATION_ERROR`,
@@ -309,8 +329,8 @@ func (r *BalanceWithdrawalsResource) CreateCrypto(ctx context.Context, params Ba
 //
 // Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card /
 // payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
-// `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the crypto
-// withdrawal.
+// `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors, MFA refusal
+// and anti-fraud checks as the crypto withdrawal.
 //
 // It calls POST /api/v2/exchange/client/balance/fiat/withdrawal with an operation MFA token for
 // WITHDRAWAL (see [Client.ConfirmOperation]).

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"iter"
 	"net/http"
-	"net/url"
 )
 
 // IcoResource holds the operations available as Client.Ico.
@@ -29,10 +28,10 @@ type IcoBuybacksResource struct {
 // [IcoBuybacksResource.ListPage].
 type IcoBuybacksListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 10.
-	Size int `query:"size,omitempty" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 10.
+	Size int `query:"size" json:"-"`
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort        *string                       `query:"sort" json:"-"`
 	IssuerIDs   []string                      `json:"issuerIds,omitzero"`
 	EmissionIDs []string                      `json:"emissionIds,omitzero"`
@@ -52,10 +51,10 @@ type IcoBuybacksRequestParams struct {
 // [IcoBuybacksResource.ListOffersPage].
 type IcoBuybacksListOffersParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 10.
-	Size int `query:"size,omitempty" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 10.
+	Size int `query:"size" json:"-"`
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort          *string                 `query:"sort" json:"-"`
 	EmissionNames []string                `json:"emissionNames,omitzero"`
 	Currencies    []string                `json:"currencies,omitzero"`
@@ -93,6 +92,12 @@ func (r *IcoBuybacksResource) List(ctx context.Context, params IcoBuybacksListPa
 // ListPage is like [IcoBuybacksResource.List] but returns a single page, the one selected by
 // params.Page, along with the pagination metadata.
 func (r *IcoBuybacksResource) ListPage(ctx context.Context, params IcoBuybacksListParams, opts ...RequestOption) (*Page[IcoBuybackApplication], error) {
+	if params.Size == 0 {
+		params.Size = 10
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[IcoBuybackApplication]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -106,8 +111,8 @@ func (r *IcoBuybacksResource) ListPage(ctx context.Context, params IcoBuybacksLi
 //
 // Asks the issuer to buy back `value` tokens under the emission's offer; only possible during the
 // request window (`buybackRequestDateFrom`..`buybackRequestDateTo` of the obligation). Pass
-// `buybackId` to change the amount of an existing application. Not enough tokens answers
-// `INSUFFICIENT_FUNDS`.
+// `buybackId` to change the amount of an existing application. Not enough tokens answers an error
+// whose `message` is `Insufficient funds`.
 //
 // This endpoint is experimental and may change without notice.
 func (r *IcoBuybacksResource) Request(ctx context.Context, params IcoBuybacksRequestParams, opts ...RequestOption) (json.RawMessage, error) {
@@ -126,9 +131,11 @@ func (r *IcoBuybacksResource) Request(ctx context.Context, params IcoBuybacksReq
 // This endpoint is experimental and may change without notice.
 func (r *IcoBuybacksResource) Withdraw(ctx context.Context, buybackID string, opts ...RequestOption) (json.RawMessage, error) {
 	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceIco,
-		method:  http.MethodDelete,
-		path:    "/api/v1/ico/offer/buyback/" + url.PathEscape(buybackID),
+		service:    ServiceIco,
+		method:     http.MethodDelete,
+		path:       "/api/v1/ico/offer/buyback/{buybackId}",
+		pathParams: []string{buybackID},
+		body:       jsonBody(struct{}{}),
 	}, opts)
 }
 
@@ -154,6 +161,12 @@ func (r *IcoBuybacksResource) ListOffers(ctx context.Context, params IcoBuybacks
 // ListOffersPage is like [IcoBuybacksResource.ListOffers] but returns a single page, the one
 // selected by params.Page, along with the pagination metadata.
 func (r *IcoBuybacksResource) ListOffersPage(ctx context.Context, params IcoBuybacksListOffersParams, opts ...RequestOption) (*Page[IcoBuybackOffer], error) {
+	if params.Size == 0 {
+		params.Size = 10
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[IcoBuybackOffer]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -172,10 +185,10 @@ type IcoEmissionsResource struct {
 // [IcoEmissionsResource.ListPage].
 type IcoEmissionsListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
+	Page int `query:"page" json:"-"`
 	// Page size.
 	Size int `query:"size,omitempty" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort *string `query:"sort" json:"-"`
 	// The web app always sends true.
 	WithLogo *bool `json:"withLogo,omitzero"`
@@ -237,10 +250,10 @@ type IcoEmissionsRequestIssueParams struct {
 // [IcoEmissionsResource.ListMinePage].
 type IcoEmissionsListMineParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 10.
-	Size int `query:"size,omitempty" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 10.
+	Size int `query:"size" json:"-"`
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort *string `query:"sort" json:"-"`
 	// Emission names.
 	Names           []string                  `json:"names,omitzero"`
@@ -266,10 +279,10 @@ type IcoEmissionsDownloadMineParams struct {
 // and [IcoEmissionsResource.SalesAnalyticsPage].
 type IcoEmissionsSalesAnalyticsParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 10.
-	Size int `query:"size,omitempty" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "sellDate,desc".
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 10.
+	Size int `query:"size" json:"-"`
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "sellDate,desc".
 	Sort          *string             `query:"sort" json:"-"`
 	EmissionNames []string            `json:"emissionNames,omitzero"`
 	Statuses      []IcoEmissionStatus `json:"statuses,omitzero"`
@@ -294,18 +307,18 @@ type IcoEmissionsDownloadSalesAnalyticsParams struct {
 // [IcoEmissionsResource.ListInvestedPage].
 type IcoEmissionsListInvestedParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty"`
+	Page int `query:"page"`
 	// Page size.
 	Size int `query:"size,omitempty"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort *string `query:"sort"`
 }
 
 // IcoEmissionsStableCoinAvailabilityParams holds the parameters of
 // [IcoEmissionsResource.StableCoinAvailability].
 type IcoEmissionsStableCoinAvailabilityParams struct {
-	// Assets to check.
-	Assets []string `query:"assets"`
+	// Assets to check; sent as repeated `assets[]` parameters like the web app does.
+	Assets []string `query:"assets[]"`
 }
 
 // List lists token emissions on sale.
@@ -331,6 +344,9 @@ func (r *IcoEmissionsResource) List(ctx context.Context, params IcoEmissionsList
 // ListPage is like [IcoEmissionsResource.List] but returns a single page, the one selected by
 // params.Page, along with the pagination metadata.
 func (r *IcoEmissionsResource) ListPage(ctx context.Context, params IcoEmissionsListParams, opts ...RequestOption) (*Page[IcoEmission], error) {
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[IcoEmission]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -350,10 +366,11 @@ func (r *IcoEmissionsResource) ListPage(ctx context.Context, params IcoEmissions
 // This endpoint is experimental and may change without notice.
 func (r *IcoEmissionsResource) Get(ctx context.Context, emissionID string, opts ...RequestOption) (*IcoEmission, error) {
 	return call[*IcoEmission](ctx, r.core, &operation{
-		service: ServiceIco,
-		method:  http.MethodPost,
-		path:    "/api/v1/ico/emission/" + url.PathEscape(emissionID),
-		public:  true,
+		service:    ServiceIco,
+		method:     http.MethodPost,
+		path:       "/api/v1/ico/emission/{emissionId}",
+		pathParams: []string{emissionID},
+		public:     true,
 	}, opts)
 }
 
@@ -366,10 +383,11 @@ func (r *IcoEmissionsResource) Get(ctx context.Context, emissionID string, opts 
 // This endpoint is experimental and may change without notice.
 func (r *IcoEmissionsResource) WhitePaper(ctx context.Context, emissionID string, opts ...RequestOption) ([]byte, error) {
 	return r.core.binary(ctx, &operation{
-		service: ServiceIco,
-		method:  http.MethodGet,
-		path:    "/api/v1/ico/emission/" + url.PathEscape(emissionID) + "/white-paper",
-		public:  true,
+		service:    ServiceIco,
+		method:     http.MethodGet,
+		path:       "/api/v1/ico/emission/{emissionId}/white-paper",
+		pathParams: []string{emissionID},
+		public:     true,
 	}, opts)
 }
 
@@ -430,6 +448,12 @@ func (r *IcoEmissionsResource) ListMine(ctx context.Context, params IcoEmissions
 // ListMinePage is like [IcoEmissionsResource.ListMine] but returns a single page, the one selected
 // by params.Page, along with the pagination metadata.
 func (r *IcoEmissionsResource) ListMinePage(ctx context.Context, params IcoEmissionsListMineParams, opts ...RequestOption) (*Page[IcoEmission], error) {
+	if params.Size == 0 {
+		params.Size = 10
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[IcoEmission]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -476,6 +500,12 @@ func (r *IcoEmissionsResource) SalesAnalytics(ctx context.Context, params IcoEmi
 // SalesAnalyticsPage is like [IcoEmissionsResource.SalesAnalytics] but returns a single page, the
 // one selected by params.Page, along with the pagination metadata.
 func (r *IcoEmissionsResource) SalesAnalyticsPage(ctx context.Context, params IcoEmissionsSalesAnalyticsParams, opts ...RequestOption) (*Page[IcoEmissionSale], error) {
+	if params.Size == 0 {
+		params.Size = 10
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("sellDate,desc")
+	}
 	return call[*Page[IcoEmissionSale]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -523,6 +553,9 @@ func (r *IcoEmissionsResource) ListInvested(ctx context.Context, params IcoEmiss
 // ListInvestedPage is like [IcoEmissionsResource.ListInvested] but returns a single page, the one
 // selected by params.Page, along with the pagination metadata.
 func (r *IcoEmissionsResource) ListInvestedPage(ctx context.Context, params IcoEmissionsListInvestedParams, opts ...RequestOption) (*Page[IcoInvestorEmission], error) {
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[IcoInvestorEmission]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -557,9 +590,10 @@ func (r *IcoEmissionsResource) StableCoinAvailability(ctx context.Context, param
 // This endpoint is experimental and may change without notice.
 func (r *IcoEmissionsResource) IsInvestor(ctx context.Context, emissionID string, opts ...RequestOption) (bool, error) {
 	return call[bool](ctx, r.core, &operation{
-		service: ServiceIco,
-		method:  http.MethodGet,
-		path:    "/api/v1/ico/investor/emission/" + url.PathEscape(emissionID) + "/is-investor",
+		service:    ServiceIco,
+		method:     http.MethodGet,
+		path:       "/api/v1/ico/investor/emission/{emissionId}/is-investor",
+		pathParams: []string{emissionID},
 	}, opts)
 }
 
@@ -570,15 +604,6 @@ type IcoIssuersResource struct {
 	core *core
 }
 
-// IcoIssuersNamesParams holds the parameters of [IcoIssuersResource.Names] and
-// [IcoIssuersResource.NamesPage].
-type IcoIssuersNamesParams struct {
-	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size.
-	Size int `query:"size,omitempty" json:"-"`
-}
-
 // Get gets an issuer profile.
 //
 // Public issuer page: company details and logo/background document IDs. Unknown IDs answer 4xx.
@@ -586,10 +611,11 @@ type IcoIssuersNamesParams struct {
 // It calls GET /api/v1/ico/issuer/get/{issuerId} without authentication.
 func (r *IcoIssuersResource) Get(ctx context.Context, issuerID string, opts ...RequestOption) (*IcoIssuer, error) {
 	return call[*IcoIssuer](ctx, r.core, &operation{
-		service: ServiceIco,
-		method:  http.MethodGet,
-		path:    "/api/v1/ico/issuer/get/" + url.PathEscape(issuerID),
-		public:  true,
+		service:    ServiceIco,
+		method:     http.MethodGet,
+		path:       "/api/v1/ico/issuer/get/{issuerId}",
+		pathParams: []string{issuerID},
+		public:     true,
 	}, opts)
 }
 
@@ -600,10 +626,11 @@ func (r *IcoIssuersResource) Get(ctx context.Context, issuerID string, opts ...R
 // It calls GET /api/v1/ico/statistic/issuer/{issuerId} without authentication.
 func (r *IcoIssuersResource) Statistics(ctx context.Context, issuerID string, opts ...RequestOption) (*IcoIssuerStatistics, error) {
 	return call[*IcoIssuerStatistics](ctx, r.core, &operation{
-		service: ServiceIco,
-		method:  http.MethodGet,
-		path:    "/api/v1/ico/statistic/issuer/" + url.PathEscape(issuerID),
-		public:  true,
+		service:    ServiceIco,
+		method:     http.MethodGet,
+		path:       "/api/v1/ico/statistic/issuer/{issuerId}",
+		pathParams: []string{issuerID},
+		public:     true,
 	}, opts)
 }
 
@@ -611,27 +638,13 @@ func (r *IcoIssuersResource) Statistics(ctx context.Context, issuerID string, op
 //
 // It calls POST /api/v1/ico/statistic/issuer/names.
 //
-// The iterator fetches pages as the loop advances, starting with params.Page, and stops after the
-// last one. [IcoIssuersResource.NamesPage] fetches a single page.
-//
 // This endpoint is experimental and may change without notice.
-func (r *IcoIssuersResource) Names(ctx context.Context, params IcoIssuersNamesParams, opts ...RequestOption) iter.Seq2[IcoIssuerName, error] {
-	return paginate(params.Page, func(page int) (*Page[IcoIssuerName], error) {
-		p := params
-		p.Page = page
-		return r.NamesPage(ctx, p, opts...)
-	})
-}
-
-// NamesPage is like [IcoIssuersResource.Names] but returns a single page, the one selected by
-// params.Page, along with the pagination metadata.
-func (r *IcoIssuersResource) NamesPage(ctx context.Context, params IcoIssuersNamesParams, opts ...RequestOption) (*Page[IcoIssuerName], error) {
+func (r *IcoIssuersResource) Names(ctx context.Context, opts ...RequestOption) (*Page[IcoIssuerName], error) {
 	return call[*Page[IcoIssuerName]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
 		path:    "/api/v1/ico/statistic/issuer/names",
-		params:  params,
-		body:    jsonBody(params),
+		body:    jsonBody(struct{}{}),
 	}, opts)
 }
 
@@ -644,7 +657,7 @@ type IcoIssuersDocumentsResource struct {
 // [IcoIssuersDocumentsResource.ListPage].
 type IcoIssuersDocumentsListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty"`
+	Page int `query:"page"`
 	// Page size.
 	Size int `query:"size,omitempty"`
 }
@@ -669,11 +682,12 @@ func (r *IcoIssuersDocumentsResource) List(ctx context.Context, issuerID string,
 // by params.Page, along with the pagination metadata.
 func (r *IcoIssuersDocumentsResource) ListPage(ctx context.Context, issuerID string, typeParam IcoIssuerDocumentType, params IcoIssuersDocumentsListParams, opts ...RequestOption) (*Page[IcoIssuerDocument], error) {
 	return call[*Page[IcoIssuerDocument]](ctx, r.core, &operation{
-		service: ServiceIco,
-		method:  http.MethodGet,
-		path:    "/api/v1/ico/issuer/documents/get/" + url.PathEscape(issuerID) + "/" + url.PathEscape(string(typeParam)),
-		public:  true,
-		params:  params,
+		service:    ServiceIco,
+		method:     http.MethodGet,
+		path:       "/api/v1/ico/issuer/documents/get/{issuerId}/{type}",
+		pathParams: []string{issuerID, string(typeParam)},
+		public:     true,
+		params:     params,
 	}, opts)
 }
 
@@ -685,10 +699,11 @@ func (r *IcoIssuersDocumentsResource) ListPage(ctx context.Context, issuerID str
 // It calls GET /api/v1/ico/issuer/document/download/{documentId} without authentication.
 func (r *IcoIssuersDocumentsResource) Download(ctx context.Context, documentID string, opts ...RequestOption) ([]byte, error) {
 	return r.core.binary(ctx, &operation{
-		service: ServiceIco,
-		method:  http.MethodGet,
-		path:    "/api/v1/ico/issuer/document/download/" + url.PathEscape(documentID),
-		public:  true,
+		service:    ServiceIco,
+		method:     http.MethodGet,
+		path:       "/api/v1/ico/issuer/document/download/{documentId}",
+		pathParams: []string{documentID},
+		public:     true,
 	}, opts)
 }
 
@@ -699,11 +714,11 @@ type IcoObligationsResource struct {
 
 // IcoObligationsListParams holds the parameters of [IcoObligationsResource.List].
 type IcoObligationsListParams struct {
-	// Zero-based page index. The server defaults to 0.
+	// Zero-based page index. Defaults to 0.
 	Page *int `query:"page" json:"-"`
-	// Page size. The server defaults to 10.
+	// Page size. Defaults to 10.
 	Size *int `query:"size" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort        *string               `query:"sort" json:"-"`
 	Currencies  []string              `json:"currencies,omitzero"`
 	IssuerIDs   []string              `json:"issuerIds,omitzero"`
@@ -780,6 +795,15 @@ type IcoObligationsRemainingLimitParams struct {
 //
 // This endpoint is experimental and may change without notice.
 func (r *IcoObligationsResource) List(ctx context.Context, params IcoObligationsListParams, opts ...RequestOption) (*IcoInvestorObligations, error) {
+	if params.Page == nil {
+		params.Page = Ptr[int](0)
+	}
+	if params.Size == nil {
+		params.Size = Ptr[int](10)
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*IcoInvestorObligations](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -843,7 +867,9 @@ func (r *IcoObligationsResource) BuyWithBalance(ctx context.Context, params IcoO
 
 // Rate gets the conversion rate for a token purchase.
 //
-// Rate used when the paying account currency differs from the emission currency.
+// Conversion rate between the paying account currency and the emission currency. The web app asks
+// for it whenever a paying account is chosen, also when both currencies are the same, and only
+// displays it; the rate is not sent with the purchase.
 //
 // It calls POST /api/v1/ico/obligation/client/rate.
 //
@@ -882,10 +908,10 @@ type IcoOperationsResource struct {
 // [IcoOperationsResource.ListPage].
 type IcoOperationsListParams struct {
 	// Zero-based page index.
-	Page int `query:"page,omitempty" json:"-"`
-	// Page size. The server defaults to 20.
-	Size int `query:"size,omitempty" json:"-"`
-	// Spring Data sort expression, `property,asc|desc`. The server defaults to "creationDate,desc".
+	Page int `query:"page" json:"-"`
+	// Page size. Defaults to 20.
+	Size int `query:"size" json:"-"`
+	// Spring Data sort expression, `property,asc|desc`. Defaults to "creationDate,desc".
 	Sort     *string `query:"sort" json:"-"`
 	DateFrom Date    `json:"dateFrom,omitzero"`
 	DateTo   Date    `json:"dateTo,omitzero"`
@@ -912,9 +938,9 @@ type IcoOperationsStatementParams struct {
 
 // IcoOperationsTransferParams holds the parameters of [IcoOperationsResource.Transfer].
 type IcoOperationsTransferParams struct {
-	// Client ID of the user.
-	ClientID     *string `json:"clientId,omitzero"`
-	CurrencyFrom string  `json:"currencyFrom"`
+	// The client's `identity` from `client.get`.
+	ClientID     string `json:"clientId"`
+	CurrencyFrom string `json:"currencyFrom"`
 	// `ICO_BALANCE`.
 	AccountTypeFrom IcoAccountType `json:"accountTypeFrom"`
 	CurrencyTo      string         `json:"currencyTo"`
@@ -944,6 +970,12 @@ func (r *IcoOperationsResource) List(ctx context.Context, params IcoOperationsLi
 // ListPage is like [IcoOperationsResource.List] but returns a single page, the one selected by
 // params.Page, along with the pagination metadata.
 func (r *IcoOperationsResource) ListPage(ctx context.Context, params IcoOperationsListParams, opts ...RequestOption) (*Page[IcoOperation], error) {
+	if params.Size == 0 {
+		params.Size = 20
+	}
+	if params.Sort == nil {
+		params.Sort = Ptr[string]("creationDate,desc")
+	}
 	return call[*Page[IcoOperation]](ctx, r.core, &operation{
 		service: ServiceIco,
 		method:  http.MethodPost,
@@ -972,7 +1004,8 @@ func (r *IcoOperationsResource) Statement(ctx context.Context, params IcoOperati
 // Transfer transfers funds from an ICO account to an e-account.
 //
 // Moves money from an ICO account (`ICO_BALANCE`) to the e-account (`USER_BALANCE`) in the same
-// currency. Not enough money answers an error whose message contains `Insufficient funds`.
+// currency. Not enough money answers an error whose message contains `Insufficient funds`. The web
+// app treats an empty answer as success.
 //
 // It calls POST /api/v1/ico/operation/transfer.
 //

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"mime"
+	"net/http"
 	"strconv"
 	"time"
 )
@@ -31,12 +33,13 @@ const (
 )
 
 // stream subscribes to an event stream and reconnects whenever the connection drops, until the
-// consumer stops or ctx is done. Transient failures to reconnect are retried with backoff;
-// other errors, including a 401 or 403 that survives a token refresh, end the stream. Failing
-// to connect the first time also ends it, so that a misconfiguration does not go unnoticed.
+// consumer stops, ctx is done or the server answers 204 No Content. Transient failures to
+// reconnect are retried with backoff; other errors, including a 401 or 403 that survives a
+// token refresh, end the stream. Failing to connect the first time also ends it, so that a
+// misconfiguration does not go unnoticed. When ctx is done the stream ends without an error.
 //
-// An event whose data does not decode as T is yielded with the decoding error; the stream goes
-// on if the consumer continues.
+// Events without data, such as keep-alives, and events whose data does not decode as T are
+// skipped.
 func stream[T any](ctx context.Context, c *core, op *operation, opts []RequestOption) iter.Seq2[StreamEvent[T], error] {
 	return func(yield func(StreamEvent[T], error) bool) {
 		var lastID string
@@ -45,14 +48,21 @@ func stream[T any](ctx context.Context, c *core, op *operation, opts []RequestOp
 		connected := false
 		for {
 			body, err := c.openStream(ctx, op, opts, lastID)
-			if err != nil {
-				if !connected || !transient(ctx, err) {
+			switch {
+			case ctx.Err() != nil:
+				if body != nil {
+					body.Close()
+				}
+				return
+			case errors.Is(err, errStreamEnded):
+				return
+			case err != nil:
+				if !connected || !transient(err) {
 					yield(StreamEvent[T]{}, err)
 					return
 				}
 				failures++
-				if err := c.sleep(ctx, jitter(min(delay<<failures, maxReconnectDelay))); err != nil {
-					yield(StreamEvent[T]{}, err)
+				if c.sleep(ctx, jitter(backoff(delay, maxReconnectDelay, failures))) != nil {
 					return
 				}
 				continue
@@ -64,13 +74,11 @@ func stream[T any](ctx context.Context, c *core, op *operation, opts []RequestOp
 				if err != nil {
 					break
 				}
+				if len(bytes.TrimSpace(raw.data)) == 0 {
+					continue
+				}
 				event := StreamEvent[T]{Name: raw.name, ID: raw.id, Raw: raw.data}
-				if err := decode(raw.data, &event.Data); err != nil {
-					err = fmt.Errorf("whitebird: %s event: %w", raw.name, err)
-					if !yield(event, err) {
-						body.Close()
-						return
-					}
+				if decode(raw.data, &event.Data) != nil {
 					continue
 				}
 				if !yield(event, nil) {
@@ -83,13 +91,15 @@ func stream[T any](ctx context.Context, c *core, op *operation, opts []RequestOp
 			if events.retry > 0 {
 				delay = events.retry
 			}
-			if err := c.sleep(ctx, delay); err != nil {
-				yield(StreamEvent[T]{}, err)
+			if c.sleep(ctx, delay) != nil {
 				return
 			}
 		}
 	}
 }
+
+// errStreamEnded reports that the server closed the stream for good with 204 No Content.
+var errStreamEnded = errors.New("whitebird: event stream ended")
 
 func (c *core) openStream(ctx context.Context, op *operation, opts []RequestOption, lastID string) (io.ReadCloser, error) {
 	p, err := c.prepare(op, "text/event-stream", opts)
@@ -106,23 +116,34 @@ func (c *core) openStream(ctx context.Context, op *operation, opts []RequestOpti
 		return nil, err
 	case r.stream == nil:
 		return nil, newAPIError(r)
+	case r.status == http.StatusNoContent:
+		r.stream.Close()
+		return nil, errStreamEnded
+	}
+	if mediaType, _, _ := mime.ParseMediaType(r.header.Get("Content-Type")); mediaType != "text/event-stream" {
+		r.stream.Close()
+		return nil, &APIError{
+			StatusCode: r.status,
+			Message:    fmt.Sprintf("expected an event stream, got %q", r.header.Get("Content-Type")),
+			sentinel:   ErrServer,
+		}
 	}
 	return r.stream, nil
 }
 
-func transient(ctx context.Context, err error) bool {
-	if ctx.Err() != nil {
-		return false
-	}
+func transient(err error) bool {
 	var transport *TransportError
 	return errors.As(err, &transport) || errors.Is(err, ErrServer) || errors.Is(err, ErrRateLimited)
 }
 
 // eventReader parses the text/event-stream format.
 type eventReader struct {
-	lines  *bufio.Scanner
-	lastID string
-	retry  time.Duration
+	lines *bufio.Scanner
+	// idBuffer is the last ID received; lastID becomes it when an event is dispatched, so that
+	// an event cut short by a dropped connection is received again.
+	idBuffer string
+	lastID   string
+	retry    time.Duration
 }
 
 type rawEvent struct {
@@ -145,6 +166,7 @@ func (r *eventReader) next() (rawEvent, error) {
 	for r.lines.Scan() {
 		line := r.lines.Bytes()
 		if len(line) == 0 {
+			r.lastID = r.idBuffer
 			if data == nil {
 				name = ""
 				continue
@@ -163,7 +185,7 @@ func (r *eventReader) next() (rawEvent, error) {
 			data = append(append(data, value...), '\n')
 		case "id":
 			if !bytes.ContainsRune(value, 0) {
-				r.lastID = string(value)
+				r.idBuffer = string(value)
 			}
 		case "retry":
 			if ms, err := strconv.ParseUint(string(value), 10, 32); err == nil {

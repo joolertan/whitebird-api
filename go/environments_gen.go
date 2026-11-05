@@ -11,6 +11,7 @@ const (
 // Whitebird services.
 const (
 	ServiceAccounting         Service = "accounting"          // Accounting
+	ServiceAccountingSpot     Service = "accounting_spot"     // Spot accounting
 	ServiceAlfa               Service = "alfa"                // Alfa-Bank payments
 	ServiceAPI                Service = "api"                 // API gateway
 	ServiceAssist             Service = "assist"              // Assist payments
@@ -44,8 +45,9 @@ const defaultEnvironment = Production
 
 var serviceURLs = map[Service]map[Environment]string{
 	ServiceAccounting:         {Production: "https://accounting-service.whitebird.io"},
+	ServiceAccountingSpot:     {Production: "https://api.whitebird.io", Demo: "https://api-demo.whitebird.io"},
 	ServiceAlfa:               {Production: "https://alfa-service.whitebird.io"},
-	ServiceAPI:                {Production: "https://api.whitebird.io", Demo: "https://api-demo.whitebird.io"},
+	ServiceAPI:                {Production: "https://api.whitebird.io"},
 	ServiceAssist:             {Production: "https://assist-service.whitebird.io"},
 	ServiceAuth:               {Production: "https://authorization-server.whitebird.io"},
 	ServiceBepaid:             {Production: "https://bepaid-service.whitebird.io"},

@@ -60,9 +60,15 @@ func TestDecimalJSON(t *testing.T) {
 	if string(out) != want {
 		t.Errorf("Marshal() = %s, want %s", out, want)
 	}
-	var invalid Decimal
-	if err := json.Unmarshal([]byte(`"12abc"`), &invalid); err == nil {
-		t.Error("Unmarshal accepted an invalid decimal")
+	// One odd value does not fail a whole response.
+	for _, in := range []string{`"12abc"`, `"N/A"`, `true`, `{}`} {
+		invalid := MustDecimal("1")
+		if err := json.Unmarshal([]byte(in), &invalid); err != nil || invalid != (Decimal{}) {
+			t.Errorf("Unmarshal(%s) = %v, %v; want the zero Decimal", in, invalid, err)
+		}
+	}
+	if !MustDecimal("1.0").Equal(MustDecimal("1")) || MustDecimal("1e-8").Cmp(MustDecimal("0.00000002")) != -1 || !(Decimal{}).Equal(MustDecimal("0")) {
+		t.Error("Equal or Cmp compare the digits, not the numbers")
 	}
 	omitted, _ := json.Marshal(struct {
 		A Decimal `json:"a,omitzero"`

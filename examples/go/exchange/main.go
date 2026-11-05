@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/joolertan/whitebird-api/examples/go/internal/envclient"
 	whitebird "github.com/joolertan/whitebird-api/go"
@@ -36,9 +37,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Quote %s: %s %s -> %s %s at %s, valid until %s\n", quote.ID,
-		quote.Input.Amount, quote.Input.Asset, quote.Output.Amount, quote.Output.Asset,
-		quote.ExchangeRateValue, quote.ExpirationDate)
+	fmt.Printf("Quote %s: %s -> %s at %s, valid until %s\n", quote.ID,
+		leg(quote.Input), leg(quote.Output), quote.ExchangeRateValue, quote.ExpirationDate.Format(time.DateTime))
 	if !*confirm {
 		fmt.Println("Dry run: pass -confirm to place the order.")
 		return
@@ -52,4 +52,12 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Order #%d placed: %s\n", order.Number, order.Status)
+}
+
+// leg formats one side of a quote; the API may leave it out.
+func leg(l *whitebird.ExchangeLeg) string {
+	if l == nil {
+		return "?"
+	}
+	return fmt.Sprintf("%s %s", l.Amount, l.Asset)
 }

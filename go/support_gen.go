@@ -18,7 +18,7 @@ type SupportSendParams struct {
 	// Google reCAPTCHA v3 token (public support form).
 	Recaptcha *string `header:"recaptcha"`
 	// JSON-encoded `SupportRequest`.
-	Request SupportRequest `form:"request" mime:"application/json"`
+	Request SupportRequest `form:"request" mime:"text/plain"`
 	// Attachments, sent as one part per file.
 	Files []io.Reader `form:"files"`
 }

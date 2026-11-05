@@ -50,6 +50,9 @@ func (r *{{ r.type }}) {{ m.signature }} {
 		return r.{{ m.page_method }}({{ m.page_args }})
 	})
 {% else %}
+{% for line in m.defaults %}
+	{{ line }}
+{% endfor %}
 	return {{ m.invoke }}&operation{
 {% for key, value in m.operation %}
 		{{ key }}: {{ value }},

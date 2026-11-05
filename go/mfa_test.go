@@ -5,15 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // mfaServer issues operation MFA tokens and serves a withdrawal that needs one.
 type mfaServer struct {
 	issued    atomic.Int32
 	withdrawn atomic.Int32
+	refused   atomic.Int32
 	refuse    atomic.Bool // refuse every token
+	inStatus  atomic.Bool // explain the refusal in "status" rather than "message"
 }
 
 func newMFAServer(t *testing.T, mux *http.ServeMux) *mfaServer {
@@ -31,8 +35,13 @@ func newMFAServer(t *testing.T, mux *http.ServeMux) *mfaServer {
 	})
 	mux.HandleFunc("POST /withdraw", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Mfa-Token") != "fresh" || m.refuse.Load() {
+			m.refused.Add(1)
+			field := "message"
+			if m.inStatus.Load() {
+				field = "status"
+			}
 			w.WriteHeader(http.StatusForbidden)
-			writeJSON(w, map[string]string{"message": "Operation denied, requires mfa checking"})
+			writeJSON(w, map[string]string{field: "Operation denied, requires mfa checking"})
 			return
 		}
 		m.withdrawn.Add(1)
@@ -98,7 +107,7 @@ func TestConfirmOperationErrors(t *testing.T) {
 	}
 }
 
-func TestMFAOperationConfirmsFirst(t *testing.T) {
+func TestMFAOperationConfirmsWhenRefused(t *testing.T) {
 	mux := http.NewServeMux()
 	newAuthServer(t, mux).mfa = true
 	m := newMFAServer(t, mux)
@@ -109,8 +118,45 @@ func TestMFAOperationConfirmsFirst(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if m.issued.Load() != 1 || m.withdrawn.Load() != 2 {
-		t.Errorf("issued %d tokens for %d withdrawals, want 1 for 2", m.issued.Load(), m.withdrawn.Load())
+	if m.issued.Load() != 1 || m.withdrawn.Load() != 2 || m.refused.Load() != 1 {
+		t.Errorf("issued %d tokens for %d withdrawals after %d refusals, want 1 for 2 after 1", m.issued.Load(), m.withdrawn.Load(), m.refused.Load())
+	}
+}
+
+func TestMFARefusalInStatus(t *testing.T) {
+	mux := http.NewServeMux()
+	newAuthServer(t, mux).mfa = true
+	m := newMFAServer(t, mux)
+	m.inStatus.Store(true)
+	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), WithCodeProvider(StaticCode("654321")))
+	if err := withdraw(client); err != nil {
+		t.Fatal(err)
+	}
+	if m.issued.Load() != 1 || m.withdrawn.Load() != 1 {
+		t.Errorf("issued %d tokens, withdrew %d times; want 1 and 1", m.issued.Load(), m.withdrawn.Load())
+	}
+}
+
+func TestConcurrentRefusalsShareOneConfirmation(t *testing.T) {
+	mux := http.NewServeMux()
+	m := newMFAServer(t, mux)
+	var asked atomic.Int32
+	client := newTestClient(t, mux, withSession(), WithCodeProvider(CodeFunc(func(context.Context) (string, error) {
+		asked.Add(1)
+		time.Sleep(20 * time.Millisecond)
+		return "654321", nil
+	})))
+	var wg sync.WaitGroup
+	for range 5 {
+		wg.Go(func() {
+			if err := withdraw(client); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if asked.Load() != 1 || m.issued.Load() != 1 || m.withdrawn.Load() != 5 {
+		t.Errorf("asked %d codes and issued %d tokens for %d withdrawals, want 1 and 1 for 5", asked.Load(), m.issued.Load(), m.withdrawn.Load())
 	}
 }
 

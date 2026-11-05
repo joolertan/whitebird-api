@@ -4,6 +4,7 @@ package whitebird
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 )
 
@@ -21,7 +22,7 @@ type AuthCreateMFATokenParams struct {
 
 // AuthMFAStatusParams holds the parameters of [AuthResource.MFAStatus].
 type AuthMFAStatusParams struct {
-	// Account email.
+	// Account email as the user typed it.
 	Username string `json:"username"`
 }
 
@@ -97,8 +98,8 @@ type AuthAuthorizeParams struct {
 // It calls POST /api/v2/auth/mfa/merchant/client/token.
 //
 // This endpoint is experimental and may change without notice.
-func (r *AuthResource) CreateMFAToken(ctx context.Context, params AuthCreateMFATokenParams, opts ...RequestOption) (*AuthMFAToken, error) {
-	return call[*AuthMFAToken](ctx, r.core, &operation{
+func (r *AuthResource) CreateMFAToken(ctx context.Context, params AuthCreateMFATokenParams, opts ...RequestOption) (json.RawMessage, error) {
+	return call[json.RawMessage](ctx, r.core, &operation{
 		service: ServiceAPI,
 		method:  http.MethodPost,
 		path:    "/api/v2/auth/mfa/merchant/client/token",
@@ -108,9 +109,12 @@ func (r *AuthResource) CreateMFAToken(ctx context.Context, params AuthCreateMFAT
 
 // MFAStatus checks whether an account has 2FA enabled.
 //
-// Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without the
-// slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve the captcha
-// from `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`.
+// Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts with
+// 2FA first send the password grant without code and without captcha; when the answer is
+// `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP code in
+// `code`. Accounts without 2FA must solve the captcha from `GET /api/v1/captcha/generate`. Unknown
+// users answer status `NOT_FOUND`; when this check fails the web app does not send the password at
+// all.
 //
 // It calls POST /api/v1/client/mfa without authentication.
 //
@@ -128,9 +132,10 @@ func (r *AuthResource) MFAStatus(ctx context.Context, params AuthMFAStatusParams
 // GenerateCaptcha returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The
 // solution is the horizontal offset of the piece (the web slider ranges 0-250) and is sent to
 // `POST /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
-// `base64(JSON.stringify({"sliderPosition": <int>, "requestId": "<requestId>"}))`. A wrong answer
-// is rejected with status `INVALID_CAPTCHA`; the web app then generates a new captcha with a fresh
-// `requestId`. Status/message `Too many requests` means the account is temporarily locked.
+// `base64(JSON.stringify({"sliderPosition": "<offset>", "requestId": "<requestId>"}))`. The
+// sign-in form sends the offset as a string of digits, the registration form as a number. A wrong
+// answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new captcha with
+// a fresh `requestId`. Status/message `Too many requests` means the account is temporarily locked.
 //
 // It calls GET /api/v1/captcha/generate without authentication.
 func (r *AuthResource) GenerateCaptcha(ctx context.Context, params AuthGenerateCaptchaParams, opts ...RequestOption) (*AuthCaptcha, error) {

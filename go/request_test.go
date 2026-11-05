@@ -50,7 +50,8 @@ func TestOperationEncoding(t *testing.T) {
 		Amount:    MustDecimal("0.10"),
 		Note:      Ptr(""),
 	}
-	op := testOperation(http.MethodPost, "/orders/"+url.PathEscape("a/b"))
+	op := testOperation(http.MethodPost, "/orders/{id}")
+	op.pathParams = []string{"a/b"}
 	op.public, op.params, op.body = true, params, jsonBody(params)
 
 	out, err := call[*struct{ ID string }](context.Background(), client.core, op, []RequestOption{WithHeader("X-Extra", "1"), WithQuery("extra", "2")})
@@ -60,7 +61,7 @@ func TestOperationEncoding(t *testing.T) {
 	if out.ID != "a/b" {
 		t.Errorf("path value = %q, want a/b", out.ID)
 	}
-	if want := "extra=2&from=2026-01-02T03%3A04%3A05Z&sort=created%2Cdesc&sort=id"; got.URL.RawQuery != want {
+	if want := "extra=2&from=2026-01-02T03%3A04%3A05%2B0000&sort=created%2Cdesc&sort=id"; got.URL.RawQuery != want {
 		t.Errorf("query = %s, want %s", got.URL.RawQuery, want)
 	}
 	if want := `{"amount":0.10,"note":""}`; string(body) != want {
@@ -151,8 +152,8 @@ func TestMultipartParts(t *testing.T) {
 		`note ""  hi`,
 		`amount ""  1.5`,
 		`photo "photo" image/png png`,
-		`files "files" application/octet-stream one`,
-		`files "files" application/octet-stream two`,
+		`files "files" text/plain; charset=utf-8 one`,
+		`files "files" text/plain; charset=utf-8 two`,
 	}
 	if !slices.Equal(parts, want) {
 		t.Errorf("parts = %q\nwant %q", parts, want)
@@ -177,6 +178,138 @@ func TestEnvelope(t *testing.T) {
 	}
 	if len(tickers) != 1 || tickers[0].Symbol != "BTCUSDT" || tickers[0].LastPrice.String() != "97000.5" {
 		t.Errorf("tickers = %+v", tickers)
+	}
+}
+
+func TestUnwrapEnvelope(t *testing.T) {
+	tests := []struct {
+		body, result string
+		code         int
+	}{
+		{`{"retCode":0,"result":[1]}`, `[1]`, 0},
+		{`{"retCode":200,"retMsg":"OK","result":{"a":1}}`, `{"a":1}`, 0},
+		{`{"code":0,"result":"x"}`, `"x"`, 0},
+		{`{"result":{"a":1}}`, `{"a":1}`, 0},
+		{`{"a":1}`, `{"a":1}`, 0},
+		{`{"retCode":"0","result":2}`, `2`, 0},
+		{`{"retCode":10001,"retMsg":"params error"}`, "", 10001},
+		{`{"code":5,"message":"failed"}`, "", 5},
+	}
+	for _, tt := range tests {
+		result, err := unwrapEnvelope([]byte(tt.body))
+		var apiErr *APIError
+		switch {
+		case tt.code != 0 && (!errors.As(err, &apiErr) || apiErr.Code != tt.code || apiErr.Message == ""):
+			t.Errorf("unwrapEnvelope(%s) = %v, want an error with code %d", tt.body, err, tt.code)
+		case tt.code == 0 && (err != nil || string(result) != tt.result):
+			t.Errorf("unwrapEnvelope(%s) = %s, %v; want %s", tt.body, result, err, tt.result)
+		}
+	}
+}
+
+func TestDecodeResultAcceptsText(t *testing.T) {
+	var s string
+	if err := decodeResult([]byte("created"), &s); err != nil || s != "created" {
+		t.Errorf("string from text = %q, %v", s, err)
+	}
+	if err := decodeResult([]byte(`"quoted"`), &s); err != nil || s != "quoted" {
+		t.Errorf("string from JSON = %q, %v", s, err)
+	}
+	var raw json.RawMessage
+	if err := decodeResult([]byte("OK"), &raw); err != nil || string(raw) != `"OK"` {
+		t.Errorf("untyped from text = %s, %v; want it as a JSON string", raw, err)
+	}
+	if err := decodeResult([]byte(" {\"a\":1}\n"), &raw); err != nil || string(raw) != `{"a":1}` {
+		t.Errorf("untyped from JSON = %s, %v", raw, err)
+	}
+	if err := decodeResult(nil, &raw); err != nil || raw != nil {
+		t.Errorf("untyped from nothing = %s, %v", raw, err)
+	}
+	var typed struct{ A int }
+	if err := decodeResult([]byte("OK"), &typed); err == nil {
+		t.Error("a typed result accepted text")
+	}
+}
+
+func TestPathParameters(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /things/{id}/parts/{part}", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(r.URL.EscapedPath()))
+	})
+	client := newTestClient(t, mux)
+	op := testOperation(http.MethodGet, "/things/{id}/parts/{part}")
+	op.public = true
+	op.pathParams = []string{`a/b\c?d`, "é 1"}
+	path, err := client.core.text(context.Background(), op, nil)
+	if want := "/things/a%2Fb%5Cc%3Fd/parts/%C3%A9%201"; err != nil || path != want {
+		t.Errorf("path = %q, %v; want %q", path, err, want)
+	}
+	for _, value := range []string{"", ".", ".."} {
+		op.pathParams = []string{value, "x"}
+		if _, err := client.core.text(context.Background(), op, nil); err == nil || !strings.Contains(err.Error(), "path parameter id") {
+			t.Errorf("path parameter %q: %v, want it refused", value, err)
+		}
+	}
+}
+
+func TestLanguage(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /language", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(r.Header.Get("Accept-Language")))
+	})
+	client := newTestClient(t, mux, WithLanguage("ru"))
+	op := testOperation(http.MethodGet, "/language")
+	op.public = true
+	if got, err := client.core.text(context.Background(), op, nil); err != nil || got != "ru" {
+		t.Errorf("Accept-Language = %q, %v", got, err)
+	}
+	if got, err := client.core.text(context.Background(), op, []RequestOption{WithHeader("Accept-Language", "en")}); err != nil || got != "en" {
+		t.Errorf("Accept-Language with WithHeader = %q, %v", got, err)
+	}
+}
+
+func TestMultipartFilesAndText(t *testing.T) {
+	type caption struct {
+		Text string `json:"text"`
+	}
+	type params struct {
+		Named   io.Reader `form:"named"`
+		Typed   io.Reader `form:"typed"`
+		Sniffed io.Reader `form:"sniffed"`
+		Caption *caption  `form:"caption" mime:"text/plain"`
+	}
+	contentType, data, err := multipartBody(params{
+		Named:   File{Name: "passport.pdf", Body: strings.NewReader("%PDF-1.7")},
+		Typed:   &File{Name: "scan", ContentType: "image/heic", Body: strings.NewReader("heic")},
+		Sniffed: strings.NewReader("\x89PNG\r\n\x1a\n...."),
+		Caption: &caption{Text: "hi"},
+	})()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, mediaParams, _ := mime.ParseMediaType(contentType)
+	reader := multipart.NewReader(bytes.NewReader(data), mediaParams["boundary"])
+	var parts []string
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(part)
+		parts = append(parts, fmt.Sprintf("%s %q %q %q", part.FormName(), part.FileName(), part.Header.Get("Content-Type"), body))
+	}
+	want := []string{
+		`named "passport.pdf" "application/pdf" "%PDF-1.7"`,
+		`typed "scan" "image/heic" "heic"`,
+		`sniffed "sniffed" "image/png" "\x89PNG\r\n\x1a\n...."`,
+		// A plain field, as the web application sends the JSON text.
+		`caption "" "" "{\"text\":\"hi\"}"`,
+	}
+	if !slices.Equal(parts, want) {
+		t.Errorf("parts = %q\nwant %q", parts, want)
 	}
 }
 
@@ -345,5 +478,20 @@ func TestUnsupportedParameter(t *testing.T) {
 	}{Filter: map[string]string{"a": "b"}}, "query")
 	if err == nil || !strings.Contains(err.Error(), "query filter") {
 		t.Errorf("encodeValues() = %v, want an error naming the parameter", err)
+	}
+}
+
+func TestEmptyModelResponse(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /empty", func(http.ResponseWriter, *http.Request) {})
+	mux.HandleFunc("GET /null", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("null")) })
+	client := newTestClient(t, mux)
+	for _, path := range []string{"/empty", "/null"} {
+		op := testOperation(http.MethodGet, path)
+		op.public = true
+		out, err := call[*struct{ Name string }](context.Background(), client.core, op, nil)
+		if err != nil || out == nil {
+			t.Errorf("%s: call() = %v, %v; want an empty result", path, out, err)
+		}
 	}
 }

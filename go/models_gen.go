@@ -197,12 +197,6 @@ type AuthMFAStatus struct {
 	MFAEnabled bool `json:"mfaEnabled,omitzero"`
 }
 
-// AuthMFAToken is returned by [AuthResource.CreateMFAToken].
-type AuthMFAToken struct {
-	// Inferred from the web application; not yet observed in responses.
-	MFAToken string `json:"mfaToken,omitzero"`
-}
-
 // AuthWebGlData is used in [AuthSendFingerprintParams].
 type AuthWebGlData struct {
 	Renderer               *string `json:"renderer,omitzero"`
@@ -226,6 +220,11 @@ type BalanceCalculation struct {
 	ReceivedAmount Decimal `json:"receivedAmount,omitzero"`
 	// Inferred from the web application; not yet observed in responses.
 	WithdrawalAmount Decimal `json:"withdrawalAmount,omitzero"`
+	// Amount debited; the web app shows it as the withdrawal amount. Inferred from the web
+	// application; not yet observed in responses.
+	GrossAmount Decimal `json:"grossAmount,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
 	// Inferred from the web application; not yet observed in responses.
 	ExpirationDate Time `json:"expirationDate,omitzero"`
 }
@@ -442,14 +441,6 @@ type CryptoWithdrawalCalculation struct {
 	ExpirationDate   Time    `json:"expirationDate,omitzero"`
 }
 
-// CurrentAccountDateFrame is used in [CurrentAccountInvoicesDownloadParams],
-// [CurrentAccountInvoicesEmailParams], [CurrentAccountInvoicesDownloadDepositParams] and
-// [CurrentAccountInvoicesEmailDepositParams].
-type CurrentAccountDateFrame struct {
-	Start *string `json:"start,omitzero"`
-	End   *string `json:"end,omitzero"`
-}
-
 // CurrentAccountSystemAccount is returned by [CurrentAccountSystemAccountsResource.List].
 type CurrentAccountSystemAccount struct {
 	// Inferred from the web application; not yet observed in responses.
@@ -495,7 +486,8 @@ type ExchangeCryptoAsset struct {
 	Protocol string `json:"protocol,omitzero"`
 }
 
-// ExchangeDateFrame is used in [ExchangeOrdersHistoryParams] and [MerchantDownloadReportParams].
+// ExchangeDateFrame is used in [ExchangeOrdersHistoryParams], [MerchantOrdersHistoryParams] and
+// [MerchantDownloadReportParams].
 //
 // Time interval. The web app formats both ends as `yyyy-MM-dd'T'HH:mm:ssZ` with a colon-less
 // offset, e.g. `2026-11-07T00:00:00+0300`.
@@ -514,7 +506,7 @@ type ExchangeFiatAsset struct {
 	Category ExchangeAssetCategory `json:"category,omitzero"`
 }
 
-// ExchangeLeg is used in [ExchangeOrder] and [ExchangeQuote].
+// ExchangeLeg is used in [ExchangeOrder], [ExchangeQuote] and [MerchantOrder].
 type ExchangeLeg struct {
 	// Inferred from the web application; not yet observed in responses.
 	Type ExchangeLegType `json:"type,omitzero"`
@@ -642,7 +634,7 @@ type ExchangeOrder struct {
 	CompletionDate Time `json:"completionDate,omitzero"`
 }
 
-// ExchangeOrderConditions is used in [ExchangeOrder].
+// ExchangeOrderConditions is used in [ExchangeOrder] and [MerchantOrder].
 type ExchangeOrderConditions struct {
 	// Inferred from the web application; not yet observed in responses.
 	FromAsset string `json:"fromAsset,omitzero"`
@@ -665,7 +657,7 @@ type ExchangeOrderConditions struct {
 	ExchangeRateValue Decimal `json:"exchangeRateValue,omitzero"`
 }
 
-// ExchangePostForm is used in [BalancePaymentDetails] and [ExchangeOrder].
+// ExchangePostForm is used in [BalancePaymentDetails], [ExchangeOrder] and [MerchantOrder].
 //
 // HTML form to submit with POST (Assist acquiring).
 type ExchangePostForm struct {
@@ -1578,6 +1570,39 @@ type MerchantCurrencyPair struct {
 	ToCurrency string `json:"toCurrency,omitzero"`
 }
 
+// MerchantOrder is returned by [MerchantOrdersResource.History].
+//
+// Exchange order of a merchant's client.
+type MerchantOrder struct {
+	// Inferred from the web application; not yet observed in responses.
+	ID string `json:"id,omitzero"`
+	// Application number shown to the client. Inferred from the web application; not yet observed in
+	// responses.
+	Number int64 `json:"number,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Status ExchangeOrderStatus `json:"status,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Input *ExchangeLeg `json:"input,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Output *ExchangeLeg `json:"output,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	Conditions *ExchangeOrderConditions `json:"conditions,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	ExchangeRateValue Decimal `json:"exchangeRateValue,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	PostForm *ExchangePostForm `json:"postForm,omitzero"`
+	// Why the terms were recalculated, e.g. `WRONG_AMOUNT` (a different amount was received). Inferred
+	// from the web application; not yet observed in responses.
+	RecalculationReason string `json:"recalculationReason,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CreationDate Time `json:"creationDate,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	CompletionDate Time `json:"completionDate,omitzero"`
+	// The client who placed the order. Inferred from the web application; not yet observed in
+	// responses.
+	ClientID string `json:"clientId,omitzero"`
+}
+
 // MerchantPair is returned by [MerchantResource.Pairs].
 type MerchantPair struct {
 	// Inferred from the web application; not yet observed in responses.
@@ -1774,9 +1799,11 @@ type PaymentCommission struct {
 
 // PaymentCommissionPair is used in [PaymentDirectionCommission].
 type PaymentCommissionPair struct {
-	// Percent, decimal comma. Inferred from the web application; not yet observed in responses.
+	// Percent as a decimal string, e.g. `1.5`. Inferred from the web application; not yet observed in
+	// responses.
 	Buy string `json:"buy,omitzero"`
-	// Percent, decimal comma. Inferred from the web application; not yet observed in responses.
+	// Percent as a decimal string, e.g. `1.5`. Inferred from the web application; not yet observed in
+	// responses.
 	Sell string `json:"sell,omitzero"`
 }
 
@@ -2049,7 +2076,8 @@ type SupportResponse struct {
 //
 // Fill of an order; also pushed on the `execution` WebSocket topic.
 type TradingExecution struct {
-	// Execution id. Inferred from the web application; not yet observed in responses.
+	// Execution id; the main web app treats it as the id of the order. Inferred from the web
+	// application; not yet observed in responses.
 	ID string `json:"id,omitzero"`
 	// Inferred from the web application; not yet observed in responses.
 	OrderID string `json:"orderId,omitzero"`

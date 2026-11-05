@@ -51,13 +51,18 @@ func TestTimeMarshal(t *testing.T) {
 		At      Time
 		Zero    Time
 		Omitted Time `json:",omitzero"`
-	}{At: Time{Time: time.Date(2026, 3, 4, 5, 6, 7, 0, time.FixedZone("MSK", 3*3600))}}
+	}{At: Time{Time: time.Date(2026, 3, 4, 5, 6, 7, 890, time.FixedZone("MSK", 3*3600))}}
 	out, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `{"At":"2026-03-04T05:06:07+03:00","Zero":null}`; string(out) != want {
+	// As the web application sends times: to the second, with a "+0300" offset.
+	if want := `{"At":"2026-03-04T05:06:07+0300","Zero":null}`; string(out) != want {
 		t.Errorf("Marshal() = %s, want %s", out, want)
+	}
+	text, _ := Time{Time: time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)}.MarshalText()
+	if string(text) != "2026-03-04T05:06:07+0000" {
+		t.Errorf("MarshalText() = %s", text)
 	}
 }
 

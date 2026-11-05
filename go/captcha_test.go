@@ -43,7 +43,8 @@ func TestLoginSolvesCaptcha(t *testing.T) {
 		t.Errorf("captchas requested = %v, want [%s]", ids, c.RequestID)
 	}
 	answer, _ := base64.StdEncoding.DecodeString(answers[0])
-	if want := fmt.Sprintf(`{"sliderPosition":117,"requestId":%q}`, c.RequestID); string(answer) != want {
+	// The web application sends the position as the string value of its slider.
+	if want := fmt.Sprintf(`{"sliderPosition":"117","requestId":%q}`, c.RequestID); string(answer) != want {
 		t.Errorf("captcha header = %s, want %s", answer, want)
 	}
 	if auth.firstForm().Has("code") {
@@ -94,11 +95,11 @@ func TestLoginRetriesInvalidCaptcha(t *testing.T) {
 func TestLoginCaptchaRequired(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
-	auth.mfaFails = true
+	auth.mfa = true
 	auth.reply = func(url.Values) (int, string) {
 		return http.StatusBadRequest, `{"status":"CAPTCHA_REQUIRED","message":"Solve the captcha"}`
 	}
-	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"))
+	client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode)
 
 	err := client.Login(context.Background())
 	if !errors.Is(err, ErrCaptchaRequired) || !errors.Is(err, ErrAuthentication) {
@@ -128,8 +129,31 @@ func TestLoginWithTwoFactorSkipsCaptcha(t *testing.T) {
 	if err := client.Login(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, answers := auth.captchas(); auth.firstForm().Get("code") != "123456" || answers[0] != "" {
-		t.Errorf("token request = %v with captcha %q, want the code and no captcha", auth.firstForm(), answers[0])
+	if _, answers := auth.captchas(); auth.form(1).Get("code") != "123456" || answers[0] != "" || answers[1] != "" {
+		t.Errorf("token requests = %v with captchas %q, want the code and no captcha", auth.forms, answers)
+	}
+}
+
+func TestLoginAfterCaptchaAsksForCode(t *testing.T) {
+	mux := http.NewServeMux()
+	auth := newAuthServer(t, mux)
+	auth.reply = func(form url.Values) (int, string) {
+		if !form.Has("code") {
+			return http.StatusOK, `{"mfaEnabled":true}`
+		}
+		return 0, ""
+	}
+	client := newTestClient(t, mux,
+		WithCredentials("trader@example.com", "secret"),
+		WithCodeProvider(StaticCode("123456")),
+		WithCaptchaSolver(func(context.Context, Captcha) (int, error) { return 7, nil }),
+	)
+	if err := client.Login(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	_, answers := auth.captchas()
+	if len(answers) != 2 || answers[0] == "" || answers[1] != "" || auth.form(1).Get("code") != "123456" {
+		t.Errorf("token requests = %v with captchas %q, want the captcha, then the code", auth.forms, answers)
 	}
 }
 
