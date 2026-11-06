@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, PoisonError, RwLock};
+use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
-use reqwest::header::USER_AGENT;
+use reqwest::header::{ACCEPT_LANGUAGE, HeaderValue, USER_AGENT};
 use reqwest::{Method, StatusCode, Url};
-
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::auth::{Credentials, Endpoints, MemoryTokenStore, Session, TokenStore, Tokens};
@@ -16,7 +17,7 @@ use crate::generated::{
     OAUTH_TOKEN_PATH, OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH, Service,
 };
 use crate::otp::CodeProvider;
-use crate::request::{RequestBuilder, RequestOptions};
+use crate::request::{self, RequestBuilder, RequestOptions, Response};
 use crate::retry::{self, RetryPolicy};
 
 pub(crate) const USER_AGENT_VALUE: &str = concat!("whitebird-api-rust/", env!("CARGO_PKG_VERSION"));
@@ -55,7 +56,6 @@ struct Inner {
     session: Session,
     retry: RetryPolicy,
     timeout: Duration,
-    mfa_token: RwLock<Option<String>>,
 }
 
 impl Client {
@@ -67,18 +67,21 @@ impl Client {
     /// Logs in with the configured credentials and returns the new tokens.
     ///
     /// Login otherwise happens lazily on the first authenticated call; calling this first
-    /// surfaces credential and two-factor problems early. The client first asks whether the
-    /// account has two-factor authentication on, then sends a code from the
-    /// [code provider](ClientBuilder::otp) or, for accounts without it, a captcha answer.
+    /// surfaces credential and two-factor problems early. Like the web app, the client first
+    /// asks whether the account has two-factor authentication on. If it has, the password is
+    /// sent alone and, when the server asks for it, again with a code from the
+    /// [code provider](ClientBuilder::otp). Otherwise the password goes with a captcha answer
+    /// from the [solver](ClientBuilder::captcha). The password is never sent if the check
+    /// fails.
     ///
     /// # Errors
     ///
-    /// Returns an error for which [`Error::is_mfa_required`] is `true` if the account has
-    /// two-factor authentication on and no code provider is configured,
-    /// [`Error::is_captcha_required`] if the account must pass a captcha and no
-    /// [solver](ClientBuilder::captcha) is configured, an
-    /// [`ErrorKind::Authentication`](crate::ErrorKind::Authentication) error if the credentials
-    /// or the code are rejected and [`Error::Config`] if no credentials are configured.
+    /// Returns an error for which [`Error::is_mfa_required`] is `true` if the server asks for a
+    /// code and no code provider is configured, [`Error::is_captcha_required`] if the account
+    /// must pass a captcha and no solver is configured (or three answers were rejected), an
+    /// [`ErrorKind::Authentication`](crate::ErrorKind::Authentication) error if there is no
+    /// account with this username or the password or the code is rejected, and
+    /// [`Error::Config`] if no credentials are configured.
     pub async fn login(&self) -> Result<Tokens> {
         self.inner.session.login().await
     }
@@ -88,8 +91,9 @@ impl Client {
     /// and returns it.
     ///
     /// Without `code`, one comes from the [code provider](ClientBuilder::otp). With a provider
-    /// configured the client calls this by itself before such operations, and again once when
-    /// one is refused for lack of a valid token.
+    /// configured the client calls this by itself when such an operation is refused for lack
+    /// of a valid token, then sends the operation again; concurrent refusals share one
+    /// confirmation.
     ///
     /// # Errors
     ///
@@ -107,7 +111,7 @@ impl Client {
     /// ```
     pub async fn confirm_operation(&self, operation: &str, code: Option<&str>) -> Result<String> {
         let code = match code {
-            Some(code) => code.to_owned(),
+            Some(code) => code.trim().to_owned(),
             None => match &self.inner.session.otp {
                 Some(otp) => otp.code().await?,
                 None => {
@@ -129,54 +133,96 @@ impl Client {
         Ok(token)
     }
 
-    /// Sends a request for an operation that needs an MFA token, obtaining one first if a code
-    /// provider is configured and no token is set, and again once if the token is refused.
+    /// Sends a request for an operation that needs an MFA token, like the web app: with the
+    /// token held, if any; when the operation is refused for lack of a valid token and a code
+    /// provider is configured, obtains a token and sends it once more.
     pub(crate) async fn execute_with_mfa(
         &self,
         request: &RequestBuilder,
         operation: &str,
     ) -> Result<reqwest::Response> {
-        if self.inner.session.otp.is_none() {
-            return self.execute(request).await;
-        }
-        if self.mfa_token().is_none() {
-            self.confirm_operation(operation, None).await?;
-        }
+        let sent = self.mfa_token();
         match self.execute(request).await {
-            Err(error) if error.is_mfa_required() => {
-                self.confirm_operation(operation, None).await?;
+            Err(error) if error.is_mfa_required() && self.inner.session.otp.is_some() => {
+                self.renew_mfa_token(operation, sent.as_deref()).await?;
                 self.execute(request).await
             }
             result => result,
         }
     }
 
+    /// Obtains a new operation MFA token after `rejected` (or no token) was refused, unless a
+    /// concurrent operation already did.
+    async fn renew_mfa_token(&self, operation: &str, rejected: Option<&str>) -> Result<()> {
+        let _confirmation = self.inner.session.confirmation.lock().await;
+        if self
+            .mfa_token()
+            .is_some_and(|token| Some(token.as_str()) != rejected)
+        {
+            return Ok(());
+        }
+        self.confirm_operation(operation, None).await.map(drop)
+    }
+
     /// Sets the operation MFA token sent as `x-mfa-token` with every request, as required by
     /// sensitive operations such as withdrawals.
     pub fn set_mfa_token(&self, token: impl Into<String>) {
-        *self
-            .inner
-            .mfa_token
-            .write()
-            .unwrap_or_else(PoisonError::into_inner) = Some(token.into());
+        let token: String = token.into();
+        self.inner
+            .session
+            .set_mfa_token(Some(token.trim().to_owned()));
     }
 
     /// Stops sending the operation MFA token.
     pub fn clear_mfa_token(&self) {
-        *self
-            .inner
-            .mfa_token
-            .write()
-            .unwrap_or_else(PoisonError::into_inner) = None;
+        self.inner.session.set_mfa_token(None);
     }
 
     /// Returns the operation MFA token, if one is set.
     pub fn mfa_token(&self) -> Option<String> {
-        self.inner
-            .mfa_token
-            .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+        self.inner.session.mfa_token()
+    }
+
+    /// Forgets the session after a logout: tokens, token store and operation MFA token.
+    pub(crate) fn end_session(&self) {
+        self.inner.session.end();
+    }
+
+    /// The session generation, captured when a request that replaces the session is sent.
+    pub(crate) fn session_generation(&self) -> u64 {
+        self.inner.session.generation()
+    }
+
+    /// Stores the token pair that `response`, the answer to a password change sent at
+    /// `generation`, carries as the new session, with `new_password` for later logins, and
+    /// returns the response with its body intact.
+    pub(crate) async fn replace_session(
+        &self,
+        response: reqwest::Response,
+        generation: u64,
+        new_password: Option<&str>,
+    ) -> Result<reqwest::Response> {
+        #[derive(Deserialize)]
+        struct Pair {
+            access_token: Option<String>,
+            refresh_token: Option<String>,
+            expires_in: Option<u64>,
+        }
+
+        let (response, body) = Response::buffer(response).await?;
+        if let Ok(Pair {
+            access_token: Some(access_token),
+            refresh_token,
+            expires_in,
+        }) = serde_json::from_slice(&body)
+        {
+            if !access_token.is_empty() {
+                let refresh_token = refresh_token.filter(|token| !token.is_empty());
+                let tokens = Tokens::issued(access_token, refresh_token, expires_in);
+                self.inner.session.replace(generation, tokens, new_password);
+            }
+        }
+        Ok(response)
     }
 
     /// Environment the client talks to.
@@ -211,9 +257,9 @@ impl Client {
     /// use whitebird::{Client, Method, Service};
     ///
     /// # async fn run(client: Client) -> whitebird::Result<()> {
-    /// let methods: serde_json::Value = client
-    ///     .request(Service::Brokerage, Method::GET, "/api/v1/brokerage/payment/methods")
-    ///     .query("currency", "USD")
+    /// let page: serde_json::Value = client
+    ///     .request(Service::Brokerage, Method::GET, "/api/v1/brokerage/some-new-endpoint")
+    ///     .query("page", 0)
     ///     .send()
     ///     .await?
     ///     .json()
@@ -230,17 +276,37 @@ impl Client {
         RequestBuilder::new(self.clone(), service, method, path.into())
     }
 
+    /// Builds a request to `template`, whose `{}` placeholders are replaced by the encoded
+    /// `params`; a parameter that would change the path makes the request invalid.
+    pub(crate) fn request_path(
+        &self,
+        service: Service,
+        method: Method,
+        template: &str,
+        params: &[&dyn fmt::Display],
+    ) -> RequestBuilder {
+        match request::fill_path(template, params) {
+            Ok(path) => self.request(service, method, path),
+            Err(problem) => {
+                let mut request = self.request(service, method, template);
+                request.invalid = Some(problem);
+                request
+            }
+        }
+    }
+
     pub(crate) async fn execute(&self, request: &RequestBuilder) -> Result<reqwest::Response> {
         if let Some(problem) = &request.invalid {
             return Err(Error::Config(problem.clone()));
         }
         let url = self.url(request)?;
+        // Requests that are not idempotent are retried only if they did not reach the server.
         let idempotent = request
             .options
             .idempotent
             .unwrap_or_else(|| retry::is_idempotent(&request.method));
         let max_retries = match request.options.max_retries {
-            _ if request.streaming || !idempotent => 0,
+            _ if request.streaming => 0,
             Some(max_retries) => max_retries,
             None => self.inner.retry.max_retries,
         };
@@ -263,16 +329,21 @@ impl Client {
                     let status = response.status();
                     if status == StatusCode::UNAUTHORIZED && !renewed {
                         if let Some(rejected) = &token {
-                            token = Some(session.renew_rejected(rejected).await?);
-                            renewed = true;
-                            continue;
+                            match session.renew_rejected(rejected).await? {
+                                Some(renewed_token) => {
+                                    token = Some(renewed_token);
+                                    renewed = true;
+                                    continue;
+                                }
+                                None => return Err(api_error(response).await),
+                            }
                         }
                     }
                     let retry_after = retry::retry_after(response.headers());
                     match self.retry_delay(
                         attempt,
                         max_retries,
-                        retry::is_retryable(status),
+                        retry::is_retryable(status, idempotent),
                         retry_after,
                     ) {
                         Some(delay) => delay,
@@ -282,14 +353,14 @@ impl Client {
                 Err(error) => match self.retry_delay(
                     attempt,
                     max_retries,
-                    retry::is_retryable_error(&error),
+                    retry::is_retryable_error(&error, idempotent),
                     None,
                 ) {
                     Some(delay) => delay,
                     None => return Err(error.into()),
                 },
             };
-            attempt += 1;
+            attempt = attempt.saturating_add(1);
             tokio::time::sleep(delay).await;
         }
     }
@@ -330,6 +401,9 @@ impl Client {
             .http
             .request(request.method.clone(), url)
             .header(USER_AGENT, USER_AGENT_VALUE);
+        if let Some(language) = &self.inner.session.language {
+            http = http.header(ACCEPT_LANGUAGE, language.clone());
+        }
         if let Some(token) = token {
             http = http.bearer_auth(token);
         }
@@ -364,13 +438,12 @@ async fn issued_mfa_token(response: reqwest::Response) -> Result<String> {
         },
         Ok(Value::String(token)) => Some(token),
         Ok(_) => None,
-        Err(_) => std::str::from_utf8(&body)
-            .ok()
-            .map(|text| text.trim().to_owned()),
+        Err(_) => std::str::from_utf8(&body).ok().map(str::to_owned),
     };
     from_body
         .into_iter()
         .chain(header)
+        .map(|token| token.trim().to_owned())
         .find(|token| !token.is_empty())
         .ok_or_else(|| {
             ApiError::new(
@@ -416,11 +489,14 @@ pub struct ClientBuilder {
     token_store: Option<Arc<dyn TokenStore>>,
     timeout: Option<Duration>,
     max_retries: Option<u32>,
+    language: Option<String>,
     http: Option<reqwest::Client>,
 }
 
 impl ClientBuilder {
-    /// Sets the account email and password. The email is lowercased on login.
+    /// Sets the account email and password. Like the web app, the client sends the email as
+    /// given to ask whether the account has two-factor authentication, and lowercased with the
+    /// password.
     pub fn credentials(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
         self.credentials = Some(Credentials {
             username: username.into(),
@@ -431,8 +507,9 @@ impl ClientBuilder {
 
     /// Sets where TOTP codes come from when two-factor authentication is on: a fixed code
     /// (`&str`), a [`CodeProvider::from_fn`] or [`CodeProvider::new`] callback or, with the
-    /// `otp` feature, a `Totp`. The provider is not asked when signing in to an account without
-    /// two-factor authentication.
+    /// `otp` feature, a `Totp`. The provider is asked only when the server wants a code: at
+    /// sign-in and when a withdrawal or another sensitive operation is refused for lack of an
+    /// operation MFA token.
     pub fn otp(mut self, provider: impl Into<CodeProvider>) -> Self {
         self.otp = Some(provider.into());
         self
@@ -472,9 +549,18 @@ impl ClientBuilder {
         self
     }
 
-    /// Sets how many times failed idempotent requests are retried; 2 by default.
+    /// Sets how many times a failed request is retried; 2 by default. GET, HEAD and OPTIONS
+    /// requests are retried on network errors, timeouts and answers 429, 502, 503 and 504;
+    /// other requests only when the connection could not be established or on 429.
     pub fn max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = Some(max_retries);
+        self
+    }
+
+    /// Sets the `Accept-Language` sent with every request, such as `en` or `ru`; the services
+    /// use it for the language of their messages.
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
         self
     }
 
@@ -488,14 +574,24 @@ impl ClientBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Config`] if a base URL is invalid and [`Error::Transport`] if the HTTP
-    /// client cannot be initialized.
+    /// Returns [`Error::Config`] if a base URL or the language is invalid and
+    /// [`Error::Transport`] if the HTTP client cannot be initialized.
     pub fn build(self) -> Result<Client> {
         for (service, url) in &self.base_urls {
             Url::parse(url).map_err(|error| {
                 Error::Config(format!("invalid base URL {url:?} for {service:?}: {error}"))
             })?;
         }
+        let language = self
+            .language
+            .as_deref()
+            .map(str::trim)
+            .filter(|language| !language.is_empty())
+            .map(|language| {
+                HeaderValue::from_str(language)
+                    .map_err(|_| Error::Config(format!("invalid language {language:?}")))
+            })
+            .transpose()?;
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
         let http = match self.http {
             Some(http) => http,
@@ -515,14 +611,19 @@ impl ClientBuilder {
                 captcha: format!("{auth_url}{OAUTH_CAPTCHA_PATH}"),
                 basic: OAUTH_BASIC.to_owned(),
             },
-            credentials: self.credentials,
+            credentials: RwLock::new(self.credentials),
             otp: self.otp,
             captcha: self.captcha,
             store: self
                 .token_store
                 .unwrap_or_else(|| Arc::new(MemoryTokenStore::new())),
             timeout,
+            language,
             renewal: tokio::sync::Mutex::new(()),
+            mfa_token: RwLock::new(None),
+            confirmation: tokio::sync::Mutex::new(()),
+            generation: AtomicU64::new(0),
+            saving: Mutex::new(()),
         };
         Ok(Client {
             inner: Arc::new(Inner {
@@ -534,14 +635,13 @@ impl ClientBuilder {
                     .max_retries
                     .map_or_else(RetryPolicy::default, RetryPolicy::with_max_retries),
                 timeout,
-                mfa_token: RwLock::new(None),
             }),
             options: RequestOptions::default(),
         })
     }
 
-    /// Builds a [`blocking::Client`](crate::blocking::Client) running on its own
-    /// current-thread runtime.
+    /// Builds a [`blocking::Client`](crate::blocking::Client) running on its own runtime, whose
+    /// thread keeps the connections alive between calls.
     ///
     /// # Errors
     ///
@@ -563,6 +663,7 @@ impl fmt::Debug for ClientBuilder {
             .field("base_urls", &self.base_urls)
             .field("timeout", &self.timeout)
             .field("max_retries", &self.max_retries)
+            .field("language", &self.language)
             .finish_non_exhaustive()
     }
 }

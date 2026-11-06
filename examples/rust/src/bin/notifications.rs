@@ -18,7 +18,14 @@ async fn main() -> Result<(), Error> {
             event = events.try_next() => event?,
         };
         let Some(event) = event else { return Ok(()) };
-        let message = event.json()?;
+        // Like the web app, skip events that are not notifications instead of stopping.
+        let message = match event.json() {
+            Ok(message) => message,
+            Err(error) => {
+                eprintln!("skipped event {:?}: {error}", event.id);
+                continue;
+            }
+        };
         let payload = message.payload.unwrap_or_default();
         match message.r#type {
             Some(Type::OrderUpdate) => println!("order update: {payload}"),

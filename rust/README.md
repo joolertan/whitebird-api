@@ -8,10 +8,11 @@ Unofficial Rust client for the [Whitebird](https://whitebird.io) crypto exchange
 - Typed methods for market data, exchange and spot trading, deposits and withdrawals, payment
   cards, brokerage, ICO tokens, KYC, notifications and account settings, grouped by resource:
   `client.brokerage().otc_orders().list(params)`.
-- Handles the whole login flow: the TOTP code when two-factor authentication is on, a captcha
-  through your solver otherwise, and the MFA token of withdrawals. Sessions are refreshed
-  before they expire and after a 401.
-- Retries idempotent requests on network errors, 429 and 5xx, honouring `Retry-After`.
+- Signs in like the web app: the TOTP code when two-factor authentication is on, a captcha
+  through your solver otherwise, and the MFA token when a withdrawal asks for one. Sessions are
+  refreshed a minute before they expire and after a 401, and end with `client.user().logout()`.
+- Retries GET requests on network errors, timeouts, 429, 502, 503 and 504, and other requests
+  only when they did not reach the server (connection failures, 429), honouring `Retry-After`.
 - Paginated endpoints are lazy `Stream`s, and notifications are a `Stream` of server-sent events
   that reconnects by itself.
 - Tolerates API changes: unknown fields are ignored, unknown enum values are kept, timestamps are
@@ -23,7 +24,7 @@ This crate is not affiliated with Whitebird.
 
 ```toml
 [dependencies]
-whitebird-api = "0.1"
+whitebird-api = { version = "0.1", features = ["otp"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
 ```
@@ -66,8 +67,10 @@ async fn main() -> whitebird::Result<()> {
     // Server-sent notifications; the stream reconnects with `Last-Event-ID`.
     let mut events = client.notifications().stream();
     while let Some(event) = events.try_next().await? {
-        let message = event.json()?;
-        println!("{:?} {:?}", message.r#type, message.payload);
+        match event.json() {
+            Ok(message) => println!("{:?} {:?}", message.r#type, message.payload),
+            Err(error) => eprintln!("skipped an event: {error}"),
+        }
     }
     Ok(())
 }
@@ -98,8 +101,8 @@ match client.brokerage().otc_orders().create(params).await {
 ### Two-factor codes, operation MFA and captchas
 
 Withdrawals need an operation MFA token. With a code provider (`.otp(..)`) the client obtains
-one before the first withdrawal and renews it when it is refused. Without a provider, pass a
-code yourself; the token is then sent as `x-mfa-token` with every request:
+one when a withdrawal is refused for lack of it and sends the withdrawal again. Without a
+provider, pass a code yourself; the token is then sent as `x-mfa-token` with every request:
 
 ```rust,no_run
 # async fn run(client: whitebird::Client) -> whitebird::Result<()> {
@@ -113,17 +116,19 @@ not solve it: set a `CaptchaSolver` that shows the images to a person or calls a
 
 ### Sessions
 
-Tokens live in memory by default. Implement `TokenStore` to keep them across restarts. Use
-`Client::request` for endpoints the SDK does not cover yet; it applies the same authentication,
-retries and error handling:
+Tokens live in memory by default. Implement `TokenStore` (`load`, `save`, `clear`) to keep them
+across restarts; `client.user().logout()` clears the store, and so does a refresh token the
+server rejects. `client.user().password().change(..)` stores the new session it returns and uses
+the new password for later logins. Use `Client::request` for endpoints the SDK does not cover yet; it applies the
+same authentication, retries and error handling:
 
 ```rust,no_run
 # async fn run(client: whitebird::Client) -> whitebird::Result<()> {
 use whitebird::{Method, Service};
 
 let body: serde_json::Value = client
-    .request(Service::Brokerage, Method::GET, "/api/v1/brokerage/payment/methods")
-    .query("currency", "RUB")
+    .request(Service::Brokerage, Method::GET, "/api/v1/brokerage/some-new-endpoint")
+    .query("page", 0)
     .send()
     .await?
     .json()

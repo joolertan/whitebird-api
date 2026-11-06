@@ -3,16 +3,18 @@
 mod tokens;
 
 use std::fmt;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
-use reqwest::StatusCode;
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
+use reqwest::header::{ACCEPT_LANGUAGE, AUTHORIZATION, CONTENT_TYPE, HeaderValue, USER_AGENT};
+use reqwest::{Method, StatusCode};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 
 pub use self::tokens::{MemoryTokenStore, TokenStore, Tokens};
 use crate::captcha::{Captcha, CaptchaSolver};
@@ -20,11 +22,12 @@ use crate::client::USER_AGENT_VALUE;
 use crate::error::{ApiError, Error, ErrorKind, Result};
 use crate::otp::CodeProvider;
 
-/// Tokens closer than this to their expiry are refreshed before use.
-const REFRESH_MARGIN: Duration = Duration::from_secs(30);
+/// Tokens closer than this to their expiry are renewed before use, like the web app does.
+const REFRESH_MARGIN: Duration = Duration::from_secs(60);
 /// Captchas tried per login when the answers are rejected.
 const CAPTCHA_ATTEMPTS: u32 = 3;
 
+#[derive(Clone)]
 pub(crate) struct Credentials {
     pub(crate) username: String,
     pub(crate) password: String,
@@ -49,22 +52,25 @@ pub(crate) struct Endpoints {
 pub(crate) struct Session {
     pub(crate) http: reqwest::Client,
     pub(crate) endpoints: Endpoints,
-    pub(crate) credentials: Option<Credentials>,
+    /// Replaced when the password is changed through the client.
+    pub(crate) credentials: RwLock<Option<Credentials>>,
     pub(crate) otp: Option<CodeProvider>,
     pub(crate) captcha: Option<CaptchaSolver>,
     pub(crate) store: Arc<dyn TokenStore>,
     pub(crate) timeout: Duration,
-    /// Held while tokens are renewed so that concurrent requests share one refresh.
+    /// `Accept-Language` sent with every request.
+    pub(crate) language: Option<HeaderValue>,
+    /// Held while tokens are renewed so that concurrent requests share one refresh or login.
     pub(crate) renewal: tokio::sync::Mutex<()>,
-}
-
-struct Login<'a> {
-    username: &'a str,
-    password: &'a str,
-    code: Option<&'a str>,
-    /// Value of the `captcha` header.
-    captcha: Option<String>,
-    mfa_enabled: Option<bool>,
+    /// Operation MFA token sent as `x-mfa-token`.
+    pub(crate) mfa_token: RwLock<Option<String>>,
+    /// Held while an operation MFA token is obtained so that concurrent operations share one.
+    pub(crate) confirmation: tokio::sync::Mutex<()>,
+    /// Incremented when the session ends or is replaced: tokens from a login or refresh that
+    /// started before are then not saved.
+    pub(crate) generation: AtomicU64,
+    /// Orders saving tokens with ending or replacing the session.
+    pub(crate) saving: Mutex<()>,
 }
 
 enum Grant {
@@ -76,50 +82,157 @@ enum Grant {
 impl Session {
     /// Returns a valid access token, logging in or refreshing first if needed.
     pub(crate) async fn access_token(&self) -> Result<String> {
-        if let Some(token) = self.fresh_token() {
+        if let Some(token) = self.fresh_token(None) {
             return Ok(token);
         }
         let _renewal = self.renewal.lock().await;
-        if let Some(token) = self.fresh_token() {
+        // Another request, or another process sharing the store, may have renewed meanwhile.
+        if let Some(token) = self.fresh_token(None) {
             return Ok(token);
         }
-        Ok(self.renew().await?.access_token)
+        self.renew(None).await?.ok_or_else(not_signed_in)
     }
 
     /// Returns a new access token after the API rejected `rejected`, unless another request
-    /// already replaced it.
-    pub(crate) async fn renew_rejected(&self, rejected: &str) -> Result<String> {
+    /// already replaced it; `None` if there is no way to get one.
+    pub(crate) async fn renew_rejected(&self, rejected: &str) -> Result<Option<String>> {
         let _renewal = self.renewal.lock().await;
-        if let Some(token) = self.fresh_token().filter(|token| token != rejected) {
-            return Ok(token);
+        if let Some(token) = self.fresh_token(Some(rejected)) {
+            return Ok(Some(token));
         }
-        Ok(self.renew().await?.access_token)
+        self.renew(Some(rejected)).await
     }
 
     pub(crate) async fn login(&self) -> Result<Tokens> {
         let _renewal = self.renewal.lock().await;
-        self.password_grant().await
+        let generation = self.generation();
+        self.password_grant(generation).await
     }
 
-    fn fresh_token(&self) -> Option<String> {
+    /// Forgets the session after a logout: tokens, store and operation MFA token. A login or
+    /// refresh still in flight does not save its tokens.
+    pub(crate) fn end(&self) {
+        let _saving = self.saving.lock().unwrap_or_else(PoisonError::into_inner);
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.forget();
+    }
+
+    /// Makes `tokens`, issued by a password change sent at `generation`, the session, keeping
+    /// the previous refresh token if the answer has none, and `new_password` the password of
+    /// later logins. Ignored if the session ended or was replaced since the request was sent.
+    pub(crate) fn replace(&self, generation: u64, mut tokens: Tokens, new_password: Option<&str>) {
+        let _saving = self.saving.lock().unwrap_or_else(PoisonError::into_inner);
+        if self.generation() != generation {
+            return;
+        }
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        if tokens.refresh_token.is_none() {
+            tokens.refresh_token = self
+                .store
+                .load()
+                .and_then(|previous| previous.refresh_token);
+        }
+        self.store.save(&tokens);
+        if let Some(password) = new_password {
+            let mut credentials = self
+                .credentials
+                .write()
+                .unwrap_or_else(PoisonError::into_inner);
+            if let Some(credentials) = credentials.as_mut() {
+                password.clone_into(&mut credentials.password);
+            }
+        }
+    }
+
+    /// The current session generation, to pass to [`replace`](Self::replace).
+    pub(crate) fn generation(&self) -> u64 {
+        self.generation.load(Ordering::SeqCst)
+    }
+
+    fn credentials(&self) -> Option<Credentials> {
+        self.credentials
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    fn has_credentials(&self) -> bool {
+        self.credentials
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some()
+    }
+
+    pub(crate) fn mfa_token(&self) -> Option<String> {
+        self.mfa_token
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub(crate) fn set_mfa_token(&self, token: Option<String>) {
+        *self
+            .mfa_token
+            .write()
+            .unwrap_or_else(PoisonError::into_inner) = token;
+    }
+
+    /// The stored access token if it is not about to expire and is not `rejected`.
+    fn fresh_token(&self, rejected: Option<&str>) -> Option<String> {
         self.store
             .load()
             .filter(|tokens| !tokens.expires_within(REFRESH_MARGIN))
             .map(|tokens| tokens.access_token)
+            .filter(|token| Some(token.as_str()) != rejected)
     }
 
-    async fn renew(&self) -> Result<Tokens> {
-        if let Some(refresh_token) = self.store.load().and_then(|tokens| tokens.refresh_token) {
-            match self.refresh_grant(&refresh_token).await {
-                Ok(tokens) => return Ok(tokens),
-                Err(Error::Api(_)) if self.credentials.is_some() => {}
-                Err(error) => return Err(error),
+    /// Saves tokens obtained by a login or refresh, unless the session ended meanwhile.
+    fn save(&self, generation: u64, tokens: &Tokens) {
+        let _saving = self.saving.lock().unwrap_or_else(PoisonError::into_inner);
+        if self.generation() == generation {
+            self.store.save(tokens);
+        }
+    }
+
+    fn forget(&self) {
+        self.store.clear();
+        self.set_mfa_token(None);
+    }
+
+    /// Refreshes the stored session or signs in with the password; `None` if neither is
+    /// possible.
+    async fn renew(&self, rejected: Option<&str>) -> Result<Option<String>> {
+        let generation = self.generation();
+        let mut refused = None;
+        if let Some(tokens) = self.store.load() {
+            if let Some(refresh_token) = tokens.usable_refresh_token() {
+                match self.refresh_grant(refresh_token, generation).await {
+                    Ok(tokens) => return Ok(Some(tokens.access_token)),
+                    // Like the web app: a refresh answered 400 or 401 ends the session.
+                    Err(Error::Api(error)) if is_refusal(&error) => {
+                        self.forget();
+                        refused = Some(error);
+                    }
+                    Err(error) => return Err(error),
+                }
+            } else if !self.has_credentials()
+                && !tokens.expires_within(Duration::ZERO)
+                && rejected != Some(tokens.access_token.as_str())
+            {
+                // Nothing to renew it with: use the token until it expires.
+                return Ok(Some(tokens.access_token));
             }
         }
-        self.password_grant().await
+        if self.has_credentials() {
+            return Ok(Some(self.password_grant(generation).await?.access_token));
+        }
+        match refused {
+            Some(error) => Err(error.with_kind(ErrorKind::Authentication).into()),
+            None => Ok(None),
+        }
     }
 
-    async fn refresh_grant(&self, refresh_token: &str) -> Result<Tokens> {
+    async fn refresh_grant(&self, refresh_token: &str, generation: u64) -> Result<Tokens> {
         let form = [
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
@@ -129,7 +242,7 @@ impl Session {
                 tokens
                     .refresh_token
                     .get_or_insert_with(|| refresh_token.to_owned());
-                self.store.save(&tokens);
+                self.save(generation, &tokens);
                 Ok(tokens)
             }
             Grant::CodeRequired(body) => Err(ApiError::new(
@@ -142,44 +255,65 @@ impl Session {
         }
     }
 
-    async fn password_grant(&self) -> Result<Tokens> {
-        let Some(credentials) = &self.credentials else {
-            return Err(Error::Config(
-                "not signed in: configure credentials or a token store with a session".into(),
-            ));
+    /// Signs in like the web app: asks whether the account has two-factor authentication, then
+    /// sends the password alone (2FA) or with a solved captcha (no 2FA), and the one-time code
+    /// if the server asks for it.
+    async fn password_grant(&self, generation: u64) -> Result<Tokens> {
+        let Some(credentials) = self.credentials() else {
+            return Err(not_signed_in());
         };
+        let two_factor = self.two_factor_enabled(&credentials.username).await?;
         let username = credentials.username.to_lowercase();
-        // Like the web app: 2FA accounts send a code, the others pass a captcha. If the status
-        // is unknown, a configured code provider is taken as a sign of 2FA.
-        let mfa_enabled = self.mfa_enabled(&username).await;
-        let two_factor = mfa_enabled.unwrap_or(self.otp.is_some());
-        let code = match &self.otp {
-            Some(otp) if two_factor => Some(otp.code().await?),
-            None if two_factor => return Err(mfa_required(StatusCode::OK, &[])),
-            _ => None,
+        let form = |code: Option<&'_ str>| {
+            let mut form = vec![
+                ("grant_type", "password".to_owned()),
+                ("username", username.clone()),
+                ("password", credentials.password.clone()),
+            ];
+            form.extend(code.map(|code| ("code", code.to_owned())));
+            form
         };
-        let solver = self.captcha.as_ref().filter(|_| !two_factor);
-        if mfa_enabled == Some(false) && solver.is_none() {
-            return Err(captcha_required());
-        }
+        let grant = if two_factor {
+            self.token_request(&pairs(&form(None)), None).await?
+        } else {
+            let Some(solver) = &self.captcha else {
+                return Err(captcha_required());
+            };
+            self.captcha_grant(solver, &pairs(&form(None))).await?
+        };
+        let tokens = match grant {
+            Grant::Issued(tokens) => tokens,
+            Grant::CodeRequired(body) => {
+                let Some(otp) = &self.otp else {
+                    return Err(mfa_required(&body));
+                };
+                let code = otp.code().await?;
+                match self.token_request(&pairs(&form(Some(&code))), None).await? {
+                    Grant::Issued(tokens) => tokens,
+                    Grant::CodeRequired(body) => {
+                        return Err(ApiError::new(
+                            ErrorKind::Authentication,
+                            StatusCode::OK,
+                            "the one-time code was not accepted",
+                            &body,
+                        )
+                        .into());
+                    }
+                }
+            }
+        };
+        self.save(generation, &tokens);
+        Ok(tokens)
+    }
 
+    /// Sends the password grant with captcha answers until one is accepted.
+    async fn captcha_grant(&self, solver: &CaptchaSolver, form: &[(&str, &str)]) -> Result<Grant> {
         let mut attempt = 1;
         loop {
-            let captcha = match solver {
-                Some(solver) => Some(self.solve_captcha(solver).await?),
-                None => None,
-            };
-            let login = Login {
-                username: &username,
-                password: &credentials.password,
-                code: code.as_deref(),
-                captcha,
-                mfa_enabled,
-            };
-            match self.password_attempt(login).await {
+            let captcha = self.solve_captcha(solver).await?;
+            match self.token_request(form, Some(&captcha)).await {
                 Err(Error::Api(error))
-                    if solver.is_some()
-                        && attempt < CAPTCHA_ATTEMPTS
+                    if attempt < CAPTCHA_ATTEMPTS
                         && error.error_code() == Some("INVALID_CAPTCHA") =>
                 {
                     attempt += 1;
@@ -189,40 +323,20 @@ impl Session {
         }
     }
 
-    async fn password_attempt(&self, login: Login<'_>) -> Result<Tokens> {
-        let mut form = vec![
-            ("grant_type", "password"),
-            ("username", login.username),
-            ("password", login.password),
-        ];
-        if let Some(code) = login.code {
-            form.push(("code", code));
+    fn post(&self, url: &str) -> reqwest::RequestBuilder {
+        self.request(Method::POST, url)
+    }
+
+    fn request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
+        let mut request = self
+            .http
+            .request(method, url)
+            .header(USER_AGENT, USER_AGENT_VALUE)
+            .timeout(self.timeout);
+        if let Some(language) = &self.language {
+            request = request.header(ACCEPT_LANGUAGE, language.clone());
         }
-        let grant = match self.token_request(&form, login.captcha.as_deref()).await {
-            Err(Error::Api(error))
-                if login.code.is_none()
-                    && login.captcha.is_none()
-                    && login.mfa_enabled.is_none()
-                    && error.error_code() == Some("invalid_grant") =>
-            {
-                return Err(mfa_required(error.status(), error.body().as_bytes()));
-            }
-            result => result?,
-        };
-        match grant {
-            Grant::Issued(tokens) => {
-                self.store.save(&tokens);
-                Ok(tokens)
-            }
-            Grant::CodeRequired(body) if login.code.is_some() => Err(ApiError::new(
-                ErrorKind::Authentication,
-                StatusCode::OK,
-                "the one-time code was not accepted",
-                &body,
-            )
-            .into()),
-            Grant::CodeRequired(body) => Err(mfa_required(StatusCode::OK, &body)),
-        }
+        request
     }
 
     async fn token_request(&self, form: &[(&str, &str)], captcha: Option<&str>) -> Result<Grant> {
@@ -230,19 +344,16 @@ impl Session {
         struct Body {
             access_token: Option<String>,
             refresh_token: Option<String>,
-            expires_in: Option<u64>,
+            expires_in: Option<Value>,
         }
 
         let body = form_urlencoded::Serializer::new(String::new())
             .extend_pairs(form)
             .finish();
         let mut request = self
-            .http
             .post(&self.endpoints.token)
             .header(AUTHORIZATION, format!("Basic {}", self.endpoints.basic))
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .timeout(self.timeout)
             .body(body);
         if let Some(captcha) = captcha {
             request = request.header("captcha", captcha);
@@ -252,45 +363,45 @@ impl Session {
         let headers = response.headers().clone();
         let bytes = response.bytes().await?;
         if !status.is_success() {
-            return Err(ApiError::from_response(status, &headers, &bytes).into());
+            return Err(ApiError::from_login_response(status, &headers, &bytes).into());
         }
         let body: Body =
             serde_json::from_slice(&bytes).map_err(|error| Error::decode(error, &bytes))?;
-        Ok(match body.access_token {
+        Ok(match body.access_token.filter(|token| !token.is_empty()) {
             Some(access_token) => Grant::Issued(Tokens::issued(
                 access_token,
-                body.refresh_token,
-                body.expires_in,
+                body.refresh_token.filter(|token| !token.is_empty()),
+                body.expires_in.as_ref().and_then(seconds),
             )),
             None => Grant::CodeRequired(bytes),
         })
     }
 
-    /// Asks whether the account has two-factor authentication on; `None` if that is unknown.
-    async fn mfa_enabled(&self, username: &str) -> Option<bool> {
-        #[derive(Deserialize)]
-        struct Status {
-            #[serde(rename = "mfaEnabled")]
-            mfa_enabled: bool,
-        }
-
+    /// Asks whether the account has two-factor authentication on. The password is never sent
+    /// if this fails, like in the web app.
+    async fn two_factor_enabled(&self, username: &str) -> Result<bool> {
         let response = self
-            .http
             .post(&self.endpoints.mfa_status)
             .header(CONTENT_TYPE, "application/json")
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .timeout(self.timeout)
             .body(serde_json::json!({ "username": username }).to_string())
             .send()
-            .await
-            .ok()?;
-        if !response.status().is_success() {
-            return None;
+            .await?;
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response.bytes().await?;
+        let body: Value = serde_json::from_slice(&bytes).unwrap_or_default();
+        let unknown = status == StatusCode::NOT_FOUND
+            || body.get("status").and_then(Value::as_str) == Some("NOT_FOUND");
+        if unknown && !truthy(body.get("mfaEnabled")) {
+            return Err(ApiError::from_response(status, &headers, &bytes)
+                .with_kind(ErrorKind::Authentication)
+                .with_message("no Whitebird account with this username")
+                .into());
         }
-        let body = response.bytes().await.ok()?;
-        serde_json::from_slice::<Status>(&body)
-            .ok()
-            .map(|status| status.mfa_enabled)
+        if !status.is_success() {
+            return Err(ApiError::from_response(status, &headers, &bytes).into());
+        }
+        Ok(truthy(body.get("mfaEnabled")))
     }
 
     /// Fetches a captcha, has `solver` solve it and returns the `captcha` header for the answer.
@@ -305,26 +416,27 @@ impl Session {
             position_y: u32,
         }
 
+        /// The web app sends the value of its range input, a string.
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Answer<'a> {
-            slider_position: u32,
+            slider_position: String,
             request_id: &'a str,
         }
 
         let request_id = uuid_v4();
         let response = self
-            .http
-            .get(format!("{}?requestId={request_id}", self.endpoints.captcha))
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .timeout(self.timeout)
+            .request(
+                Method::GET,
+                &format!("{}?requestId={request_id}", self.endpoints.captcha),
+            )
             .send()
             .await?;
         let status = response.status();
         let headers = response.headers().clone();
         let bytes = response.bytes().await?;
         if !status.is_success() {
-            return Err(ApiError::from_response(status, &headers, &bytes).into());
+            return Err(ApiError::from_login_response(status, &headers, &bytes).into());
         }
         let challenge: Challenge =
             serde_json::from_slice(&bytes).map_err(|error| Error::decode(error, &bytes))?;
@@ -337,11 +449,47 @@ impl Session {
             })
             .await?;
         let answer = serde_json::to_vec(&Answer {
-            slider_position,
+            slider_position: slider_position.to_string(),
             request_id: &request_id,
         })
         .map_err(|error| Error::Config(format!("cannot encode the captcha answer: {error}")))?;
         Ok(STANDARD.encode(answer))
+    }
+}
+
+fn pairs<'a>(form: &'a [(&'a str, String)]) -> Vec<(&'a str, &'a str)> {
+    form.iter()
+        .map(|(name, value)| (*name, value.as_str()))
+        .collect()
+}
+
+/// Whether a failed refresh means the session is over: 400 or 401, or no token issued.
+fn is_refusal(error: &ApiError) -> bool {
+    matches!(error.status().as_u16(), 400 | 401) || error.status().is_success()
+}
+
+/// JavaScript truthiness, which the web app applies to `mfaEnabled`.
+fn truthy(value: Option<&Value>) -> bool {
+    match value {
+        None | Some(Value::Null) => false,
+        Some(Value::Bool(value)) => *value,
+        Some(Value::Number(number)) => number.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
+        Some(Value::String(text)) => !text.is_empty(),
+        Some(Value::Array(_) | Value::Object(_)) => true,
+    }
+}
+
+/// `expires_in` as whole seconds, whether sent as a number or a string.
+fn seconds(value: &Value) -> Option<u64> {
+    match value {
+        Value::Number(number) => number.as_u64().or_else(|| {
+            number
+                .as_f64()
+                .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+                .map(|seconds| Duration::from_secs_f64(seconds.min(1e12)).as_secs())
+        }),
+        Value::String(text) => text.trim().parse().ok(),
+        _ => None,
     }
 }
 
@@ -372,6 +520,12 @@ fn uuid_v4() -> String {
     )
 }
 
+fn not_signed_in() -> Error {
+    Error::Config(
+        "not signed in: configure credentials, or a token store holding a valid session".into(),
+    )
+}
+
 fn captcha_required() -> Error {
     ApiError::new(
         ErrorKind::CaptchaRequired,
@@ -383,10 +537,10 @@ fn captcha_required() -> Error {
     .into()
 }
 
-fn mfa_required(status: StatusCode, body: &[u8]) -> Error {
+fn mfa_required(body: &[u8]) -> Error {
     ApiError::new(
         ErrorKind::MfaRequired,
-        status,
+        StatusCode::OK,
         "two-factor authentication is enabled: configure a one-time code with ClientBuilder::otp",
         body,
     )
@@ -396,6 +550,104 @@ fn mfa_required(status: StatusCode, body: &[u8]) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn session(store: Arc<MemoryTokenStore>) -> Session {
+        Session {
+            http: reqwest::Client::new(),
+            endpoints: Endpoints {
+                token: String::new(),
+                mfa_status: String::new(),
+                captcha: String::new(),
+                basic: String::new(),
+            },
+            credentials: RwLock::new(None),
+            otp: None,
+            captcha: None,
+            store,
+            timeout: Duration::from_secs(1),
+            language: None,
+            renewal: tokio::sync::Mutex::new(()),
+            mfa_token: RwLock::new(Some("mfa".into())),
+            confirmation: tokio::sync::Mutex::new(()),
+            generation: AtomicU64::new(0),
+            saving: Mutex::new(()),
+        }
+    }
+
+    #[test]
+    fn a_login_finishing_after_the_session_ended_is_not_saved() {
+        let store = Arc::new(MemoryTokenStore::from(Tokens::new("old", None)));
+        let session = session(Arc::clone(&store));
+
+        let started = session.generation();
+        session.end();
+        session.save(started, &Tokens::new("late", None));
+
+        assert_eq!(store.load(), None);
+        assert_eq!(session.mfa_token(), None);
+        session.save(session.generation(), &Tokens::new("next", None));
+        assert_eq!(store.load().unwrap().access_token, "next");
+    }
+
+    #[test]
+    fn a_replaced_session_is_not_overwritten_by_an_older_refresh() {
+        let store = Arc::new(MemoryTokenStore::new());
+        let session = session(Arc::clone(&store));
+
+        let started = session.generation();
+        session.replace(started, Tokens::new("changed", None), None);
+        session.save(started, &Tokens::new("refreshed", None));
+
+        assert_eq!(store.load().unwrap().access_token, "changed");
+    }
+
+    #[test]
+    fn a_password_change_answered_after_the_session_ended_is_ignored() {
+        let store = Arc::new(MemoryTokenStore::from(Tokens::new("old", Some("r".into()))));
+        let session = session(Arc::clone(&store));
+        *session.credentials.write().unwrap() = Some(Credentials {
+            username: "me".into(),
+            password: "old secret".into(),
+        });
+
+        let sent = session.generation();
+        session.end();
+        session.replace(sent, Tokens::new("changed", None), Some("new secret"));
+        assert_eq!(store.load(), None);
+        assert_eq!(session.credentials().unwrap().password, "old secret");
+
+        let sent = session.generation();
+        session.replace(sent, Tokens::new("changed", None), Some("new secret"));
+        assert_eq!(store.load(), Some(Tokens::new("changed", None)));
+        assert_eq!(session.credentials().unwrap().password, "new secret");
+    }
+
+    #[test]
+    fn mfa_enabled_is_read_like_javascript() {
+        let values = [
+            serde_json::json!(true),
+            serde_json::json!(1),
+            serde_json::json!("yes"),
+        ];
+        assert!(values.iter().all(|value| truthy(Some(value))));
+        for value in [
+            serde_json::json!(false),
+            serde_json::json!(0),
+            serde_json::json!(""),
+            Value::Null,
+        ] {
+            assert!(!truthy(Some(&value)), "{value}");
+        }
+        assert!(!truthy(None));
+    }
+
+    #[test]
+    fn reads_expires_in_leniently() {
+        assert_eq!(seconds(&serde_json::json!(3600)), Some(3600));
+        assert_eq!(seconds(&serde_json::json!(3599.9)), Some(3599));
+        assert_eq!(seconds(&serde_json::json!("60")), Some(60));
+        assert_eq!(seconds(&serde_json::json!(-1)), None);
+    }
 
     #[test]
     fn uuids_are_version_4() {

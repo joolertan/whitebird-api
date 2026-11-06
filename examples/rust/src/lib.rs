@@ -1,9 +1,11 @@
 //! Shared setup of the examples: credentials from the environment and a session kept in a file.
 
 use std::env;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::process;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -13,7 +15,7 @@ use whitebird::{BoxError, Captcha, CaptchaSolver, Client, CodeProvider, TokenSto
 pub type Error = Box<dyn std::error::Error>;
 
 /// Keeps the session tokens in a JSON file so that later runs skip the login. The file grants
-/// access to the account: keep it private.
+/// access to the account, so it is written readable by its owner only.
 pub struct FileTokenStore {
     path: PathBuf,
 }
@@ -22,22 +24,60 @@ impl FileTokenStore {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self { path: path.into() }
     }
+
+    /// Writes `json` to a new file next to the session file, then renames it over the session
+    /// file, so that a crash or a concurrent run never leaves a half-written session.
+    fn write(&self, json: &[u8]) -> io::Result<()> {
+        static WRITES: AtomicU64 = AtomicU64::new(0);
+        let mut name = self.path.file_name().unwrap_or_default().to_owned();
+        name.push(format!(
+            ".{}-{}.tmp",
+            process::id(),
+            WRITES.fetch_add(1, Ordering::Relaxed)
+        ));
+        let temporary = self.path.with_file_name(name);
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let result = options.open(&temporary).and_then(|mut file| {
+            file.write_all(json)?;
+            file.sync_all()?;
+            fs::rename(&temporary, &self.path)
+        });
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+        result
+    }
 }
 
 impl TokenStore for FileTokenStore {
     fn load(&self) -> Option<Tokens> {
+        // A missing or damaged file means no session: the client signs in again.
         let json = fs::read(&self.path).ok()?;
         serde_json::from_slice(&json).ok()
     }
 
     fn save(&self, tokens: &Tokens) {
-        if let Ok(json) = serde_json::to_vec_pretty(tokens) {
-            if let Err(error) = fs::write(&self.path, json) {
-                eprintln!(
-                    "cannot save the session to {}: {error}",
-                    self.path.display()
-                );
-            }
+        let saved = serde_json::to_vec_pretty(tokens)
+            .map_err(io::Error::other)
+            .and_then(|json| self.write(&json));
+        if let Err(error) = saved {
+            eprintln!(
+                "cannot save the session to {}: {error}",
+                self.path.display()
+            );
+        }
+    }
+
+    fn clear(&self) {
+        match fs::remove_file(&self.path) {
+            Err(error) if error.kind() != io::ErrorKind::NotFound => eprintln!(
+                "cannot delete the session in {}: {error}",
+                self.path.display()
+            ),
+            _ => {}
         }
     }
 }

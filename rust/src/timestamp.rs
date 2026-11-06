@@ -8,9 +8,12 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// A point in time in UTC.
 ///
 /// Whitebird services are not consistent about dates, so parsing is lenient: RFC 3339
-/// (`2024-05-01T12:00:00+03:00`), ISO-8601 without an offset (`2024-05-01T09:00:00.123`, taken as
-/// UTC), a bare date (`2024-05-01`, midnight UTC) and Unix time in milliseconds, as a number or a
-/// string. Timestamps serialize as RFC 3339.
+/// (`2024-05-01T12:00:00+03:00`), an offset without a colon (`2024-05-01T12:00:00+0300`),
+/// ISO-8601 without an offset (`2024-05-01T09:00:00.123`, taken as UTC), a bare date
+/// (`2024-05-01`, midnight UTC) and Unix time in milliseconds, as a number or a string.
+///
+/// Timestamps are sent the way the web app sends them, to the second with a numeric offset:
+/// `2024-05-01T09:00:00+0000`. [`Display`](fmt::Display) shows them in RFC 3339.
 ///
 /// # Examples
 ///
@@ -18,10 +21,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// use whitebird::Timestamp;
 ///
 /// let a: Timestamp = "2024-05-01T09:00:00".parse().unwrap();
-/// let b: Timestamp = "2024-05-01T12:00:00+03:00".parse().unwrap();
+/// let b: Timestamp = "2024-05-01T12:00:00+0300".parse().unwrap();
 /// assert_eq!(a, b);
 /// assert_eq!(a, Timestamp::from_unix_millis(1_714_554_000_000).unwrap());
 /// assert_eq!(a.to_string(), "2024-05-01T09:00:00Z");
+/// assert_eq!(serde_json::to_string(&a).unwrap(), r#""2024-05-01T09:00:00+0000""#);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Timestamp(DateTime<Utc>);
@@ -68,6 +72,11 @@ impl FromStr for Timestamp {
         if let Ok(datetime) = DateTime::parse_from_rfc3339(value) {
             return Ok(Self(datetime.to_utc()));
         }
+        for format in ["%Y-%m-%dT%H:%M:%S%.f%z", "%Y-%m-%d %H:%M:%S%.f%z"] {
+            if let Ok(datetime) = DateTime::parse_from_str(value, format) {
+                return Ok(Self(datetime.to_utc()));
+            }
+        }
         for format in [
             "%Y-%m-%dT%H:%M:%S%.f",
             "%Y-%m-%d %H:%M:%S%.f",
@@ -96,7 +105,7 @@ impl fmt::Display for Timestamp {
 
 impl Serialize for Timestamp {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(self)
+        serializer.collect_str(&self.0.format("%Y-%m-%dT%H:%M:%S%z"))
     }
 }
 
@@ -155,6 +164,9 @@ mod tests {
         let expected = Timestamp::from_unix_millis(1_714_554_000_123).unwrap();
         assert_eq!(parse(r#""2024-05-01T09:00:00.123Z""#), expected);
         assert_eq!(parse(r#""2024-05-01T12:00:00.123+03:00""#), expected);
+        assert_eq!(parse(r#""2024-05-01T12:00:00.123+0300""#), expected);
+        assert_eq!(parse(r#""2024-05-01T09:00:00.123+0000""#), expected);
+        assert_eq!(parse(r#""2024-05-01 09:00:00.123+0000""#), expected);
         assert_eq!(parse(r#""2024-05-01T09:00:00.123""#), expected);
         assert_eq!(parse(r#""2024-05-01 09:00:00.123""#), expected);
         assert_eq!(parse("1714554000123"), expected);
@@ -164,11 +176,16 @@ mod tests {
     }
 
     #[test]
-    fn round_trips_as_rfc_3339() {
-        let timestamp = parse(r#""2024-05-01T09:00:00.123""#);
+    fn serializes_like_the_web_app() {
+        let timestamp = parse(r#""2024-05-01T12:00:00.123+03:00""#);
         assert_eq!(
             serde_json::to_string(&timestamp).unwrap(),
-            r#""2024-05-01T09:00:00.123Z""#
+            r#""2024-05-01T09:00:00+0000""#
+        );
+        assert_eq!(timestamp.to_string(), "2024-05-01T09:00:00.123Z");
+        assert_eq!(
+            parse(&serde_json::to_string(&timestamp).unwrap()).unix_millis(),
+            1_714_554_000_000
         );
     }
 

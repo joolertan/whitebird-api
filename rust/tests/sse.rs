@@ -1,5 +1,7 @@
 mod common;
 
+use std::time::Duration;
+
 use common::*;
 use futures::StreamExt;
 use serde::Deserialize;
@@ -65,18 +67,16 @@ async fn reconnects_with_the_last_event_id_until_rejected() {
 
     let events = events(&server).await;
 
-    assert_eq!(events.len(), 4, "{events:?}");
+    // The ping without data is skipped.
+    assert_eq!(events.len(), 3, "{events:?}");
     let first = events[0].as_ref().unwrap();
     assert_eq!(first.event, "order-updates");
     assert_eq!(first.id.as_deref(), Some("1"));
     assert_eq!(first.json().unwrap().order_id, "a");
-    let ping = events[1].as_ref().unwrap();
-    assert_eq!((ping.event.as_str(), ping.data.as_str()), ("ping", ""));
-    assert!(ping.json().unwrap_err().to_string().contains("EOF"));
-    let second = events[2].as_ref().unwrap();
+    let second = events[1].as_ref().unwrap();
     assert_eq!(second.event, "message");
     assert_eq!(second.json().unwrap().order_id, "b");
-    let error = events[3].as_ref().unwrap_err();
+    let error = events[2].as_ref().unwrap_err();
     assert_eq!(error.kind(), Some(ErrorKind::PermissionDenied));
     assert_eq!(server.received_requests().await.unwrap().len(), 4);
 }
@@ -150,4 +150,70 @@ async fn generated_stream_decodes_notifications() {
     );
     assert!(events[2].is_err());
     assert_eq!(events.len(), 3);
+}
+
+#[tokio::test]
+async fn retries_answers_that_are_not_event_streams() {
+    let server = MockServer::start().await;
+    Mock::given(path(CONNECT_PATH))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw("<html>challenge</html>", "text/html"),
+        )
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(path(CONNECT_PATH))
+        .respond_with(stream("retry: 10\nid: 1\ndata: {\"orderId\":\"a\"}\n\n"))
+        .up_to_n_times(1)
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    Mock::given(path(CONNECT_PATH))
+        .respond_with(ResponseTemplate::new(204))
+        .with_priority(3)
+        .mount(&server)
+        .await;
+
+    let events = tokio::time::timeout(Duration::from_secs(10), events(&server))
+        .await
+        .unwrap();
+
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0].as_ref().unwrap().json().unwrap().order_id, "a");
+    assert_eq!(server.received_requests().await.unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn sends_the_language_and_the_last_event_id() {
+    let server = MockServer::start().await;
+    Mock::given(path(CONNECT_PATH))
+        .and(header("accept-language", "ru"))
+        .respond_with(stream(
+            "id: 7\ndata: {\"orderId\":\"a\"}\n\nid: 8\ndata: {\"orderId\":",
+        ))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path(CONNECT_PATH))
+        .and(header("last-event-id", "7"))
+        .respond_with(ResponseTemplate::new(204))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+
+    let events: Vec<Result<Event<OrderUpdate>>> = builder(&server)
+        .language("ru")
+        .token_store(whitebird::MemoryTokenStore::from(whitebird::Tokens::new(
+            jwt("me", 3600),
+            None,
+        )))
+        .build()
+        .unwrap()
+        .request(Service::Notification, Method::GET, CONNECT_PATH)
+        .events()
+        .collect()
+        .await;
+
+    assert_eq!(events.len(), 1, "{events:?}");
 }

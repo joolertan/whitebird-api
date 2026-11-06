@@ -7,7 +7,7 @@ use base64::engine::general_purpose::STANDARD;
 use common::*;
 use serde_json::{Value, json};
 use whitebird::{Captcha, CaptchaSolver, Error, ErrorKind};
-use wiremock::matchers::{body_string_contains, header_exists, method, path};
+use wiremock::matchers::{header_exists, method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
 const BACKGROUND: &[u8] = b"\x89PNG background";
@@ -48,7 +48,7 @@ fn captcha_answer(request: &Request) -> Value {
     serde_json::from_slice(&STANDARD.decode(header).unwrap()).unwrap()
 }
 
-fn requests_to<'a>(requests: &'a [Request], target: &str) -> Vec<&'a Request> {
+fn sent_to<'a>(requests: &'a [Request], target: &str) -> Vec<&'a Request> {
     requests.iter().filter(|r| r.url.path() == target).collect()
 }
 
@@ -80,7 +80,7 @@ async fn solves_the_captcha_before_logging_in_without_two_factor() {
     assert_eq!(seen[0].background_image, BACKGROUND);
     assert_eq!(seen[0].puzzle_piece, PIECE);
     assert_eq!(seen[0].position_y, 40);
-    let fetched = requests_to(&requests, CAPTCHA_PATH);
+    let fetched = sent_to(&requests, CAPTCHA_PATH);
     let (_, request_id) = fetched[0]
         .url
         .query_pairs()
@@ -88,10 +88,11 @@ async fn solves_the_captcha_before_logging_in_without_two_factor() {
         .unwrap();
     assert_eq!(request_id, seen[0].request_id);
     assert_eq!(request_id.len(), 36);
-    let token = requests_to(&requests, TOKEN_PATH);
+    let token = sent_to(&requests, TOKEN_PATH);
+    // The web app sends the value of its range input: a string.
     assert_eq!(
         captcha_answer(token[0]),
-        json!({ "sliderPosition": 123, "requestId": request_id })
+        json!({ "sliderPosition": "123", "requestId": request_id })
     );
     assert!(!form(token[0]).iter().any(|(name, _)| name == "code"));
 }
@@ -174,12 +175,13 @@ async fn reports_captcha_required_without_a_solver() {
     assert_eq!(error.kind(), Some(ErrorKind::CaptchaRequired));
     assert!(error.is_authentication());
     let requests = server.received_requests().await.unwrap();
-    assert!(requests_to(&requests, CAPTCHA_PATH).is_empty());
+    assert!(sent_to(&requests, CAPTCHA_PATH).is_empty());
 }
 
 #[tokio::test]
-async fn maps_a_captcha_demand_when_the_status_is_unknown() {
+async fn a_captcha_demand_to_a_two_factor_account_is_reported() {
     let server = MockServer::start().await;
+    mfa_check(true).mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
         .respond_with(ResponseTemplate::new(400).set_body_json(json!({
@@ -189,9 +191,11 @@ async fn maps_a_captcha_demand_when_the_status_is_unknown() {
         .expect(1)
         .mount(&server)
         .await;
+    let (solver, seen) = recording_solver();
 
     let error = builder(&server)
         .credentials("me@example.com", "secret")
+        .captcha(solver)
         .build()
         .unwrap()
         .login()
@@ -200,26 +204,46 @@ async fn maps_a_captcha_demand_when_the_status_is_unknown() {
 
     assert_eq!(error.kind(), Some(ErrorKind::CaptchaRequired));
     assert!(error.is_authentication());
+    assert!(seen.lock().unwrap().is_empty());
     let requests = server.received_requests().await.unwrap();
-    assert!(requests_to(&requests, CAPTCHA_PATH).is_empty());
-    assert!(
-        !requests_to(&requests, TOKEN_PATH)[0]
-            .headers
-            .contains_key("captcha")
-    );
+    assert!(sent_to(&requests, CAPTCHA_PATH).is_empty());
+}
+
+#[tokio::test]
+async fn asks_for_the_code_when_the_captcha_login_wants_one() {
+    let server = MockServer::start().await;
+    mfa_check(false).mount(&server).await;
+    serve_captchas(&server).await;
+    code_requested().expect(1).mount(&server).await;
+    code_grant("123456")
+        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let (solver, seen) = recording_solver();
+
+    builder(&server)
+        .credentials("me@example.com", "secret")
+        .otp("123456")
+        .captcha(solver)
+        .build()
+        .unwrap()
+        .login()
+        .await
+        .unwrap();
+
+    assert_eq!(seen.lock().unwrap().len(), 1);
+    let requests = server.received_requests().await.unwrap();
+    let logins = sent_to(&requests, TOKEN_PATH);
+    assert!(logins[0].headers.contains_key("captcha"));
+    assert!(!logins[1].headers.contains_key("captcha"));
 }
 
 #[tokio::test]
 async fn sends_the_code_instead_when_two_factor_is_on() {
     let server = MockServer::start().await;
-    mfa_check(true).expect(1).mount(&server).await;
     serve_captchas(&server).await;
-    password_grant()
-        .and(body_string_contains("code=123456"))
-        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
-        .expect(1)
-        .mount(&server)
-        .await;
+    two_factor_login(&server, "123456", &jwt("me", 3600)).await;
     let (solver, seen) = recording_solver();
 
     builder(&server)
@@ -257,8 +281,8 @@ async fn accepts_async_solvers() {
         .unwrap();
 
     let requests = server.received_requests().await.unwrap();
-    let answer = captcha_answer(requests_to(&requests, TOKEN_PATH)[0]);
-    assert_eq!(answer["sliderPosition"], 77);
+    let answer = captcha_answer(sent_to(&requests, TOKEN_PATH)[0]);
+    assert_eq!(answer["sliderPosition"], "77");
 }
 
 #[tokio::test]

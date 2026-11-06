@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
-use tokio::runtime::Runtime;
 
-use super::Client;
+use super::{BackgroundRuntime, Client};
 use crate::sse::Event;
 use crate::{Page, Result};
 
@@ -13,7 +12,7 @@ use crate::{Page, Result};
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct Paginator<T> {
     inner: crate::Paginator<T>,
-    runtime: Arc<Runtime>,
+    runtime: Arc<BackgroundRuntime>,
 }
 
 impl<T> Paginator<T> {
@@ -65,7 +64,7 @@ impl<T: DeserializeOwned + Send + 'static> Iterator for Paginator<T> {
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct Pages<T> {
     inner: crate::Pages<T>,
-    runtime: Arc<Runtime>,
+    runtime: Arc<BackgroundRuntime>,
 }
 
 impl<T> Iterator for Pages<T> {
@@ -81,7 +80,7 @@ impl<T> Iterator for Pages<T> {
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct EventStream<T> {
     inner: crate::sse::EventStream<T>,
-    runtime: Arc<Runtime>,
+    runtime: Arc<BackgroundRuntime>,
 }
 
 impl<T> EventStream<T> {

@@ -1,8 +1,9 @@
 //! Unofficial client for the [Whitebird](https://whitebird.io) crypto exchange API.
 //!
-//! The client signs in with the account email and password (plus a TOTP code when two-factor
-//! authentication is on), keeps the OAuth session fresh and exposes the endpoints as typed
-//! methods grouped by resource: `client.brokerage().otc_orders().list(..)`.
+//! The client signs in with the account email and password, plus a TOTP code when two-factor
+//! authentication is on or a captcha answer when it is off, keeps the OAuth session fresh and
+//! exposes the endpoints as typed methods grouped by resource:
+//! `client.brokerage().otc_orders().list(..)`.
 //!
 //! ```no_run
 //! use futures::TryStreamExt;
@@ -53,6 +54,7 @@ mod client;
 mod decimal;
 mod enums;
 mod error;
+mod file;
 mod generated;
 mod otp;
 mod pagination;
@@ -67,6 +69,7 @@ pub use captcha::{Captcha, CaptchaSolver};
 pub use client::{Client, ClientBuilder};
 pub use decimal::Decimal;
 pub use error::{ApiError, BoxError, Error, ErrorKind, Result};
+pub use file::File;
 pub use generated::{Environment, Service, models, params, resources};
 pub use otp::CodeProvider;
 #[cfg(feature = "otp")]

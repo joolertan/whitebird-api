@@ -40,7 +40,8 @@ SCALARS = {
     "boolean": "bool",
     "datetime": "Timestamp",
     "date": "NaiveDate",
-    "binary": "Vec<u8>",
+    # Binary values only appear in parameters: multipart file parts.
+    "binary": "File",
     "any": "Value",
 }
 # Paths of the non-prelude types that generated signatures may mention.
@@ -50,6 +51,7 @@ TYPE_PATHS = {
     "Value": "serde_json::Value",
     "Bytes": "crate::Bytes",
     "Decimal": "crate::Decimal",
+    "File": "crate::File",
     "Timestamp": "crate::Timestamp",
     "Page": "crate::Page",
     "Multipart": "crate::Multipart",
@@ -80,6 +82,7 @@ COPY_TYPES = frozenset({"i32", "i64", "u32", "f64", "bool", "Decimal", "Timestam
 PAGE_DOC = "Page to start from, 0-based; the following pages are fetched as items are consumed."
 DOC_WIDTH = 88
 JSON = "application/json"
+TEXT = "text/plain"
 
 
 def emit(ir: IR) -> dict[str, str]:
@@ -136,6 +139,19 @@ def literal(value: str | int) -> str:
     for char, escape in (("\\", "\\\\"), ('"', '\\"'), ("\n", "\\n"), ("\r", "\\r"), ("\t", "\\t")):
         value = value.replace(char, escape)
     return f'"{value}"'
+
+
+def default_literal(value: object) -> str | None:
+    """Rust literal of a scalar spec default, or None for no or a structured default."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return repr(value) if "." in repr(value) or "e" in repr(value) else f"{value}.0"
+    if isinstance(value, str):
+        return literal(value)
+    return None
 
 
 # Documentation
@@ -485,9 +501,7 @@ class View:
                 ["Inferred from how the web application uses the response; may be absent."]
                 if f.inferred
                 else [],
-                [f"Defaults to `{json.dumps(f.default)}` on the server."]
-                if f.default is not None
-                else [],
+                [f"Defaults to `{json.dumps(f.default)}`."] if f.default is not None else [],
             )
             views.append(
                 FieldView(rust_ident, f"Option<{rust}>" if optional else rust, field_docs, attrs)
@@ -499,8 +513,13 @@ class View:
         attrs = []
         if builder:
             all_derives.append("bon::Builder")
-            if any(view.type in ("String", "Option<String>") for view in views):
-                attrs.append("#[builder(on(String, into))]")
+            converted = [
+                rust
+                for rust in ("String", "File")
+                if any(view.type in (rust, f"Option<{rust}>") for view in views)
+            ]
+            if converted:
+                attrs.append(f"#[builder({', '.join(f'on({rust}, into)' for rust in converted)})]")
         if rename_all:
             attrs.append('#[serde(rename_all = "camelCase")]')
         return StructView(name, comment(docs), all_derives, attrs, views)
@@ -664,7 +683,13 @@ class View:
                 payload = {"binary": "Bytes", "text": "String", "empty": "()"}[response.kind]
                 self._use(None, payload)
             returns = f"Result<{payload}>"
-            read = {"json": ".json()", "binary": ".bytes()", "text": ".text()"}.get(response.kind)
+            # Payloads without a fixed shape are taken as text when they are not JSON.
+            lenient = response.kind == "json" and payload in ("Value", "String")
+            read = {
+                "json": ".json_or_text()" if lenient else ".json()",
+                "binary": ".bytes()",
+                "text": ".text()",
+            }.get(response.kind)
             tail = (
                 [".send()", ".await?", read, ".await"]
                 if read
@@ -682,7 +707,7 @@ class View:
             returns=returns,
             is_async=blocking_stream is None,
             blocking_stream=blocking_stream,
-            request=f"Service::{naming.pascal(op.service)}, Method::{op.method}, {self._path(op)}",
+            request=self._request_call(op),
             chain=self._request_chain(op),
             tail=tail,
         )
@@ -726,28 +751,32 @@ class View:
             errors,
         )
 
-    def _path(self, op: Operation) -> str:
+    def _request_call(self, op: Operation) -> str:
+        """``request(..)`` call starting the chain; path parameters are encoded and checked."""
+        target = f"Service::{naming.pascal(op.service)}, Method::{op.method}"
         if not op.path_params:
-            return literal(op.path)
-        self.resource_imports.add("crate::request::path_segment")
-        template = (
-            re.sub(r"{[^}]+}", "\0", op.path)
-            .replace("{", "{{")
-            .replace("}", "}}")
-            .replace("\0", "{}")
-        )
-        segments = ", ".join(f"path_segment({ident(p.name)})" for p in op.path_params)
-        return f"format!({literal(template)}, {segments})"
+            return f"request({target}, {literal(op.path)})"
+        template = re.sub(r"{[^}]+}", "{}", op.path)
+        if re.sub(r"{}", "", template).count("{") or "}" in re.sub(r"{}", "", template):
+            raise ValueError(f"{op.id}: unexpected brace in path {op.path}")
+        params = ", ".join(f"&{ident(p.name)}" for p in op.path_params)
+        return f"request_path({target}, {literal(template)}, &[{params}])"
 
     def _request_chain(self, op: Operation) -> list[str]:
         chain = [".public()"] if op.auth == "none" else []
         if op.envelope == "retcode":
             chain.append(".envelope(Envelope::Retcode)")
             self.resource_imports.add("crate::Envelope")
-        for param in [*op.query_params, *op.header_params]:
+        params = [*op.query_params, *op.header_params]
+        for param in params:
             field = Field(param.name, param.wire, param.type)
             method = "query" if param.location == "query" else "header"
             chain.append(f".{method}({literal(param.wire)}, {self._argument(op, field, 'query')})")
+        # Like the web app, values the spec gives a default for are always sent.
+        for param in params:
+            if (default := default_literal(param.default)) is not None:
+                method = "default_query" if param.location == "query" else "default_header"
+                chain.append(f".{method}({literal(param.wire)}, {default})")
         if op.auth == "mfa" and op.mfa_operation:
             chain.append(f".mfa_operation({literal(op.mfa_operation)})")
         body = op.body
@@ -760,7 +789,25 @@ class View:
             chain.append(f".{body.kind}(Map::new())")
         elif body:
             chain.append(f".{body.kind}({'params' if body.flattened else 'body'})")
+        for f in self._body_fields(op):
+            if (default := default_literal(f.default)) is not None:
+                chain.append(f".default_field({literal(f.wire)}, {default})")
+        if op.session == "end":
+            chain.append(".ends_session()")
+        elif op.session == "replace":
+            chain.append(".replaces_session()")
         return chain
+
+    def _body_fields(self, op: Operation) -> list[Field]:
+        """Top-level fields of the request body."""
+        body = op.body
+        if body is None:
+            return []
+        if body.flattened:
+            return body.fields
+        if body.type.kind == "model" and body.type.name and body.kind in ("json", "form"):
+            return self.ir.models[body.type.name].fields
+        return []
 
     def _argument(self, op: Operation, f: Field, location: str) -> str:
         """``params.<field>``, borrowed unless the field is ``Copy``."""
@@ -775,15 +822,22 @@ class View:
         name, value = literal(f.wire), f"params.{ident(f.name)}"
         item = f.type.item if f.type.kind == "array" and f.type.item else f.type
         if f.type.kind == "binary":
-            part = f".file({name}, {value})"
-        elif item.kind == "binary":
+            # An optional file is an Option, which `files` takes as zero or one file.
+            return f".{'file' if f.required else 'files'}({name}, {value})"
+        if item.kind == "binary":
             files = value if f.required else f"{value}.into_iter().flatten()"
-            part = f".files({name}, {files})"
-        elif item.kind in ("model", "map", "any"):
-            part = f".json({name}, {self._argument(op, f, 'body')})"
-        else:
-            part = f".text({name}, {self._argument(op, f, 'body')})"
-        if f.content_type and not (part.startswith(".json(") and f.content_type == JSON):
+            return f".files({name}, {files})"
+        argument = self._argument(op, f, "body")
+        if item.kind in ("model", "map", "any"):
+            if f.content_type == TEXT:
+                # Sent like the web app's `JSON.stringify` part: plain text without a type.
+                return f".json_text({name}, {argument})"
+            part = f".json({name}, {argument})"
+            if f.content_type and f.content_type != JSON:
+                part += f".content_type({name}, {literal(f.content_type)})"
+            return part
+        part = f".text({name}, {argument})"
+        if f.content_type and f.content_type != TEXT:
             part += f".content_type({name}, {literal(f.content_type)})"
         return part
 

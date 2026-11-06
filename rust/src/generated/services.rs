@@ -17,6 +17,8 @@ pub enum Environment {
 pub enum Service {
     /// Accounting.
     Accounting,
+    /// Spot accounting.
+    AccountingSpot,
     /// Alfa-Bank payments.
     Alfa,
     /// API gateway.
@@ -74,6 +76,7 @@ impl Service {
     pub fn key(self) -> &'static str {
         match self {
             Self::Accounting => "accounting",
+            Self::AccountingSpot => "accounting_spot",
             Self::Alfa => "alfa",
             Self::Api => "api",
             Self::Assist => "assist",
@@ -106,8 +109,9 @@ impl Service {
     pub fn url(self, environment: Environment) -> &'static str {
         match (self, environment) {
             (Self::Accounting, _) => "https://accounting-service.whitebird.io",
+            (Self::AccountingSpot, Environment::Demo) => "https://api-demo.whitebird.io",
+            (Self::AccountingSpot, _) => "https://api.whitebird.io",
             (Self::Alfa, _) => "https://alfa-service.whitebird.io",
-            (Self::Api, Environment::Demo) => "https://api-demo.whitebird.io",
             (Self::Api, _) => "https://api.whitebird.io",
             (Self::Assist, _) => "https://assist-service.whitebird.io",
             (Self::Auth, _) => "https://authorization-server.whitebird.io",

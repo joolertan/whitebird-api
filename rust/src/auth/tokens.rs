@@ -42,10 +42,21 @@ impl Tokens {
         tokens
     }
 
-    /// Returns `true` if the access token expires within `margin` from now.
+    /// Returns `true` if the access token expires within `margin` from now. The expiry is read
+    /// from the token itself when `expires_at` is unknown.
     pub(crate) fn expires_within(&self, margin: Duration) -> bool {
         self.expires_at
-            .is_some_and(|at| at <= unix_now() + margin.as_secs())
+            .or_else(|| jwt_expiry(&self.access_token))
+            .is_some_and(|at| at <= unix_now().saturating_add(margin.as_secs()))
+    }
+
+    /// The refresh token, unless it is a JWT that has expired.
+    pub(crate) fn usable_refresh_token(&self) -> Option<&str> {
+        self.refresh_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .filter(|token| jwt_expiry(token).is_none_or(|at| at > unix_now()))
     }
 }
 
@@ -62,7 +73,8 @@ impl fmt::Debug for Tokens {
     }
 }
 
-fn jwt_expiry(token: &str) -> Option<u64> {
+/// The `exp` claim of a JWT; `None` if `token` is not a JWT with one.
+pub(crate) fn jwt_expiry(token: &str) -> Option<u64> {
     #[derive(Deserialize)]
     struct Claims {
         exp: u64,
@@ -82,9 +94,14 @@ fn unix_now() -> u64 {
 
 /// Storage for the session tokens.
 ///
-/// The client reads the tokens before every authenticated request and saves them after each
-/// login or refresh. Implement it to keep a session across restarts, for example in a file or a
-/// keychain.
+/// The client reads the tokens before every authenticated request, saves them after each login
+/// or refresh and clears them when the session ends: after `client.user().logout()` or when the
+/// refresh token is rejected. Implement it to keep a session across restarts, for example in a
+/// file or a keychain.
+///
+/// The methods cannot fail: [`load`](Self::load) returns `None` when the stored data is missing,
+/// unreadable or not valid tokens, so the client signs in again, and failures to save or clear
+/// should be logged rather than reported, since the request that obtained the tokens succeeded.
 ///
 /// # Examples
 ///
@@ -97,21 +114,30 @@ fn unix_now() -> u64 {
 ///
 /// impl TokenStore for FileStore {
 ///     fn load(&self) -> Option<Tokens> {
-///         self.0.lock().unwrap().clone()
+///         // Read the file and decode it with serde_json here; None if that fails.
+///         self.0.lock().unwrap_or_else(PoisonError::into_inner).clone()
 ///     }
 ///
 ///     fn save(&self, tokens: &Tokens) {
-///         // Write serde_json::to_vec(tokens) to disk here.
-///         *self.0.lock().unwrap() = Some(tokens.clone());
+///         // Write serde_json::to_vec(tokens) to a temporary file and rename it here.
+///         *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(tokens.clone());
+///     }
+///
+///     fn clear(&self) {
+///         // Delete the file here.
+///         *self.0.lock().unwrap_or_else(PoisonError::into_inner) = None;
 ///     }
 /// }
 /// ```
 pub trait TokenStore: Send + Sync {
-    /// Returns the stored tokens, if any.
+    /// Returns the stored tokens; `None` if there are none or they cannot be read.
     fn load(&self) -> Option<Tokens>;
 
     /// Replaces the stored tokens.
     fn save(&self, tokens: &Tokens);
+
+    /// Forgets the stored tokens.
+    fn clear(&self);
 }
 
 /// Lets the caller keep a handle on a store it gives to the client.
@@ -122,6 +148,10 @@ impl<T: TokenStore + ?Sized> TokenStore for Arc<T> {
 
     fn save(&self, tokens: &Tokens) {
         (**self).save(tokens);
+    }
+
+    fn clear(&self) {
+        (**self).clear();
     }
 }
 
@@ -153,6 +183,10 @@ impl TokenStore for MemoryTokenStore {
     fn save(&self, tokens: &Tokens) {
         *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(tokens.clone());
     }
+
+    fn clear(&self) {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    }
 }
 
 #[cfg(test)]
@@ -173,6 +207,28 @@ mod tests {
         assert!(!tokens.expires_within(Duration::from_secs(30)));
         assert!(tokens.expires_within(Duration::from_secs(3600)));
         assert_eq!(Tokens::new("opaque", None).expires_at, None);
+    }
+
+    #[test]
+    fn reads_expiry_from_the_token_when_unknown() {
+        let payload = URL_SAFE_NO_PAD.encode(br#"{"exp":1700000000}"#);
+        let tokens = Tokens {
+            access_token: format!("h.{payload}.s"),
+            refresh_token: None,
+            expires_at: None,
+        };
+        assert!(tokens.expires_within(Duration::ZERO));
+    }
+
+    #[test]
+    fn expired_refresh_tokens_are_not_used() {
+        let expired = format!("h.{}.s", URL_SAFE_NO_PAD.encode(br#"{"exp":1700000000}"#));
+        let valid = format!("h.{}.s", URL_SAFE_NO_PAD.encode(br#"{"exp":99999999999}"#));
+        let tokens = |refresh: &str| Tokens::new("access", Some(refresh.to_owned()));
+        assert_eq!(tokens(&expired).usable_refresh_token(), None);
+        assert_eq!(tokens(&valid).usable_refresh_token(), Some(valid.as_str()));
+        assert_eq!(tokens("opaque").usable_refresh_token(), Some("opaque"));
+        assert_eq!(tokens(" ").usable_refresh_token(), None);
     }
 
     #[test]

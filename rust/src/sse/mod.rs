@@ -10,6 +10,8 @@ use std::time::Duration;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use futures_util::stream::{self, BoxStream};
+use reqwest::StatusCode;
+use reqwest::header::CONTENT_TYPE;
 use serde::de::DeserializeOwned;
 
 use self::parser::{Parser, RawEvent};
@@ -58,10 +60,15 @@ impl<T> From<RawEvent> for Event<T> {
 ///
 /// The connection is opened on the first poll. When it drops, the stream reconnects with
 /// `Last-Event-ID` after the delay requested by the server (3 seconds by default), backing off
-/// up to 30 seconds while the server is unreachable or failing. It ends with an error when the
-/// server rejects the request, e.g. with 401 after a token refresh or with 403.
+/// up to 30 seconds while the server is unreachable, failing or answering something other than
+/// an event stream. It ends with an error when the server rejects the request, e.g. with 401
+/// after a token refresh or with 403, and without one when it answers 204 No Content. Events
+/// without data, such as keep-alives, are skipped; dropping the stream closes the connection.
 ///
 /// # Examples
+///
+/// An event whose data cannot be decoded is best skipped, like the web app does, rather than
+/// ending the loop:
 ///
 /// ```no_run
 /// use futures::TryStreamExt;
@@ -69,8 +76,10 @@ impl<T> From<RawEvent> for Event<T> {
 /// # async fn run(client: whitebird::Client) -> whitebird::Result<()> {
 /// let mut events = client.notifications().stream();
 /// while let Some(event) = events.try_next().await? {
-///     let message = event.json()?;
-///     println!("{:?}: {:?}", message.r#type, message.payload);
+///     match event.json() {
+///         Ok(message) => println!("{:?}: {:?}", message.r#type, message.payload),
+///         Err(error) => eprintln!("skipped event {:?}: {error}", event.id),
+///     }
 /// }
 /// # Ok(())
 /// # }
@@ -117,6 +126,9 @@ impl Connection {
     async fn next_event(&mut self) -> Option<Result<RawEvent>> {
         while !self.finished {
             if let Some(event) = self.parser.next_event() {
+                if event.data.trim().is_empty() {
+                    continue;
+                }
                 return Some(Ok(event));
             }
             if let Some(response) = &mut self.response {
@@ -133,12 +145,21 @@ impl Connection {
                 continue;
             }
             match self.connect().await {
-                Ok(response) => {
+                Ok(response) if response.status() == StatusCode::NO_CONTENT => {
+                    // The server asks not to reconnect.
+                    self.finished = true;
+                }
+                Ok(response) if is_event_stream(&response) => {
                     self.response = Some(response);
                     self.failures = 0;
                 }
+                // Such as the HTML page of a proxy: try again later, like a server error.
+                Ok(_) => {
+                    self.failures = self.failures.saturating_add(1);
+                    tokio::time::sleep(self.backoff()).await;
+                }
                 Err(error) if is_transient(&error) => {
-                    self.failures += 1;
+                    self.failures = self.failures.saturating_add(1);
                     tokio::time::sleep(self.backoff()).await;
                 }
                 Err(error) => {
@@ -165,6 +186,14 @@ impl Connection {
         let factor = 2u32.saturating_pow(self.failures.saturating_sub(1));
         self.retry.saturating_mul(factor).min(MAX_BACKOFF)
     }
+}
+
+fn is_event_stream(response: &Response) -> bool {
+    response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.to_ascii_lowercase().contains("text/event-stream"))
 }
 
 fn is_transient(error: &Error) -> bool {

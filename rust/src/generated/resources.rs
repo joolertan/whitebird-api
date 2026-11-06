@@ -11,21 +11,21 @@ use crate::models::{
     AccountingAccount, AccountingEnhancedAccount, AccountingTransaction, AlfaCardBindUrl,
     AlfaCryptoCardClientInfo, AlfaCryptoCardInit, AlfaCryptoCardReleaseDetails,
     AlfaCryptoCardValidation, AlfaPayment, AssistCardBindForm, AuthCaptcha, AuthGeo, AuthMfaStatus,
-    AuthMfaToken, BalanceCalculation, BalanceCryptoDeposit, BalanceCurrentOperations,
-    BalanceFiatDeposit, BalanceOperation, BalanceOrderResponse, CarusellBank, ClientFeature,
-    ClientModel, CryptoAddressResponse, CurrentAccountSystemAccount, DownloadTokenResponse,
-    ExchangeAssets, ExchangeLegacyOrder, ExchangeLimits, ExchangeOrder, ExchangeQuote,
-    ExchangeRateStat, IcoBuyResult, IcoBuybackApplication, IcoBuybackOffer, IcoCalculatorResult,
+    BalanceCalculation, BalanceCryptoDeposit, BalanceCurrentOperations, BalanceFiatDeposit,
+    BalanceOperation, BalanceOrderResponse, CarusellBank, ClientFeature, ClientModel,
+    CryptoAddressResponse, CurrentAccountSystemAccount, DownloadTokenResponse, ExchangeAssets,
+    ExchangeLegacyOrder, ExchangeLimits, ExchangeOrder, ExchangeQuote, ExchangeRateStat,
+    IcoBuyResult, IcoBuybackApplication, IcoBuybackOffer, IcoCalculatorResult,
     IcoCardBuyCalculation, IcoClientInfo, IcoEmission, IcoEmissionSale, IcoInvestedIncome,
     IcoInvestedTotal, IcoInvestorEmission, IcoInvestorObligations, IcoIssuer, IcoIssuerDebt,
     IcoIssuerDocument, IcoIssuerDocumentType, IcoIssuerName, IcoIssuerStatistics, IcoOperation,
     IcoPaymentSchedule, IcoRate, IcoStatistics, IcoYearAmount, IcoYield, KycActualData,
     KycActualizationClientStatus, KycCryptoTest, KycInvestorData, KycLivenessSession,
     KycLivenessStatus, KycMsiRedirect, KycPersonalData, KycSumsubToken, KycVerification,
-    MarketInstrument, MarketKline, MarketOrderbook, Merchant, MerchantClientCounts, MerchantPair,
-    MtsCardCountry, MtsQrCommission, MtsQrInfo, NotificationEvent, NotificationStreamMessage,
-    OrderUnifiedResponse, OtcOrderCalculateResponse, OtcOrderResponse, PaymentCard,
-    PaymentCardLimits, PaymentCommission, PaymentDirectionCommission, PaymentMethod,
+    MarketInstrument, MarketKline, MarketOrderbook, Merchant, MerchantClientCounts, MerchantOrder,
+    MerchantPair, MtsCardCountry, MtsQrCommission, MtsQrInfo, NotificationEvent,
+    NotificationStreamMessage, OrderUnifiedResponse, OtcOrderCalculateResponse, OtcOrderResponse,
+    PaymentCard, PaymentCardLimits, PaymentCommission, PaymentDirectionCommission, PaymentMethod,
     PaymentMethodResponse, PaymentProvider, PaymentProviderType, Referral, ReferralTransaction,
     RegistrationSdkResult, RegistrationState, StatusbankCardDetails, StatusbankCardSystems,
     StatusbankOrderConfirmation, StatusbankRegistration, SubaccountDetailsResponse,
@@ -76,33 +76,33 @@ use crate::params::{
     KycGetParams, KycLivenessStartParams, KycMsiAuthenticateParams, KycProfileClosureConfirmParams,
     KycQualificationSubmitParams, KycSdkLinkParams, KycSubmitParams, KycSumsubTokenParams,
     MarketInstrumentsParams, MarketKlinesParams, MarketOrderbookParams,
-    MerchantDownloadReportParams, MerchantSetShowNameParams, MerchantStatisticsCountByStatusParams,
-    MerchantStatisticsExportCsvParams, MerchantWebhooksSetUrlParams, NotificationsMarkViewedParams,
-    NotificationsSearchParams, PaymentsCardsRenameParams, PaymentsCommissionsListParams,
-    PaymentsMethodsListParams, PaymentsProvidersListParams, ProvidersAlfaCardBindUrlParams,
-    ProvidersAlfaPaymentParams, ProvidersAssistCardBindFormParams,
-    ProvidersAssistCardBindUrlParams, ProvidersBepaidCardBindUrlParams, ProvidersMtsBindCardParams,
-    ProvidersMtsQrCommissionParams, ProvidersMtsQrInfoParams,
-    ProvidersStatusbankConfirmOrderParams, ProvidersStatusbankRegisterCardParams,
-    ProvidersVtbCortiMilliRateParams, ReferralTransactionsListParams, RegistrationCompleteParams,
-    RegistrationCompleteSdkParams, RegistrationInitiateParams, RegistrationInitiateSdkParams,
-    RegistrationResendEmailCodeParams, RegistrationSendPhoneCodeParams,
-    RegistrationVerifyEmailParams, RegistrationVerifyPhoneParams, ReportsDownloadBalanceParams,
-    ReportsDownloadExchangeParams, ReportsEmailBalanceParams, ReportsEmailExchangeParams,
-    SupportSendParams, TradingAccountFeeRateParams, TradingAccountPortfolioStatisticsParams,
-    TradingDemoDepositParams, TradingExecutionsListParams, TradingOrdersActiveParams,
-    TradingOrdersAmendParams, TradingOrdersCancelParams, TradingOrdersCreateParams,
-    TradingOrdersHistoryParams, TradingOrdersListParams, TradingReportsOperationsParams,
-    UserAntifraudVerifyCodeParams, UserEmailConfirmParams, UserEmailSendCodeParams,
-    UserEmailVerifyCodeParams, UserMfaVerifyParams, UserPasswordChangeParams,
-    UserPasswordResetParams, UserPasswordSendResetLinkParams, UserPhoneChangeParams,
-    UserPhoneSendChangeCodeParams, UserPhoneSetNotificationsParams,
+    MerchantDownloadReportParams, MerchantOrdersHistoryParams, MerchantSetShowNameParams,
+    MerchantStatisticsCountByStatusParams, MerchantStatisticsExportCsvParams,
+    MerchantWebhooksSetUrlParams, NotificationsMarkViewedParams, NotificationsSearchParams,
+    PaymentsCardsRenameParams, PaymentsCommissionsListParams, PaymentsMethodsListParams,
+    PaymentsProvidersListParams, ProvidersAlfaCardBindUrlParams, ProvidersAlfaPaymentParams,
+    ProvidersAssistCardBindFormParams, ProvidersAssistCardBindUrlParams,
+    ProvidersBepaidCardBindUrlParams, ProvidersMtsBindCardParams, ProvidersMtsQrCommissionParams,
+    ProvidersMtsQrInfoParams, ProvidersStatusbankConfirmOrderParams,
+    ProvidersStatusbankRegisterCardParams, ProvidersVtbCortiMilliRateParams,
+    ReferralTransactionsListParams, RegistrationCompleteParams, RegistrationCompleteSdkParams,
+    RegistrationInitiateParams, RegistrationInitiateSdkParams, RegistrationResendEmailCodeParams,
+    RegistrationSendPhoneCodeParams, RegistrationVerifyEmailParams, RegistrationVerifyPhoneParams,
+    ReportsDownloadBalanceParams, ReportsDownloadExchangeParams, ReportsEmailBalanceParams,
+    ReportsEmailExchangeParams, SupportSendParams, TradingAccountFeeRateParams,
+    TradingAccountPortfolioStatisticsParams, TradingDemoDepositParams, TradingExecutionsListParams,
+    TradingOrdersActiveParams, TradingOrdersAmendParams, TradingOrdersCancelParams,
+    TradingOrdersCreateParams, TradingOrdersHistoryParams, TradingOrdersListParams,
+    TradingReportsOperationsParams, UserAntifraudVerifyCodeParams, UserEmailConfirmParams,
+    UserEmailSendCodeParams, UserEmailVerifyCodeParams, UserMfaVerifyParams,
+    UserPasswordChangeParams, UserPasswordResetParams, UserPasswordSendResetLinkParams,
+    UserPhoneChangeParams, UserPhoneSendChangeCodeParams, UserPhoneSetNotificationsParams,
     UserPhoneVerifyChangeCodeParams, UserPhoneVerifyConfirmationCodeParams, UserSetGenderParams,
 };
-use crate::request::path_segment;
 use crate::sse::EventStream;
 use crate::{
-    Bytes, Client, Decimal, Envelope, Method, Multipart, PageParam, Paginator, Result, Service,
+    Bytes, Client, Decimal, Envelope, Method, Multipart, Page, PageParam, Paginator, Result,
+    Service,
 };
 
 impl Client {
@@ -236,6 +236,37 @@ pub struct AccountingAccounts<'a> {
 }
 
 impl AccountingAccounts<'_> {
+    /// Get balances with USD valuation
+    ///
+    /// Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for
+    /// the wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
+    /// `amount` is the reserved amount). In the demo environment this reads the demo trading
+    /// balances.
+    ///
+    /// `POST /api/v2/accounting/client/account/enhanced`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub async fn get_enhanced(
+        &self,
+        params: AccountingAccountsGetEnhancedParams,
+    ) -> Result<AccountingEnhancedAccount> {
+        self.client
+            .request(
+                Service::AccountingSpot,
+                Method::POST,
+                "/api/v2/accounting/client/account/enhanced",
+            )
+            .json(params)
+            .send()
+            .await?
+            .json()
+            .await
+    }
+
     /// Get balances of a ledger account
     ///
     /// Balances of one account type (`USER_BALANCE` = Whitebird wallet, `REFERRER_BALANCE` =
@@ -255,36 +286,6 @@ impl AccountingAccounts<'_> {
                 Service::Api,
                 Method::POST,
                 "/api/v2/accounting/client/account",
-            )
-            .json(params)
-            .send()
-            .await?
-            .json()
-            .await
-    }
-
-    /// Get balances with USD valuation
-    ///
-    /// Same as `get` with USD rate and value per asset. The web app requests `USER_BALANCE` for
-    /// the wallet and `USER_SPOT_RESERVING` for the amounts reserved by open spot orders (there
-    /// `amount` is the reserved amount).
-    ///
-    /// `POST /api/v2/accounting/client/account/enhanced`
-    ///
-    /// **Experimental:** the endpoint may change without notice.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response cannot be decoded.
-    pub async fn get_enhanced(
-        &self,
-        params: AccountingAccountsGetEnhancedParams,
-    ) -> Result<AccountingEnhancedAccount> {
-        self.client
-            .request(
-                Service::Api,
-                Method::POST,
-                "/api/v2/accounting/client/account/enhanced",
             )
             .json(params)
             .send()
@@ -324,6 +325,9 @@ impl AccountingTransactions<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -406,7 +410,7 @@ impl Auth<'_> {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response cannot be decoded.
-    pub async fn create_mfa_token(&self, params: AuthCreateMfaTokenParams) -> Result<AuthMfaToken> {
+    pub async fn create_mfa_token(&self, params: AuthCreateMfaTokenParams) -> Result<Value> {
         self.client
             .request(
                 Service::Api,
@@ -416,16 +420,18 @@ impl Auth<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
     /// Check whether an account has 2FA enabled
     ///
-    /// Called by the sign-in form before `POST /oauth/token`. Accounts with 2FA sign in without
-    /// the slider captcha (the TOTP code is sent as `code`); accounts without 2FA must solve
-    /// the captcha from `GET /api/v1/captcha/generate`. Unknown users answer status
-    /// `NOT_FOUND`.
+    /// Called by the sign-in form before `POST /oauth/token`, with the username as typed.
+    /// Accounts with 2FA first send the password grant without code and without captcha; when
+    /// the answer is `{"mfaEnabled": true}` without `access_token`, they send the grant again
+    /// with the TOTP code in `code`. Accounts without 2FA must solve the captcha from `GET
+    /// /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`; when this check
+    /// fails the web app does not send the password at all.
     ///
     /// `POST /api/v1/client/mfa`
     ///
@@ -452,10 +458,11 @@ impl Auth<'_> {
     /// Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution
     /// is the horizontal offset of the piece (the web slider ranges 0-250) and is sent to `POST
     /// /oauth/token` (or `/api/v1/registration/initiate`) in the `captcha` header as
-    /// `base64(JSON.stringify({"sliderPosition": \<int\>, "requestId": "\<requestId\>"}))`. A
-    /// wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
-    /// captcha with a fresh `requestId`. Status/message `Too many requests` means the account
-    /// is temporarily locked.
+    /// `base64(JSON.stringify({"sliderPosition": "\<offset\>", "requestId":
+    /// "\<requestId\>"}))`. The sign-in form sends the offset as a string of digits, the
+    /// registration form as a number. A wrong answer is rejected with status `INVALID_CAPTCHA`;
+    /// the web app then generates a new captcha with a fresh `requestId`. Status/message `Too
+    /// many requests` means the account is temporarily locked.
     ///
     /// `GET /api/v1/captcha/generate`
     ///
@@ -606,7 +613,8 @@ impl BalanceDeposits<'_> {
     ///
     /// Returns the Whitebird address to send the crypto to (`depositCryptoAddress`). Errors:
     /// `ACTIVE_DEPOSIT_REQUEST_FOUND`, `ADDRESS_ALREADY_BOUND` (a pending operation already
-    /// uses the network), `INVALID_CRYPTO_ADDRESS`, `EXCHANGE_UNAVAILABLE`.
+    /// uses the network), `INVALID_CRYPTO_ADDRESS`, `INVALID_MFA_STATUS` (two-factor
+    /// authentication must be enabled), `EXCHANGE_UNAVAILABLE`.
     ///
     /// `POST /api/v2/exchange/client/balance/crypto/deposit`
     ///
@@ -639,7 +647,8 @@ impl BalanceDeposits<'_> {
     /// `paymentDetails.postForm` (Assist). Current-account (`CA`) deposits are paid by invoice
     /// (see `current_account.invoices`). Errors: `ACTIVE_DEPOSIT_REQUEST_FOUND`,
     /// `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_CORPORATE_CARD`, `INVALID_MIN_LIMIT`,
-    /// `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `EXCHANGE_UNAVAILABLE`.
+    /// `INVALID_MAX_LIMIT`, `AMOUNT_TOO_SMALL`, `INVALID_MFA_STATUS` (two-factor authentication
+    /// must be enabled), `EXCHANGE_UNAVAILABLE`.
     ///
     /// `POST /api/v2/exchange/client/balance/fiat/deposit`
     ///
@@ -745,9 +754,10 @@ impl BalanceOperations<'_> {
                 "/api/v2/exchange/client/balance/crypto/reject",
             )
             .json(params)
+            .default_field("operationType", "crypto")
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -768,9 +778,10 @@ impl BalanceOperations<'_> {
                 "/api/v2/exchange/client/balance/fiat/reject",
             )
             .json(params)
+            .default_field("operationType", "fiat")
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -791,7 +802,11 @@ impl BalanceOperations<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
+            .default_query("sort", "creationDate,desc")
             .json(params)
+            .default_field("limit", 20)
             .paginate(PageParam::Query("page"))
     }
 }
@@ -807,11 +822,14 @@ impl BalanceWithdrawals<'_> {
     ///
     /// Executes a calculation made with `balance.withdrawals.calculate_crypto` (address, amount
     /// and network are taken from it). Needs an operation MFA token for `WITHDRAWAL`; without
-    /// it the service answers "Operation denied, requires mfa checking". Errors:
-    /// `INVALID_CALCULATION` (calculation expired, calculate again),
-    /// `ACTIVE_WITHDRAWAL_REQUEST_FOUND`, `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`,
-    /// `DESTINATION_ADDRESS_IS_INTERNAL`, `INVALID_AMOUNT` (commission exceeds the amount),
-    /// `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`, `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`,
+    /// it the service answers "Operation denied, requires mfa checking" in `message` or in
+    /// `status`. Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or
+    /// `LIVENESS_VERIFICATION_REQUIRED`; after the check, send the same request again
+    /// (calculate again on `INVALID_CALCULATION`). Errors: `INVALID_CALCULATION` (calculation
+    /// expired, calculate again), `ACTIVE_WITHDRAWAL_REQUEST_FOUND`,
+    /// `ACTIVE_BALANCE_OPERATION_FOUND`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`,
+    /// `INVALID_AMOUNT` (commission exceeds the amount), `INVALID_MIN_LIMIT`,
+    /// `INVALID_MAX_LIMIT`, `INVALID_MFA_STATUS`, `INVALID_MFA_CODE`,
     /// `AML_FRAUD_VALIDATION_ERROR`, `BALANCE_OPERATION_PROCESSING_ERROR`.
     ///
     /// `POST /api/v2/exchange/client/balance/crypto/withdrawal`
@@ -839,7 +857,7 @@ impl BalanceWithdrawals<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -847,8 +865,8 @@ impl BalanceWithdrawals<'_> {
     ///
     /// Needs an operation MFA token for `WITHDRAWAL`. `paymentToken` is the id of a bound card
     /// / payment method (`payments.methods.list`), or the QR ticket id for `MTS_QR` payments.
-    /// `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors as the
-    /// crypto withdrawal.
+    /// `bankIdentifier` selects the recipient bank for SBP-style providers. Same errors, MFA
+    /// refusal and anti-fraud checks as the crypto withdrawal.
     ///
     /// `POST /api/v2/exchange/client/balance/fiat/withdrawal`
     ///
@@ -872,7 +890,7 @@ impl BalanceWithdrawals<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -1064,7 +1082,9 @@ impl BrokerageBalanceOrders<'_> {
 
     /// Create Crypto Withdrawal
     ///
-    /// Create a crypto withdrawal balance order
+    /// Create a crypto withdrawal balance order. The order stays `AWAITING_CLIENT_CONFIRMATION`
+    /// until the client confirms it with the token emailed to them
+    /// (`confirm_crypto_withdrawal`); it then moves to `AWAITING_ADMIN_CONFIRMATION`.
     ///
     /// `POST /api/v1/brokerage/balance-order/crypto/withdrawal`
     ///
@@ -1094,6 +1114,8 @@ impl BrokerageBalanceOrders<'_> {
     ///
     /// `POST /api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client`
     ///
+    /// Public: works without signing in.
+    ///
     /// # Errors
     ///
     /// Returns an error if the request fails or the response cannot be decoded.
@@ -1107,6 +1129,7 @@ impl BrokerageBalanceOrders<'_> {
                 Method::POST,
                 "/api/v1/brokerage/balance-order/crypto/withdrawal/confirm/client",
             )
+            .public()
             .json(params)
             .send()
             .await?
@@ -1186,6 +1209,8 @@ impl BrokerageBalanceOrders<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -1222,7 +1247,9 @@ impl BrokerageCryptoAddresses<'_> {
 
     /// Add Crypto Address
     ///
-    /// Add a crypto address for the current subaccount
+    /// Add a crypto address for the current subaccount. Errors: 403 when the account has no
+    /// two-factor authentication (the web app asks to enable it), 400 `INVALID_ADDRESS` or
+    /// `MAX_NUMBER_REACHED`.
     ///
     /// `POST /api/v1/brokerage/crypto-address`
     ///
@@ -1257,13 +1284,11 @@ impl BrokerageCryptoAddresses<'_> {
     /// Returns an error if the request fails.
     pub async fn delete(&self, address_id: &str) -> Result<()> {
         self.client
-            .request(
+            .request_path(
                 Service::Brokerage,
                 Method::DELETE,
-                format!(
-                    "/api/v1/brokerage/crypto-address/{}",
-                    path_segment(address_id)
-                ),
+                "/api/v1/brokerage/crypto-address/{}",
+                &[&address_id],
             )
             .send()
             .await?;
@@ -1284,13 +1309,11 @@ impl BrokerageCryptoAddresses<'_> {
         subaccount_id: &str,
     ) -> Result<Vec<CryptoAddressResponse>> {
         self.client
-            .request(
+            .request_path(
                 Service::Brokerage,
                 Method::GET,
-                format!(
-                    "/api/v1/brokerage/crypto-address/{}/list",
-                    path_segment(subaccount_id)
-                ),
+                "/api/v1/brokerage/crypto-address/{}/list",
+                &[&subaccount_id],
             )
             .send()
             .await?
@@ -1323,6 +1346,8 @@ impl BrokerageOrders<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -1450,6 +1475,8 @@ impl BrokerageOtcOrders<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -1476,13 +1503,11 @@ impl BrokeragePayments<'_> {
         balance_order_id: &str,
     ) -> Result<DownloadTokenResponse> {
         self.client
-            .request(
+            .request_path(
                 Service::Brokerage,
                 Method::POST,
-                format!(
-                    "/api/v1/brokerage/payment/invoice/{}/download-token",
-                    path_segment(balance_order_id)
-                ),
+                "/api/v1/brokerage/payment/invoice/{}/download-token",
+                &[&balance_order_id],
             )
             .send()
             .await?
@@ -1522,7 +1547,9 @@ pub struct BrokerageSubaccounts<'a> {
 impl BrokerageSubaccounts<'_> {
     /// Add Subaccount (Individual)
     ///
-    /// Add an Individual subaccount for current broker
+    /// Add an Individual subaccount for current broker. Errors: status `USER_EXISTS` (the email
+    /// is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and per-field
+    /// errors in `fields\[\]`.
     ///
     /// `POST /api/v1/brokerage/subaccount/add/individual`
     ///
@@ -1548,7 +1575,9 @@ impl BrokerageSubaccounts<'_> {
 
     /// Add Subaccount (Individual Entrepreneur)
     ///
-    /// Add an Individual Entrepreneur subaccount for current broker
+    /// Add an Individual Entrepreneur subaccount for current broker. Errors: status
+    /// `USER_EXISTS` (the email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is
+    /// taken), and per-field errors in `fields\[\]`.
     ///
     /// `POST /api/v1/brokerage/subaccount/add/individual-entrepreneur`
     ///
@@ -1574,7 +1603,9 @@ impl BrokerageSubaccounts<'_> {
 
     /// Add Subaccount (Organization)
     ///
-    /// Add an Organization subaccount for current broker
+    /// Add an Organization subaccount for current broker. Errors: status `USER_EXISTS` (the
+    /// email is taken), `SUBACCOUNT_EXISTS_BY_CUSTOM_ID` (the `customId` is taken), and
+    /// per-field errors in `fields\[\]`.
     ///
     /// `POST /api/v1/brokerage/subaccount/add/organization`
     ///
@@ -1637,6 +1668,8 @@ impl BrokerageSubaccounts<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
             .paginate(PageParam::Query("page"))
     }
 
@@ -1651,10 +1684,11 @@ impl BrokerageSubaccounts<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn get(&self, id: &str) -> Result<SubaccountResponse> {
         self.client
-            .request(
+            .request_path(
                 Service::Brokerage,
                 Method::GET,
-                format!("/api/v1/brokerage/subaccount/{}", path_segment(id)),
+                "/api/v1/brokerage/subaccount/{}",
+                &[&id],
             )
             .send()
             .await?
@@ -1673,10 +1707,11 @@ impl BrokerageSubaccounts<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn details(&self, id: &str) -> Result<SubaccountDetailsResponse> {
         self.client
-            .request(
+            .request_path(
                 Service::Brokerage,
                 Method::GET,
-                format!("/api/v1/brokerage/subaccount/{}/details", path_segment(id)),
+                "/api/v1/brokerage/subaccount/{}/details",
+                &[&id],
             )
             .send()
             .await?
@@ -1736,7 +1771,7 @@ impl ClientModelResource<'_> {
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -1757,6 +1792,7 @@ impl ClientModelResource<'_> {
         self.client
             .request(Service::Exchange, Method::GET, "/api/v1/client/features")
             .query("merchantId", &params.merchant_id)
+            .default_query("merchantId", "11111111-1111-1111-1111-111111111111")
             .send()
             .await?
             .json()
@@ -1799,14 +1835,15 @@ impl<'a> CurrentAccount<'a> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn delete(&self, account_id: &str) -> Result<Value> {
         self.client
-            .request(
+            .request_path(
                 Service::CurrentAccount,
                 Method::DELETE,
-                format!("/api/v1/currentAccount/{}", path_segment(account_id)),
+                "/api/v1/currentAccount/{}",
+                &[&account_id],
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -1836,13 +1873,11 @@ impl CurrentAccountInvoices<'_> {
         params: CurrentAccountInvoicesDownloadParams,
     ) -> Result<Bytes> {
         self.client
-            .request(
+            .request_path(
                 Service::CurrentAccount,
                 Method::POST,
-                format!(
-                    "/api/v1/currentAccount/order/{}/invoice",
-                    path_segment(invoice_id)
-                ),
+                "/api/v1/currentAccount/order/{}/invoice",
+                &[&invoice_id],
             )
             .json(params)
             .send()
@@ -1869,13 +1904,11 @@ impl CurrentAccountInvoices<'_> {
         params: CurrentAccountInvoicesEmailParams,
     ) -> Result<()> {
         self.client
-            .request(
+            .request_path(
                 Service::CurrentAccount,
                 Method::POST,
-                format!(
-                    "/api/v1/currentAccount/order/{}/email/invoice",
-                    path_segment(invoice_id)
-                ),
+                "/api/v1/currentAccount/order/{}/email/invoice",
+                &[&invoice_id],
             )
             .json(params)
             .send()
@@ -1901,13 +1934,11 @@ impl CurrentAccountInvoices<'_> {
         params: CurrentAccountInvoicesDownloadDepositParams,
     ) -> Result<Bytes> {
         self.client
-            .request(
+            .request_path(
                 Service::CurrentAccount,
                 Method::POST,
-                format!(
-                    "/api/v1/currentAccount/order/deposit/invoice/{}",
-                    path_segment(invoice_id)
-                ),
+                "/api/v1/currentAccount/order/deposit/invoice/{}",
+                &[&invoice_id],
             )
             .json(params)
             .send()
@@ -1931,13 +1962,11 @@ impl CurrentAccountInvoices<'_> {
         params: CurrentAccountInvoicesEmailDepositParams,
     ) -> Result<()> {
         self.client
-            .request(
+            .request_path(
                 Service::CurrentAccount,
                 Method::POST,
-                format!(
-                    "/api/v1/currentAccount/order/deposit/email/invoice/{}",
-                    path_segment(invoice_id)
-                ),
+                "/api/v1/currentAccount/order/deposit/email/invoice/{}",
+                &[&invoice_id],
             )
             .json(params)
             .send()
@@ -2074,7 +2103,8 @@ impl ExchangeAssetsResource<'_> {
     /// List assets available for a destination
     ///
     /// Sent without a body. `merchantId` scopes the list to a merchant widget; the web app
-    /// falls back to `11111111-1111-1111-1111-111111111111` when embedded without one.
+    /// always sends one, `11111111-1111-1111-1111-111111111111` (Whitebird itself) unless
+    /// embedded in a merchant's widget.
     ///
     /// `POST /api/v2/exchange/client/assets`
     ///
@@ -2088,6 +2118,7 @@ impl ExchangeAssetsResource<'_> {
             .request(Service::Api, Method::POST, "/api/v2/exchange/client/assets")
             .query("destination", &params.destination)
             .query("merchantId", &params.merchant_id)
+            .default_query("merchantId", "11111111-1111-1111-1111-111111111111")
             .send()
             .await?
             .json()
@@ -2181,6 +2212,11 @@ impl ExchangeOrders<'_> {
     /// `IMPOSSIBLE_TO_COMPLETE_OPERATION_DUE_TO_INTERNAL_REASON` (anti-fraud),
     /// `EXCHANGE_UNAVAILABLE`.
     ///
+    /// Anti-fraud may answer 400 `SMS_VERIFICATION_REQUIRED` or
+    /// `LIVENESS_VERIFICATION_REQUIRED` (see `user.antifraud` and `kyc.liveness`); after the
+    /// check, send the same request again. If the quote expired meanwhile it fails with
+    /// `QUOTE_NOT_FOUND`: request a new quote.
+    ///
     /// `POST /api/v3/exchange/client/order`
     ///
     /// **Experimental:** the endpoint may change without notice.
@@ -2209,10 +2245,11 @@ impl ExchangeOrders<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn get(&self, order_id: &str) -> Result<ExchangeOrder> {
         self.client
-            .request(
+            .request_path(
                 Service::Api,
                 Method::GET,
-                format!("/api/v3/exchange/client/order/{}", path_segment(order_id)),
+                "/api/v3/exchange/client/order/{}",
+                &[&order_id],
             )
             .send()
             .await?
@@ -2235,18 +2272,16 @@ impl ExchangeOrders<'_> {
         params: ExchangeOrdersRejectParams,
     ) -> Result<Value> {
         self.client
-            .request(
+            .request_path(
                 Service::Api,
                 Method::POST,
-                format!(
-                    "/api/v3/exchange/client/order/{}/reject",
-                    path_segment(order_id)
-                ),
+                "/api/v3/exchange/client/order/{}/reject",
+                &[&order_id],
             )
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -2270,6 +2305,7 @@ impl ExchangeOrders<'_> {
                 "/api/v3/exchange/client/order/current",
             )
             .query("destination", &params.destination)
+            .default_query("destination", "EXCHANGE")
             .send()
             .await?
             .json()
@@ -2315,7 +2351,11 @@ impl ExchangeOrders<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
+            .default_query("sort", "creationDate,desc")
             .json(params)
+            .default_field("limit", 20)
             .paginate(PageParam::Query("page"))
     }
 }
@@ -2333,7 +2373,8 @@ impl ExchangeQuotes<'_> {
     /// electronic wallet), a `CRYPTO_TRANSFER` (external crypto address) or a `FIAT_PROVIDER`
     /// (bank card / bank account of a payment provider). Set the amount on exactly one leg; the
     /// other one is computed. The quote `id` is then passed to `exchange.orders.create`. The
-    /// web app re-requests the quote every 15 s while the form is open.
+    /// quote is valid until `expirationDate`; the web app requests a new one 2 s before that
+    /// (`expirationDate` - `creationDate` - 2 s), or every 15 s when the dates are missing.
     ///
     /// Errors: `EXCHANGE_UNAVAILABLE`, `INVALID_MIN_LIMIT`, `INVALID_MAX_LIMIT`,
     /// `AMOUNT_TOO_SMALL`, `INVALID_ADDRESS`, `DESTINATION_ADDRESS_IS_INTERNAL`.
@@ -2459,6 +2500,9 @@ impl IcoBuybacks<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 10)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -2468,7 +2512,7 @@ impl IcoBuybacks<'_> {
     /// Asks the issuer to buy back `value` tokens under the emission's offer; only possible
     /// during the request window (`buybackRequestDateFrom`..`buybackRequestDateTo` of the
     /// obligation). Pass `buybackId` to change the amount of an existing application. Not
-    /// enough tokens answers `INSUFFICIENT_FUNDS`.
+    /// enough tokens answers an error whose `message` is `Insufficient funds`.
     ///
     /// `POST /api/v1/ico/offer/buyback`
     ///
@@ -2483,7 +2527,7 @@ impl IcoBuybacks<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -2498,14 +2542,16 @@ impl IcoBuybacks<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn withdraw(&self, buyback_id: &str) -> Result<Value> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::DELETE,
-                format!("/api/v1/ico/offer/buyback/{}", path_segment(buyback_id)),
+                "/api/v1/ico/offer/buyback/{}",
+                &[&buyback_id],
             )
+            .json(Map::new())
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -2529,6 +2575,9 @@ impl IcoBuybacks<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 10)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -2561,6 +2610,8 @@ impl IcoEmissions<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -2581,10 +2632,11 @@ impl IcoEmissions<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn get(&self, emission_id: &str) -> Result<IcoEmission> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::POST,
-                format!("/api/v1/ico/emission/{}", path_segment(emission_id)),
+                "/api/v1/ico/emission/{}",
+                &[&emission_id],
             )
             .public()
             .send()
@@ -2608,13 +2660,11 @@ impl IcoEmissions<'_> {
     /// Returns an error if the request fails.
     pub async fn white_paper(&self, emission_id: &str) -> Result<Bytes> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::GET,
-                format!(
-                    "/api/v1/ico/emission/{}/white-paper",
-                    path_segment(emission_id)
-                ),
+                "/api/v1/ico/emission/{}/white-paper",
+                &[&emission_id],
             )
             .public()
             .send()
@@ -2680,7 +2730,7 @@ impl IcoEmissions<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -2700,6 +2750,9 @@ impl IcoEmissions<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 10)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -2752,6 +2805,9 @@ impl IcoEmissions<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 10)
+            .default_query("sort", "sellDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -2803,6 +2859,8 @@ impl IcoEmissions<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("sort", "creationDate,desc")
             .paginate(PageParam::Query("page"))
     }
 
@@ -2828,7 +2886,7 @@ impl IcoEmissions<'_> {
                 Method::GET,
                 "/api/v1/ico/emission/stable-coin/available",
             )
-            .query("assets", &params.assets)
+            .query("assets[]", &params.assets)
             .send()
             .await?
             .json()
@@ -2848,13 +2906,11 @@ impl IcoEmissions<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn is_investor(&self, emission_id: &str) -> Result<bool> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::GET,
-                format!(
-                    "/api/v1/ico/investor/emission/{}/is-investor",
-                    path_segment(emission_id)
-                ),
+                "/api/v1/ico/investor/emission/{}/is-investor",
+                &[&emission_id],
             )
             .send()
             .await?
@@ -2891,10 +2947,11 @@ impl<'a> IcoIssuers<'a> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn get(&self, issuer_id: &str) -> Result<IcoIssuer> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::GET,
-                format!("/api/v1/ico/issuer/get/{}", path_segment(issuer_id)),
+                "/api/v1/ico/issuer/get/{}",
+                &[&issuer_id],
             )
             .public()
             .send()
@@ -2916,10 +2973,11 @@ impl<'a> IcoIssuers<'a> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn statistics(&self, issuer_id: &str) -> Result<IcoIssuerStatistics> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::GET,
-                format!("/api/v1/ico/statistic/issuer/{}", path_segment(issuer_id)),
+                "/api/v1/ico/statistic/issuer/{}",
+                &[&issuer_id],
             )
             .public()
             .send()
@@ -2936,8 +2994,10 @@ impl<'a> IcoIssuers<'a> {
     ///
     /// **Experimental:** the endpoint may change without notice.
     ///
-    /// Returns a lazy stream over the items of every page; it yields errors as items.
-    pub fn names(&self) -> Paginator<IcoIssuerName> {
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub async fn names(&self) -> Result<Page<IcoIssuerName>> {
         self.client
             .request(
                 Service::Ico,
@@ -2945,7 +3005,10 @@ impl<'a> IcoIssuers<'a> {
                 "/api/v1/ico/statistic/issuer/names",
             )
             .json(Map::new())
-            .paginate(PageParam::Query("page"))
+            .send()
+            .await?
+            .json()
+            .await
     }
 }
 
@@ -2972,18 +3035,16 @@ impl IcoIssuersDocuments<'_> {
         params: IcoIssuersDocumentsListParams,
     ) -> Paginator<IcoIssuerDocument> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::GET,
-                format!(
-                    "/api/v1/ico/issuer/documents/get/{}/{}",
-                    path_segment(issuer_id),
-                    path_segment(r#type)
-                ),
+                "/api/v1/ico/issuer/documents/get/{}/{}",
+                &[&issuer_id, &r#type],
             )
             .public()
             .query("page", params.page)
             .query("size", params.size)
+            .default_query("page", 0)
             .paginate(PageParam::Query("page"))
     }
 
@@ -3001,13 +3062,11 @@ impl IcoIssuersDocuments<'_> {
     /// Returns an error if the request fails.
     pub async fn download(&self, document_id: &str) -> Result<Bytes> {
         self.client
-            .request(
+            .request_path(
                 Service::Ico,
                 Method::GET,
-                format!(
-                    "/api/v1/ico/issuer/document/download/{}",
-                    path_segment(document_id)
-                ),
+                "/api/v1/ico/issuer/document/download/{}",
+                &[&document_id],
             )
             .public()
             .send()
@@ -3046,6 +3105,9 @@ impl IcoObligations<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 10)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .send()
             .await?
@@ -3143,7 +3205,9 @@ impl IcoObligations<'_> {
 
     /// Get the conversion rate for a token purchase
     ///
-    /// Rate used when the paying account currency differs from the emission currency.
+    /// Conversion rate between the paying account currency and the emission currency. The web
+    /// app asks for it whenever a paying account is chosen, also when both currencies are the
+    /// same, and only displays it; the rate is not sent with the purchase.
     ///
     /// `POST /api/v1/ico/obligation/client/rate`
     ///
@@ -3218,6 +3282,9 @@ impl IcoOperations<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
+            .default_query("sort", "creationDate,desc")
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -3251,7 +3318,7 @@ impl IcoOperations<'_> {
     ///
     /// Moves money from an ICO account (`ICO_BALANCE`) to the e-account (`USER_BALANCE`) in the
     /// same currency. Not enough money answers an error whose message contains `Insufficient
-    /// funds`.
+    /// funds`. The web app treats an empty answer as success.
     ///
     /// `POST /api/v1/ico/operation/transfer`
     ///
@@ -3266,7 +3333,7 @@ impl IcoOperations<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -3576,9 +3643,9 @@ impl<'a> Kyc<'a> {
 
     /// Accept the public offer
     ///
-    /// Sent before verification when the user profile has no `offerAgreement` yet. The web app
-    /// retries a 400 answer up to 5 times with exponential backoff (2 s, 4 s, ...), while the
-    /// client record is still being created.
+    /// Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
+    /// `kyc.submit` answered `firstStageConfirmed: true`, for MSI before
+    /// `kyc.msi.authenticate`.
     ///
     /// `POST /api/v2/kyc/client/agreed-offer`
     ///
@@ -3595,7 +3662,7 @@ impl<'a> Kyc<'a> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -3617,6 +3684,7 @@ impl<'a> Kyc<'a> {
         self.client
             .request(Service::Kyc, Method::GET, "/api/v1/kyc")
             .query("provider", &params.provider)
+            .default_query("provider", "SUMSUB")
             .send()
             .await?
             .json()
@@ -3719,7 +3787,7 @@ impl KycActualization<'_> {
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -3771,7 +3839,7 @@ impl KycCryptoTestResource<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -3903,6 +3971,7 @@ impl KycMsi<'_> {
             .query("duplicateUrl", &params.duplicate_url)
             .query("failureUrl", &params.failure_url)
             .query("docExpiredUrl", &params.doc_expired_url)
+            .default_query("isUl", false)
             .send()
             .await?
             .json()
@@ -3950,7 +4019,7 @@ impl KycPersonalDataResource<'_> {
             .request(Service::Kyc, Method::POST, "/api/v1/kyc/client/confirm")
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -3985,7 +4054,7 @@ impl KycProfileClosure<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -4022,7 +4091,7 @@ impl KycQualification<'_> {
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -4077,7 +4146,7 @@ impl KycSdk<'_> {
             .query("externalUserId", &params.external_user_id)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -4213,6 +4282,13 @@ impl<'a> MerchantResource<'a> {
     /// Endpoints of `client.merchant().api_keys()`.
     pub fn api_keys(&self) -> MerchantApiKeys<'a> {
         MerchantApiKeys {
+            client: self.client,
+        }
+    }
+
+    /// Endpoints of `client.merchant().orders()`.
+    pub fn orders(&self) -> MerchantOrders<'a> {
+        MerchantOrders {
             client: self.client,
         }
     }
@@ -4363,18 +4439,53 @@ impl MerchantApiKeys<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn delete(&self, api_key_id: &str) -> Result<Merchant> {
         self.client
-            .request(
+            .request_path(
                 Service::Exchange,
                 Method::POST,
-                format!(
-                    "/api/v1/merchant/current/remove/apiKey/{}",
-                    path_segment(api_key_id)
-                ),
+                "/api/v1/merchant/current/remove/apiKey/{}",
+                &[&api_key_id],
             )
             .send()
             .await?
             .json()
             .await
+    }
+}
+
+/// Endpoints of `client.merchant().orders()`.
+#[derive(Debug, Clone, Copy)]
+pub struct MerchantOrders<'a> {
+    client: &'a Client,
+}
+
+impl MerchantOrders<'_> {
+    /// List orders made through the merchant's widget
+    ///
+    /// For accounts with the `MERCHANT` role: orders of the merchant's clients, newest first.
+    /// The web app filters by creation date, statuses, assets and client id, the same filter as
+    /// `merchant.download_report`.
+    ///
+    /// `POST /api/v3/exchange/merchant-admin/order/history`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// Returns a lazy stream over the items of every page; it yields errors as items.
+    pub fn history(&self, params: MerchantOrdersHistoryParams) -> Paginator<MerchantOrder> {
+        self.client
+            .request(
+                Service::Api,
+                Method::POST,
+                "/api/v3/exchange/merchant-admin/order/history",
+            )
+            .query("page", params.page)
+            .query("size", params.size)
+            .query("sort", &params.sort)
+            .default_query("page", 0)
+            .default_query("size", 20)
+            .default_query("sort", "creationDate,desc")
+            .json(params)
+            .default_field("limit", 20)
+            .paginate(PageParam::Query("page"))
     }
 }
 
@@ -4520,6 +4631,7 @@ impl Notifications<'_> {
             .query("page", params.page)
             .query("size", params.size)
             .query("sort", &params.sort)
+            .default_query("page", 0)
             .json(params)
             .paginate(PageParam::Query("page"))
     }
@@ -4554,8 +4666,7 @@ impl Notifications<'_> {
     /// Server-Sent Events stream of account updates (order progress, balance operations, KYC
     /// applicant and client status). The web app opens it with `fetch` (not `EventSource`) so
     /// it can send `Authorization: Bearer \<access token\>` and `Accept-Language`; it sends
-    /// `Accept: text/event-stream` and optionally `Cache-Control: no-cache, no-store,
-    /// must-revalidate` / `Pragma: no-cache`.
+    /// `Accept: text/event-stream`.
     ///
     /// Every message carries a JSON `data` field (`NotificationStreamMessage`); the SSE `event`
     /// name is not used for routing, messages are dispatched on `data.type`:
@@ -4568,10 +4679,10 @@ impl Notifications<'_> {
     /// - `CLIENT_STATUS_UPDATE`: client status change; `payload` shape not used by the web app.
     ///
     /// Messages without `data` (keep-alive comments) are ignored. The `id` of the last message
-    /// is sent back as `Last-Event-ID` on reconnect. The web app reconnects with backoff 1 s x
-    /// 4^(n-1), capped at 30 s; 401/403 are fatal (re-authenticate before reconnecting). It
-    /// also reconnects when the UI language changes, since the server localises messages by
-    /// `Accept-Language`.
+    /// is sent back as `Last-Event-ID` on reconnect. After an error the web app reconnects with
+    /// backoff 1 s x 4^(n-1), capped at 30 s; 401/403 are fatal (re-authenticate before
+    /// reconnecting). It does not reconnect when the server ends the stream cleanly. The server
+    /// localises messages by `Accept-Language`.
     ///
     /// `GET /api/v1/sse/connect`
     ///
@@ -4671,14 +4782,11 @@ impl PaymentsCards<'_> {
         params: PaymentsCardsRenameParams,
     ) -> Result<PaymentCard> {
         self.client
-            .request(
+            .request_path(
                 Service::Exchange,
                 Method::PUT,
-                format!(
-                    "/api/v1/client/payment/{}/provider/{}",
-                    path_segment(card_id),
-                    path_segment(provider_type)
-                ),
+                "/api/v1/client/payment/{}/provider/{}",
+                &[&card_id, &provider_type],
             )
             .json(params)
             .send()
@@ -4940,14 +5048,15 @@ impl<'a> ProvidersAlfa<'a> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn unbind_card(&self, card_id: &str) -> Result<Value> {
         self.client
-            .request(
+            .request_path(
                 Service::Alfa,
                 Method::POST,
-                format!("/api/v1/customer/card/unbind/{}", path_segment(card_id)),
+                "/api/v1/customer/card/unbind/{}",
+                &[&card_id],
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -5046,8 +5155,9 @@ impl ProvidersAlfaCryptoCard<'_> {
     ///
     /// Second step, after a successful `validate`. When `msi` is true and `redirectUrl` is set,
     /// the user identifies through MSI (the Belarusian interbank identification system) by
-    /// opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub identity check
-    /// in its own UI and then calls `client_info` to get the bank's application page.
+    /// opening `redirectUrl` in a browser. Otherwise the web app runs a SumSub liveness check
+    /// (WebSDK with a token from `kyc.sumsub.token` with `levelType=LIVENESS`) and then calls
+    /// `client_info` to get the bank's application page.
     ///
     /// `POST /api/v1/release/partner/init`
     ///
@@ -5110,7 +5220,9 @@ impl ProvidersAssist<'_> {
     ///
     /// The user enters the card details and passes 3-D Secure on the Assist page, then the
     /// browser is sent back to `returnUrl`. The web app passes
-    /// `<https://whitebird.io/account/payments?card_bind=success`>.
+    /// `<https://whitebird.io/account/payments?card_bind=success`>. Assist appends `billnumber`
+    /// to it, and reaching that page does not prove the card was bound: check
+    /// `payments.methods.list`.
     ///
     /// `GET /api/v1/card/bind/post-form`
     ///
@@ -5127,6 +5239,7 @@ impl ProvidersAssist<'_> {
             .request(Service::Assist, Method::GET, "/api/v1/card/bind/post-form")
             .query("type", &params.r#type)
             .query("returnUrl", &params.return_url)
+            .default_query("type", "CLIENT")
             .send()
             .await?
             .json()
@@ -5135,9 +5248,9 @@ impl ProvidersAssist<'_> {
 
     /// Get an Assist card binding URL
     ///
-    /// Older variant of `card_bind_form`. The current web app only references it from unused
-    /// legacy code and never reads the response; it presumably returns a URL of the Assist
-    /// binding page to open in a browser, which sends the user back to `returnUrl`.
+    /// Older variant of `card_bind_form`. The current web app only builds this request in
+    /// unused legacy code and never sends it; it presumably returns a URL of the Assist binding
+    /// page to open in a browser, which sends the user back to `returnUrl`.
     ///
     /// `GET /api/v1/card/bind/url`
     ///
@@ -5151,9 +5264,10 @@ impl ProvidersAssist<'_> {
             .request(Service::Assist, Method::GET, "/api/v1/card/bind/url")
             .query("type", &params.r#type)
             .query("returnUrl", &params.return_url)
+            .default_query("type", "CLIENT")
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -5170,14 +5284,15 @@ impl ProvidersAssist<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn unbind_card(&self, card_id: &str) -> Result<Value> {
         self.client
-            .request(
+            .request_path(
                 Service::Assist,
                 Method::POST,
-                format!("/api/v1/card/unbind/{}", path_segment(card_id)),
+                "/api/v1/card/unbind/{}",
+                &[&card_id],
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -5191,9 +5306,10 @@ pub struct ProvidersBepaid<'a> {
 impl ProvidersBepaid<'_> {
     /// Get a bePaid card binding URL
     ///
-    /// Legacy: the current web app never reads the response. Like the other binding endpoints
-    /// it presumably returns the URL of the bePaid page where the user enters the card details
-    /// and passes 3-D Secure in a browser before being sent back to `returnUrl`.
+    /// Legacy: the current web app only builds this request in unused code and never sends it.
+    /// Like the other binding endpoints it presumably returns the URL of the bePaid page where
+    /// the user enters the card details and passes 3-D Secure in a browser before being sent
+    /// back to `returnUrl`.
     ///
     /// `GET /api/v1/card/bind/url`
     ///
@@ -5208,7 +5324,7 @@ impl ProvidersBepaid<'_> {
             .query("returnUrl", &params.return_url)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -5280,7 +5396,7 @@ impl<'a> ProvidersMts<'a> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -5297,14 +5413,15 @@ impl<'a> ProvidersMts<'a> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn unbind_card(&self, card_id: &str) -> Result<Value> {
         self.client
-            .request(
+            .request_path(
                 Service::Mts,
                 Method::POST,
-                format!("/api/v1/card/unbind/{}", path_segment(card_id)),
+                "/api/v1/card/unbind/{}",
+                &[&card_id],
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -5330,13 +5447,13 @@ impl<'a> ProvidersMts<'a> {
             .await
     }
 
-    /// Get the order number of a pending MTS deposit
+    /// Get the number of a pending MTS deposit
     ///
     /// Cash deposits in MTS retail stores (`MTS_CASH`) and transfers through Multitransfer
-    /// (`MTS_MULTITRANSFER`) are matched by an order number that the client gives to the
-    /// cashier or enters in the transfer form. This endpoint returns the number of the client's
-    /// pending deposit. The response shape is unknown: the web app declares the call but never
-    /// reads the result.
+    /// (`MTS_MULTITRANSFER`) are matched by a number that the client gives to the cashier or
+    /// enters in the transfer form. The web app declares this call (as a phone number code of
+    /// the pending deposit) but never sends it, so the meaning and shape of the answer are
+    /// unknown.
     ///
     /// `GET /api/v1/operations/deposit/pending-number`
     ///
@@ -5354,7 +5471,7 @@ impl<'a> ProvidersMts<'a> {
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -5378,10 +5495,12 @@ impl ProvidersMtsQr<'_> {
     /// 2. For a static QR code (`payments\[0\].qrType == "static"`) the payer chooses the
     ///    amount and gets the amount to pay from `commission`; otherwise the amount is
     ///    `payments\[0\].settlementAmount`.
-    /// 3. Pay through the exchange API: from a RUB balance with a fiat withdrawal
-    ///    (`fiatProviderType: MTS_QR`, `paymentToken: qrTicketId`, `commissionType: ADD`), or
-    ///    by selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider:
-    ///    MTS_QR, token: qrTicketId}`.
+    /// 3. Pay through the exchange API: from a RUB balance, first
+    ///    `balance.withdrawals.calculate_fiat` with `fiatProviderType: MTS_QR`, `paymentToken:
+    ///    qrTicketId`, `commissionType: ADD` and the amount, then
+    ///    `balance.withdrawals.create_fiat` with the same fields plus `accountType`; or by
+    ///    selling crypto with a quote whose output is `{type: FIAT_PROVIDER, provider: MTS_QR,
+    ///    token: qrTicketId}`.
     ///
     /// `POST /api/v1/qr/info`
     ///
@@ -5508,10 +5627,11 @@ impl ProvidersStatusbank<'_> {
     /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn card_details(&self, card_id: &str) -> Result<StatusbankCardDetails> {
         self.client
-            .request(
+            .request_path(
                 Service::Statusbank,
                 Method::GET,
-                format!("/api/v1/statusbank/card/{}", path_segment(card_id)),
+                "/api/v1/statusbank/card/{}",
+                &[&card_id],
             )
             .send()
             .await?
@@ -5593,6 +5713,7 @@ impl ProvidersVtbCortiMilli<'_> {
         self.client
             .request(Service::Vtb, Method::POST, "/api/v1/corti-milli/rate")
             .json(params)
+            .default_field("serviceType", "EXCHANGE")
             .send()
             .await?
             .json()
@@ -5635,7 +5756,7 @@ impl<'a> ReferralResource<'a> {
             )
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -5676,7 +5797,7 @@ impl<'a> ReferralResource<'a> {
             .request(Service::Exchange, Method::POST, "/api/v1/referrer/generate")
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -5727,6 +5848,8 @@ impl ReferralTransactions<'_> {
                 "/api/v2/accounting/referrer/transactions",
             )
             .json(params)
+            .default_field("page", 0)
+            .default_field("size", 20)
             .paginate(PageParam::Body("page"))
     }
 }
@@ -5941,7 +6064,7 @@ impl Registration<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 
@@ -6001,6 +6124,7 @@ impl Reports<'_> {
                 "/api/v1/client/balance/report",
             )
             .json(params)
+            .default_field("limit", 20)
             .send()
             .await?
             .bytes()
@@ -6027,6 +6151,7 @@ impl Reports<'_> {
                 "/api/v1/client/balance/email/report",
             )
             .json(params)
+            .default_field("limit", 20)
             .send()
             .await?;
         Ok(())
@@ -6052,6 +6177,7 @@ impl Reports<'_> {
                 "/api/v1/client/exchange/report",
             )
             .json(params)
+            .default_field("limit", 20)
             .send()
             .await?
             .bytes()
@@ -6075,6 +6201,7 @@ impl Reports<'_> {
                 "/api/v1/client/exchange/email/report",
             )
             .json(params)
+            .default_field("limit", 20)
             .send()
             .await?;
         Ok(())
@@ -6153,7 +6280,7 @@ impl Support<'_> {
             .header("recaptcha", &params.recaptcha)
             .multipart(
                 Multipart::new()
-                    .json("request", &params.request)
+                    .json_text("request", &params.request)
                     .files("files", params.files.into_iter().flatten()),
             )
             .send()
@@ -6275,7 +6402,8 @@ impl TradingDemo<'_> {
     /// Top up the demo account
     ///
     /// Credits virtual funds to the trading account. Meant for the demo environment
-    /// (`trading-demo-service`); a deposit limit applies.
+    /// (`trading-demo-service`); a deposit limit applies. The answer is a `retCode` envelope
+    /// like the order management responses; the web app ignores its `result`.
     ///
     /// `POST /api/v1/demo/balance/deposit`
     ///
@@ -6283,18 +6411,20 @@ impl TradingDemo<'_> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the request fails.
-    pub async fn deposit(&self, params: TradingDemoDepositParams) -> Result<()> {
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub async fn deposit(&self, params: TradingDemoDepositParams) -> Result<Value> {
         self.client
             .request(
                 Service::Trading,
                 Method::POST,
                 "/api/v1/demo/balance/deposit",
             )
+            .envelope(Envelope::Retcode)
             .json(params)
             .send()
-            .await?;
-        Ok(())
+            .await?
+            .json_or_text()
+            .await
     }
 }
 
@@ -6322,6 +6452,7 @@ impl TradingExecutions<'_> {
             .query("startTime", params.start_time)
             .query("endTime", params.end_time)
             .query("limit", params.limit)
+            .default_query("limit", 1000)
             .send()
             .await?
             .json()
@@ -6353,6 +6484,7 @@ impl TradingOrders<'_> {
             .request(Service::OrderManagement, Method::PUT, "/api/v1/orders")
             .envelope(Envelope::Retcode)
             .json(params)
+            .default_field("category", "spot")
             .send()
             .await?
             .json()
@@ -6373,6 +6505,8 @@ impl TradingOrders<'_> {
             .request(Service::OrderManagement, Method::POST, "/api/v1/orders")
             .envelope(Envelope::Retcode)
             .json(params)
+            .default_field("timeInForce", "GTC")
+            .default_field("category", "spot")
             .send()
             .await?
             .json()
@@ -6395,6 +6529,7 @@ impl TradingOrders<'_> {
             .query("id", &params.id)
             .query("symbol", &params.symbol)
             .query("category", &params.category)
+            .default_query("category", "spot")
             .send()
             .await?
             .json()
@@ -6427,6 +6562,9 @@ impl TradingOrders<'_> {
 
     /// List closed orders in a time range
     ///
+    /// The web app only sends `startTime` and `endTime`; the other filters follow the Bybit
+    /// convention and are not verified. The result is a plain list without a cursor.
+    ///
     /// `GET /api/v1/orders/history`
     ///
     /// **Experimental:** the endpoint may change without notice.
@@ -6449,7 +6587,6 @@ impl TradingOrders<'_> {
             .query("startTime", params.start_time)
             .query("endTime", params.end_time)
             .query("limit", params.limit)
-            .query("cursor", &params.cursor)
             .send()
             .await?
             .json()
@@ -6477,6 +6614,10 @@ impl TradingOrders<'_> {
             .query("size", params.size)
             .query("sortBy", &params.sort_by)
             .query("sortDir", &params.sort_dir)
+            .default_query("page", 0)
+            .default_query("size", 30)
+            .default_query("sortBy", "exchangeTime")
+            .default_query("sortDir", "DESC")
             .paginate(PageParam::Query("page"))
     }
 }
@@ -6505,6 +6646,7 @@ impl TradingReports<'_> {
                 "/api/v1/operations/report",
             )
             .json(params)
+            .default_field("format", "PDF")
             .send()
             .await?
             .bytes()
@@ -6574,6 +6716,9 @@ impl<'a> User<'a> {
 
     /// Sign out and revoke the current tokens
     ///
+    /// The client forgets its session (tokens, operation MFA token and the token store) after
+    /// the call, also when the call fails, as the web app does.
+    ///
     /// `POST /api/v1/user/logout`
     ///
     /// # Errors
@@ -6582,6 +6727,7 @@ impl<'a> User<'a> {
     pub async fn logout(&self) -> Result<()> {
         self.client
             .request(Service::Auth, Method::POST, "/api/v1/user/logout")
+            .ends_session()
             .send()
             .await?;
         Ok(())
@@ -6705,7 +6851,8 @@ impl UserEmail<'_> {
 
     /// Confirm the new email address with the emailed code
     ///
-    /// The web app signs the user out after a successful change.
+    /// The web app signs the user out after a successful change; sign in again with the new
+    /// address.
     ///
     /// `POST /api/v1/user/email/change/verify`
     ///
@@ -6752,7 +6899,7 @@ impl UserEmail<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 }
@@ -6814,10 +6961,10 @@ pub struct UserPassword<'a> {
 impl UserPassword<'_> {
     /// Change the password and get new tokens
     ///
-    /// The previous tokens stop working; store the returned pair. Errors: `BAD_CREDENTIALS`
-    /// (wrong old password), `BAD_REQUEST` with `fields\[\].fieldName = newPassword` and
-    /// message `INVALID_PASSWORD` (weak new password), `INVALID_CODE` (2FA code missing or
-    /// wrong).
+    /// The previous tokens stop working; the client stores the returned pair as its session and
+    /// uses `newPassword` for later sign-ins. Errors: `BAD_CREDENTIALS` (wrong old password),
+    /// `BAD_REQUEST` with `fields\[\].fieldName = newPassword` and message `INVALID_PASSWORD`
+    /// (weak new password), `INVALID_CODE` (2FA code missing or wrong).
     ///
     /// `POST /api/v1/user/password/change-and-reauthorize`
     ///
@@ -6834,6 +6981,7 @@ impl UserPassword<'_> {
                 "/api/v1/user/password/change-and-reauthorize",
             )
             .json(params)
+            .replaces_session()
             .send()
             .await?
             .json()
@@ -6970,7 +7118,7 @@ impl UserPhone<'_> {
             .json(params)
             .send()
             .await?
-            .json()
+            .json_or_text()
             .await
     }
 

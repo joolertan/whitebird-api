@@ -85,6 +85,36 @@ def test_operations(files: dict[str, str]) -> None:
     assert "pub fn stream(&self) -> EventStream<Event> {" in resources
     assert "Needs an operation MFA token for `WITHDRAWAL`" in resources
     assert '.mfa_operation("WITHDRAWAL")\n            .form(params)' in resources
+    assert (
+        ".request_path(\n                Service::Shop,\n                Method::POST,\n"
+        '                "/api/v1/orders/{}/withdraw",\n                &[&order_id],\n'
+        "            )\n"
+    ) in resources
+    # Path parameters are encoded by the runtime, never pasted into the path.
+    assert '"/api/v1/orders/{orderId}' not in resources
+    # A page response without page parameters is a single call, not a paginator.
+    assert "pub async fn featured(&self) -> Result<Page<Product>> {" in resources
+
+
+def test_defaults_are_sent(files: dict[str, str]) -> None:
+    resources = files["rust/src/generated/resources.rs"]
+    params = files["rust/src/generated/params.rs"]
+    assert (
+        '.query("labels[]", &params.labels)\n'
+        '            .query("sort", &params.sort)\n'
+        '            .default_query("page", 0)\n'
+        '            .default_query("size", 20)\n'
+        '            .default_query("sort", "name,asc")\n'
+    ) in resources
+    assert '.json(params)\n            .default_field("channel", "web")\n' in resources
+    assert '    /// Defaults to `"name,asc"`.\n    pub sort: Option<String>,' in params
+    assert "    pub labels: Option<Vec<String>>," in params
+
+
+def test_session_hooks(files: dict[str, str]) -> None:
+    resources = files["rust/src/generated/resources.rs"]
+    assert '"/api/v1/session/logout")\n            .ends_session()\n' in resources
+    assert ".json(params)\n            .replaces_session()\n" in resources
 
 
 def test_request_bodies(files: dict[str, str]) -> None:
@@ -93,9 +123,15 @@ def test_request_bodies(files: dict[str, str]) -> None:
         '.request(Service::Shop, Method::POST, "/api/v1/cart/clear")\n'
         "            .json(Map::new())\n"
     ) in resources
-    assert '.file("file", params.file)\n                    .json("crop", &params.crop),' in (
-        resources
-    )
+    # Files keep their name and media type; a text/plain part carries the JSON as text.
+    assert (
+        '.files("file", params.file)\n'
+        '                    .json("crop", &params.crop)\n'
+        '                    .json_text("caption", &params.caption),'
+    ) in resources
+    params = files["rust/src/generated/params.rs"]
+    assert "#[builder(on(File, into))]" in params
+    assert "    pub file: Option<File>," in params
     assert "# Errors" in resources
 
 

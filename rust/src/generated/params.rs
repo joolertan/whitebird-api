@@ -13,10 +13,9 @@ use crate::models::{
     AccountingAccountType, AccountingTransactionType, AssetFilter, AssistCardBindType,
     AuthDeviceFingerprintSource, AuthMediaCapabilities, AuthMfaOperation, AuthWebGlData,
     BalanceAccountType, BalanceCommissionType, BalanceCryptoAsset, BalanceFiatAsset,
-    BalanceOperationStatus, BalanceOperationType, BalanceOrderStatus,
-    BalanceRejectRequestOperationType, CurrentAccountDateFrame, CurrentAccountFiatOpType,
-    DateFrame, ExchangeDateFrame, ExchangeDestination, ExchangeLegType, ExchangeLimitsLeg,
-    ExchangeOrderStatus, ExchangeQuoteLegRequest, FileType, IcoAccountType,
+    BalanceOperationStatus, BalanceOperationType, BalanceOrderStatus, BalanceRejectOperationType,
+    CurrentAccountFiatOpType, DateFrame, ExchangeDateFrame, ExchangeDestination, ExchangeLegType,
+    ExchangeLimitsLeg, ExchangeOrderStatus, ExchangeQuoteLegRequest, FileType, IcoAccountType,
     IcoBuybackApplicationStatus, IcoBuybackOfferStatus, IcoBuybackPaymentStatus, IcoEmissionStatus,
     IcoObligationStatus, IcoOperationAccount, IcoOperationStatus, IcoPaymentInterval,
     IcoReportFormat, IcoYieldPeriod, KycProvider, KycQualificationRequest, KycSumsubLevelType,
@@ -28,16 +27,7 @@ use crate::models::{
     TradingReportFormat, TradingSortDirection, TradingTimeInForce, UserGender,
     VtbCortiMilliServiceType,
 };
-use crate::{Decimal, Timestamp};
-
-/// Parameters of [`AccountingAccounts::get`](crate::resources::AccountingAccounts::get).
-#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
-pub struct AccountingAccountsGetParams {
-    pub r#type: AccountingAccountType,
-    /// Asset codes to include; all assets when null.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub assets: Option<Vec<String>>,
-}
+use crate::{Decimal, File, Timestamp};
 
 /// Parameters of
 /// [`AccountingAccounts::get_enhanced`](crate::resources::AccountingAccounts::get_enhanced).
@@ -49,9 +39,19 @@ pub struct AccountingAccountsGetEnhancedParams {
     pub assets: Option<Vec<String>>,
 }
 
+/// Parameters of [`AccountingAccounts::get`](crate::resources::AccountingAccounts::get).
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+pub struct AccountingAccountsGetParams {
+    pub r#type: AccountingAccountType,
+    /// Asset codes to include; all assets when null.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assets: Option<Vec<String>>,
+}
+
 /// Parameters of
 /// [`AccountingTransactions::list`](crate::resources::AccountingTransactions::list).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct AccountingTransactionsListParams {
     /// Page to start from, 0-based; the following pages are fetched as items are consumed.
@@ -59,12 +59,14 @@ pub struct AccountingTransactionsListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
-    /// Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
+    /// Sort criteria in the format `property,(asc|desc)`.
+    ///
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
-    pub sort: Option<Vec<String>>,
+    pub sort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transaction_types: Option<Vec<AccountingTransactionType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,7 +104,7 @@ pub struct AuthCreateMfaTokenParams {
 #[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
 pub struct AuthMfaStatusParams {
-    /// Account email.
+    /// Account email as the user typed it.
     pub username: String,
 }
 
@@ -265,9 +267,11 @@ pub struct BalanceDepositsCalculateFiatParams {
 #[serde(rename_all = "camelCase")]
 pub struct BalanceOperationsRejectCryptoParams {
     pub transaction_id: String,
-    /// Same as the path segment (`crypto` or `fiat`).
+    /// Same as the path segment.
+    ///
+    /// Defaults to `"crypto"`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub operation_type: Option<BalanceRejectRequestOperationType>,
+    pub operation_type: Option<BalanceRejectOperationType>,
 }
 
 /// Parameters of
@@ -277,13 +281,16 @@ pub struct BalanceOperationsRejectCryptoParams {
 #[serde(rename_all = "camelCase")]
 pub struct BalanceOperationsRejectFiatParams {
     pub transaction_id: String,
-    /// Same as the path segment (`crypto` or `fiat`).
+    /// Same as the path segment.
+    ///
+    /// Defaults to `"fiat"`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub operation_type: Option<BalanceRejectRequestOperationType>,
+    pub operation_type: Option<BalanceRejectOperationType>,
 }
 
 /// Parameters of [`BalanceOperations::list`](crate::resources::BalanceOperations::list).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceOperationsListParams {
     /// Page to start from, 0-based; the following pages are fetched as items are consumed.
@@ -291,17 +298,19 @@ pub struct BalanceOperationsListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
-    /// Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
+    /// Sort criteria in the format `property,(asc|desc)`.
+    ///
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
-    pub sort: Option<Vec<String>>,
-    /// Defaults to `20` on the server.
+    pub sort: Option<String>,
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_types: Option<Vec<BalanceOperationType>>,
+    /// Operation types to list; pass all three for no filter.
+    pub transaction_types: Vec<BalanceOperationType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub statuses: Option<Vec<BalanceOperationStatus>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -422,9 +431,13 @@ pub struct BrokerageBalanceOrdersConfirmCryptoWithdrawalParams {
 #[serde(rename_all = "camelCase")]
 pub struct BrokerageBalanceOrdersCreateFiatDepositParams {
     pub subaccount_id: String,
+    /// The web app sends `CA` (current account).
     pub fiat_provider_type: ProviderType,
+    /// Settlement account to deposit from, the `id` of an account from
+    /// `current_account.system_accounts.list` with `currency=RUB` and `fiatOpType=BROKER`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub internal_token: Option<String>,
+    /// The web app sends `RUB`.
     pub asset_code: String,
     pub amount: Decimal,
 }
@@ -436,9 +449,12 @@ pub struct BrokerageBalanceOrdersCreateFiatDepositParams {
 #[serde(rename_all = "camelCase")]
 pub struct BrokerageBalanceOrdersCreateFiatWithdrawalParams {
     pub subaccount_id: String,
+    /// The web app sends `CA` (current account).
     pub fiat_provider_type: ProviderType,
+    /// Bank account to withdraw to, the `id` of a method from `brokerage.payments.methods`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_token: Option<String>,
+    /// The web app sends `RUB`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset_code: Option<String>,
     pub amount: Decimal,
@@ -455,7 +471,7 @@ pub struct BrokerageBalanceOrdersListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Sort criteria in the format `property,(asc|desc)`.
@@ -500,7 +516,7 @@ pub struct BrokerageOrdersListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Sort criteria in the format `property,(asc|desc)`.
@@ -607,7 +623,7 @@ pub struct BrokerageOtcOrdersListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Sort criteria in the format `property,(asc|desc)`.
@@ -730,7 +746,7 @@ pub struct BrokerageSubaccountsListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     pub size: Option<u32>,
     /// Sort criteria in the format `property,(asc|desc)`.
     pub sort: Option<Vec<String>>,
@@ -741,6 +757,7 @@ pub struct BrokerageSubaccountsListParams {
 #[derive(Debug, Clone, Default, PartialEq, bon::Builder)]
 #[builder(on(String, into))]
 pub struct ClientFeaturesParams {
+    /// Defaults to `"11111111-1111-1111-1111-111111111111"`.
     pub merchant_id: Option<String>,
 }
 
@@ -748,64 +765,40 @@ pub struct ClientFeaturesParams {
 /// [`CurrentAccountInvoices::download`](crate::resources::CurrentAccountInvoices::download).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
-#[serde(rename_all = "camelCase")]
 pub struct CurrentAccountInvoicesDownloadParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub completion_date_frame: Option<CurrentAccountDateFrame>,
+    /// Document type; its code path could send it, but never does for invoices.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
 }
 
 /// Parameters of
 /// [`CurrentAccountInvoices::email`](crate::resources::CurrentAccountInvoices::email).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
-#[serde(rename_all = "camelCase")]
 pub struct CurrentAccountInvoicesEmailParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub completion_date_frame: Option<CurrentAccountDateFrame>,
+    /// Document type; its code path could send it, but never does for invoices.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
 }
 
 /// Parameters of
 /// [`CurrentAccountInvoices::download_deposit`](crate::resources::CurrentAccountInvoices::download_deposit).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
-#[serde(rename_all = "camelCase")]
 pub struct CurrentAccountInvoicesDownloadDepositParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub completion_date_frame: Option<CurrentAccountDateFrame>,
+    /// Document type; its code path could send it, but never does for invoices.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
 }
 
 /// Parameters of
 /// [`CurrentAccountInvoices::email_deposit`](crate::resources::CurrentAccountInvoices::email_deposit).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
-#[serde(rename_all = "camelCase")]
 pub struct CurrentAccountInvoicesEmailDepositParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub completion_date_frame: Option<CurrentAccountDateFrame>,
+    /// Document type; its code path could send it, but never does for invoices.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
 }
 
 /// Parameters of
@@ -831,6 +824,7 @@ pub struct CurrentAccountSystemAccountsListParams {
 #[builder(on(String, into))]
 pub struct ExchangeAssetsListParams {
     pub destination: Option<ExchangeDestination>,
+    /// Defaults to `"11111111-1111-1111-1111-111111111111"`.
     pub merchant_id: Option<String>,
 }
 
@@ -887,11 +881,13 @@ pub struct ExchangeOrdersRejectParams {
 /// Parameters of [`ExchangeOrders::current`](crate::resources::ExchangeOrders::current).
 #[derive(Debug, Clone, Default, PartialEq, bon::Builder)]
 pub struct ExchangeOrdersCurrentParams {
+    /// Defaults to `"EXCHANGE"`.
     pub destination: Option<ExchangeDestination>,
 }
 
 /// Parameters of [`ExchangeOrders::history`](crate::resources::ExchangeOrders::history).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct ExchangeOrdersHistoryParams {
     /// Page to start from, 0-based; the following pages are fetched as items are consumed.
@@ -899,13 +895,15 @@ pub struct ExchangeOrdersHistoryParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
-    /// Sort criteria in the format `property,(asc|desc)`; the web app uses `creationDate,desc`.
+    /// Sort criteria in the format `property,(asc|desc)`.
+    ///
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
-    pub sort: Option<Vec<String>>,
-    /// Defaults to `20` on the server.
+    pub sort: Option<String>,
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -918,6 +916,12 @@ pub struct ExchangeOrdersHistoryParams {
     pub output_operation_types: Option<Vec<ExchangeLegType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub statuses: Option<Vec<ExchangeOrderStatus>>,
+    /// Orders with one of these assets on either leg.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assets: Option<Vec<String>>,
+    /// Orders with one of these leg types on either leg.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_types: Option<Vec<ExchangeLegType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub creation_date_frame: Option<ExchangeDateFrame>,
 }
@@ -949,12 +953,12 @@ pub struct IcoBuybacksListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `10` on the server.
+    /// Defaults to `10`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -988,12 +992,12 @@ pub struct IcoBuybacksListOffersParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `10` on the server.
+    /// Defaults to `10`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1035,7 +1039,7 @@ pub struct IcoEmissionsListParams {
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     /// The web app always sends true.
@@ -1138,12 +1142,12 @@ pub struct IcoEmissionsListMineParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `10` on the server.
+    /// Defaults to `10`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     /// Emission names.
@@ -1190,12 +1194,12 @@ pub struct IcoEmissionsSalesAnalyticsParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `10` on the server.
+    /// Defaults to `10`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"sellDate,desc"` on the server.
+    /// Defaults to `"sellDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1238,7 +1242,7 @@ pub struct IcoEmissionsListInvestedParams {
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     pub sort: Option<String>,
 }
 
@@ -1246,7 +1250,7 @@ pub struct IcoEmissionsListInvestedParams {
 /// [`IcoEmissions::stable_coin_availability`](crate::resources::IcoEmissions::stable_coin_availability).
 #[derive(Debug, Clone, PartialEq, bon::Builder)]
 pub struct IcoEmissionsStableCoinAvailabilityParams {
-    /// Assets to check.
+    /// Assets to check; sent as repeated `assets\[\]` parameters like the web app does.
     pub assets: Vec<String>,
 }
 
@@ -1267,17 +1271,17 @@ pub struct IcoIssuersDocumentsListParams {
 pub struct IcoObligationsListParams {
     /// Zero-based page index.
     ///
-    /// Defaults to `0` on the server.
+    /// Defaults to `0`.
     #[serde(skip)]
     pub page: Option<i64>,
     /// Page size.
     ///
-    /// Defaults to `10` on the server.
+    /// Defaults to `10`.
     #[serde(skip)]
     pub size: Option<i64>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1386,12 +1390,12 @@ pub struct IcoOperationsListParams {
     pub page: Option<u32>,
     /// Page size.
     ///
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip)]
     pub size: Option<u32>,
     /// Spring Data sort expression, `property,asc|desc`.
     ///
-    /// Defaults to `"creationDate,desc"` on the server.
+    /// Defaults to `"creationDate,desc"`.
     #[serde(skip)]
     pub sort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1439,9 +1443,8 @@ pub struct IcoOperationsStatementParams {
 #[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct IcoOperationsTransferParams {
-    /// Client ID of the user.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_id: Option<String>,
+    /// The client's `identity` from `client.get`.
+    pub client_id: String,
     pub currency_from: String,
     /// `ICO_BALANCE`.
     pub account_type_from: IcoAccountType,
@@ -1531,7 +1534,9 @@ pub struct KycAgreeOfferParams {
 /// Parameters of [`Kyc::get`](crate::resources::Kyc::get).
 #[derive(Debug, Clone, Default, PartialEq, bon::Builder)]
 pub struct KycGetParams {
-    /// Verification provider; the web app defaults to `SUMSUB`.
+    /// Verification provider.
+    ///
+    /// Defaults to `"SUMSUB"`.
     pub provider: Option<KycProvider>,
 }
 
@@ -1585,15 +1590,21 @@ pub struct KycLivenessStartParams {
 }
 
 /// Parameters of [`KycMsi::authenticate`](crate::resources::KycMsi::authenticate).
-#[derive(Debug, Clone, Default, PartialEq, bon::Builder)]
+#[derive(Debug, Clone, PartialEq, bon::Builder)]
 #[builder(on(String, into))]
 pub struct KycMsiAuthenticateParams {
-    /// Legal entity identification; the web app always sends `false`.
+    /// Legal entity identification.
+    ///
+    /// Defaults to `false`.
     pub is_ul: Option<bool>,
-    pub redirect_url: Option<String>,
-    pub duplicate_url: Option<String>,
-    pub failure_url: Option<String>,
-    pub doc_expired_url: Option<String>,
+    /// Page MSI returns to after a successful identification.
+    pub redirect_url: String,
+    /// Page MSI returns to when the person is already identified for another account.
+    pub duplicate_url: String,
+    /// Page MSI returns to when the identification failed.
+    pub failure_url: String,
+    /// Page MSI returns to when the identity document has expired.
+    pub doc_expired_url: String,
 }
 
 /// Parameters of
@@ -1613,7 +1624,7 @@ pub struct KycQualificationSubmitParams {
     /// JSON-encoded `KycQualificationRequest`.
     pub request: KycQualificationRequest,
     /// Supporting documents, sent as one part per file.
-    pub files: Vec<Vec<u8>>,
+    pub files: Vec<File>,
 }
 
 /// Parameters of [`KycSdk::link`](crate::resources::KycSdk::link).
@@ -1686,6 +1697,38 @@ pub struct MerchantDownloadReportParams {
 #[serde(rename_all = "camelCase")]
 pub struct MerchantSetShowNameParams {
     pub show_name: String,
+}
+
+/// Parameters of [`MerchantOrders::history`](crate::resources::MerchantOrders::history).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[builder(on(String, into))]
+#[serde(rename_all = "camelCase")]
+pub struct MerchantOrdersHistoryParams {
+    /// Page to start from, 0-based; the following pages are fetched as items are consumed.
+    #[serde(skip)]
+    pub page: Option<u32>,
+    /// Page size.
+    ///
+    /// Defaults to `20`.
+    #[serde(skip)]
+    pub size: Option<u32>,
+    /// Sort criteria in the format `property,(asc|desc)`.
+    ///
+    /// Defaults to `"creationDate,desc"`.
+    #[serde(skip)]
+    pub sort: Option<String>,
+    /// Defaults to `20`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creation_date_frame: Option<ExchangeDateFrame>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<ExchangeOrderStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assets: Option<Vec<String>>,
+    /// Only the orders of this client.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
 }
 
 /// Parameters of
@@ -1811,7 +1854,7 @@ pub struct ProvidersAlfaPaymentParams {
 pub struct ProvidersAssistCardBindFormParams {
     /// Binding owner type; the web app always sends `CLIENT`.
     ///
-    /// Defaults to `"CLIENT"` on the server.
+    /// Defaults to `"CLIENT"`.
     pub r#type: Option<AssistCardBindType>,
     /// Where Assist sends the browser after the binding.
     pub return_url: String,
@@ -1824,7 +1867,7 @@ pub struct ProvidersAssistCardBindFormParams {
 pub struct ProvidersAssistCardBindUrlParams {
     /// Binding owner type; the web app always sends `CLIENT`.
     ///
-    /// Defaults to `"CLIENT"` on the server.
+    /// Defaults to `"CLIENT"`.
     pub r#type: Option<AssistCardBindType>,
     /// Where Assist sends the browser after the binding.
     pub return_url: String,
@@ -1906,7 +1949,7 @@ pub struct ProvidersVtbCortiMilliRateParams {
     /// Recipient's 16-digit Corti Milli card number, digits only. The web app also sends the
     /// card token of an existing quote's output here.
     pub card: String,
-    /// Defaults to `"EXCHANGE"` on the server.
+    /// Defaults to `"EXCHANGE"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_type: Option<VtbCortiMilliServiceType>,
 }
@@ -1918,7 +1961,7 @@ pub struct ReferralTransactionsListParams {
     /// Page to start from, 0-based; the following pages are fetched as items are consumed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<u32>,
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u32>,
 }
@@ -2027,23 +2070,20 @@ pub struct RegistrationCompleteSdkParams {
 
 /// Parameters of
 /// [`Reports::download_balance`](crate::resources::Reports::download_balance).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportsDownloadBalanceParams {
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_date_frame: Option<ReportDateFrame>,
-    /// Document type (`PDF`, `XLSX`).
+    /// Operation types to include; pass all three for no filter.
+    pub transaction_types: Vec<ReportOperationType>,
+    /// Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    /// Document format (`PDF`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_types: Option<Vec<ReportOperationType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub statuses: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2055,23 +2095,20 @@ pub struct ReportsDownloadBalanceParams {
 }
 
 /// Parameters of [`Reports::email_balance`](crate::resources::Reports::email_balance).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
+#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportsEmailBalanceParams {
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_date_frame: Option<ReportDateFrame>,
-    /// Document type (`PDF`, `XLSX`).
+    /// Operation types to include; pass all three for no filter.
+    pub transaction_types: Vec<ReportOperationType>,
+    /// Document type (`PDF`, `XLSX`); the web app does not choose one for this statement.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    /// Document format (`PDF`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_types: Option<Vec<ReportOperationType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub statuses: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2085,38 +2122,24 @@ pub struct ReportsEmailBalanceParams {
 /// Parameters of
 /// [`Reports::download_exchange`](crate::resources::Reports::download_exchange).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
-#[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportsDownloadExchangeParams {
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_date_frame: Option<ReportDateFrame>,
-    /// Document type (`PDF`, `XLSX`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub r#type: Option<String>,
-    /// Document format (`PDF`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
 }
 
 /// Parameters of [`Reports::email_exchange`](crate::resources::Reports::email_exchange).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, bon::Builder)]
-#[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportsEmailExchangeParams {
-    /// Defaults to `20` on the server.
+    /// Defaults to `20`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_date_frame: Option<ReportDateFrame>,
-    /// Document type (`PDF`, `XLSX`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub r#type: Option<String>,
-    /// Document format (`PDF`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
 }
 
 /// Parameters of [`Support::send`](crate::resources::Support::send).
@@ -2128,7 +2151,7 @@ pub struct SupportSendParams {
     /// JSON-encoded `SupportRequest`.
     pub request: SupportRequest,
     /// Attachments, sent as one part per file.
-    pub files: Option<Vec<Vec<u8>>>,
+    pub files: Option<Vec<File>>,
 }
 
 /// Parameters of [`TradingAccount::fee_rate`](crate::resources::TradingAccount::fee_rate).
@@ -2164,7 +2187,9 @@ pub struct TradingExecutionsListParams {
     pub start_time: Option<i64>,
     /// Epoch milliseconds.
     pub end_time: Option<i64>,
-    /// The web app asks for 1000.
+    /// Maximum number of executions.
+    ///
+    /// Defaults to `1000`.
     pub limit: Option<i64>,
 }
 
@@ -2196,7 +2221,7 @@ pub struct TradingOrdersAmendParams {
     pub tp_limit_price: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sl_limit_price: Option<String>,
-    /// Defaults to `"spot"` on the server.
+    /// Defaults to `"spot"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<TradingCategory>,
 }
@@ -2215,7 +2240,10 @@ pub struct TradingOrdersCreateParams {
     /// Limit price; leave out for market orders.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub price: Option<String>,
-    /// The web terminal sends `GTC`, or `PostOnly` for maker-only limit orders.
+    /// `PostOnly` for maker-only limit orders. The web terminal sends `GTC` also for market
+    /// orders.
+    ///
+    /// Defaults to `"GTC"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_in_force: Option<TradingTimeInForce>,
     /// Client order id.
@@ -2239,7 +2267,7 @@ pub struct TradingOrdersCreateParams {
     /// Limit price of the stop-loss order when `slOrderType` is `Limit`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sl_limit_price: Option<String>,
-    /// Defaults to `"spot"` on the server.
+    /// Defaults to `"spot"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<TradingCategory>,
 }
@@ -2252,7 +2280,7 @@ pub struct TradingOrdersCancelParams {
     pub id: String,
     /// Instrument symbol without separator, e.g. `BTCUSDT`.
     pub symbol: String,
-    /// Defaults to `"spot"` on the server.
+    /// Defaults to `"spot"`.
     pub category: Option<TradingCategory>,
 }
 
@@ -2277,7 +2305,6 @@ pub struct TradingOrdersHistoryParams {
     /// Epoch milliseconds.
     pub end_time: Option<i64>,
     pub limit: Option<i64>,
-    pub cursor: Option<String>,
 }
 
 /// Parameters of [`TradingOrders::list`](crate::resources::TradingOrders::list).
@@ -2291,10 +2318,13 @@ pub struct TradingOrdersListParams {
     pub end_time: Option<i64>,
     /// Page to start from, 0-based; the following pages are fetched as items are consumed.
     pub page: Option<u32>,
-    /// Defaults to `30` on the server.
+    /// Defaults to `30`.
     pub size: Option<u32>,
-    /// Sort field; the web terminal uses `exchangeTime`.
+    /// Sort field, e.g. `exchangeTime` (creation time).
+    ///
+    /// Defaults to `"exchangeTime"`.
     pub sort_by: Option<String>,
+    /// Defaults to `"DESC"`.
     pub sort_dir: Option<TradingSortDirection>,
 }
 
@@ -2307,7 +2337,7 @@ pub struct TradingReportsOperationsParams {
     pub start_time: i64,
     /// Epoch milliseconds.
     pub end_time: i64,
-    /// Defaults to `"PDF"` on the server.
+    /// Defaults to `"PDF"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<TradingReportFormat>,
 }
@@ -2409,7 +2439,8 @@ pub struct UserPhoneSetNotificationsParams {
 #[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
 pub struct UserPhoneChangeParams {
-    /// Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`).
+    /// Google reCAPTCHA v3 token (web action `SETTINGS_CHANGE_PHONE`, or
+    /// `SETTINGS_CHANGE_PHONE_MFA` when repeating the call with `mfaSecret`).
     #[serde(skip)]
     pub recaptcha: Option<String>,
     /// ISO 3166-1 alpha-2 country of the number.

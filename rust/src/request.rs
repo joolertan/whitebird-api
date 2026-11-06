@@ -2,7 +2,7 @@ use std::fmt;
 use std::time::Duration;
 
 use bytes::Bytes;
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Method, StatusCode};
 use serde::Serialize;
@@ -12,6 +12,7 @@ use serde_json::value::RawValue;
 
 use crate::client::Client;
 use crate::error::{ApiError, Error, ErrorKind, Result};
+use crate::file::File;
 use crate::generated::Service;
 use crate::pagination::{PageParam, Paginator};
 use crate::sse::EventStream;
@@ -20,8 +21,9 @@ use crate::sse::EventStream;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Envelope {
-    /// `{"retCode": 0, "retMsg": "OK", "result": ...}`: `result` is the payload and a non-zero
-    /// `retCode` is an error even with HTTP 200.
+    /// `{"retCode": 0, "retMsg": "OK", "result": ...}` of the trading services: `result` is
+    /// the payload (the whole body if it has none). A `retCode` (or `code`) other than 0 and
+    /// 200 is an error even with HTTP 200, described by `retMsg` (or `message`).
     Retcode,
 }
 
@@ -78,8 +80,9 @@ impl RequestOptions {
         self
     }
 
-    /// Overrides whether requests may be retried. By default GET, HEAD, PUT, DELETE and OPTIONS
-    /// are retried and POST is not.
+    /// Overrides whether requests are idempotent. By default GET, HEAD and OPTIONS are, and
+    /// are retried after any transient failure; other requests are retried only when the
+    /// connection could not be established or on HTTP 429.
     pub fn idempotent(mut self, idempotent: bool) -> Self {
         self.idempotent = Some(idempotent);
         self
@@ -99,11 +102,12 @@ impl RequestOptions {
 /// # Examples
 ///
 /// ```
-/// use whitebird::Multipart;
+/// use whitebird::{File, Multipart};
 ///
 /// let form = Multipart::new()
 ///     .json("request", serde_json::json!({ "criteria": ["certifiedExpert"] }))
-///     .files("files", [b"%PDF-1.7".to_vec(), b"%PDF-1.4".to_vec()])
+///     .files("files", [File::new(b"%PDF-1.7".to_vec()).with_name("diploma.pdf")])
+///     .file("photo", b"\xFF\xD8\xFF".to_vec())
 ///     .text("comment", "two diplomas");
 /// ```
 #[derive(Debug, Clone, Default)]
@@ -122,7 +126,7 @@ struct Part {
 #[derive(Debug, Clone)]
 enum Content {
     Text(String),
-    File(Vec<u8>),
+    File(File),
 }
 
 impl Multipart {
@@ -161,18 +165,26 @@ impl Multipart {
         self
     }
 
-    /// Adds a file part; `None` is skipped.
-    pub fn file(mut self, name: &str, data: impl Into<Option<Vec<u8>>>) -> Self {
-        if let Some(data) = data.into() {
-            self.push(name, Content::File(data), None);
+    /// Adds the JSON text of `value` as a plain text part, the way a browser sends
+    /// `JSON.stringify(value)`; `None` is skipped.
+    pub fn json_text(mut self, name: &str, value: impl Serialize) -> Self {
+        match serde_json::to_value(value) {
+            Ok(Value::Null) | Err(_) => {}
+            Ok(value) => self.push(name, Content::Text(value.to_string()), None),
         }
         self
     }
 
-    /// Adds one file part per item, all under `name`.
-    pub fn files(mut self, name: &str, files: impl IntoIterator<Item = Vec<u8>>) -> Self {
-        for data in files {
-            self.push(name, Content::File(data), None);
+    /// Adds a file part. See [`File`] for the name and media type it is sent with.
+    pub fn file(mut self, name: &str, file: impl Into<File>) -> Self {
+        self.push(name, Content::File(file.into()), None);
+        self
+    }
+
+    /// Adds one file part per item, all under `name`; an `Option` adds one part or none.
+    pub fn files<F: Into<File>>(mut self, name: &str, files: impl IntoIterator<Item = F>) -> Self {
+        for file in files {
+            self.push(name, Content::File(file.into()), None);
         }
         self
     }
@@ -183,6 +195,10 @@ impl Multipart {
             part.content_type = Some(media_type.to_owned());
         }
         self
+    }
+
+    pub(crate) fn has(&self, name: &str) -> bool {
+        self.parts.iter().any(|part| part.name == name)
     }
 
     fn push(&mut self, name: &str, content: Content, content_type: Option<&str>) {
@@ -205,7 +221,7 @@ impl Multipart {
     fn invalid_media_type(&self) -> Option<&str> {
         self.parts
             .iter()
-            .filter_map(|part| part.content_type.as_deref())
+            .filter_map(Part::media_type)
             .find(|media_type| {
                 reqwest::multipart::Part::text("")
                     .mime_str(media_type)
@@ -226,14 +242,25 @@ impl Part {
     fn to_part(&self) -> reqwest::multipart::Part {
         let part = || match &self.content {
             Content::Text(text) => reqwest::multipart::Part::text(text.clone()),
-            Content::File(data) => {
-                reqwest::multipart::Part::bytes(data.clone()).file_name(self.name.clone())
-            }
+            Content::File(file) => reqwest::multipart::Part::stream_with_length(
+                reqwest::Body::from(file.data.clone()),
+                file.data.len() as u64,
+            )
+            .file_name(file.file_name(&self.name)),
         };
-        self.content_type
-            .as_deref()
-            .and_then(|media_type| part().mime_str(media_type).ok())
-            .unwrap_or_else(part)
+        // Media types are validated when the form is set on the request.
+        match self.media_type() {
+            Some(media_type) => part().mime_str(media_type).unwrap_or_else(|_| part()),
+            None => part(),
+        }
+    }
+
+    fn media_type(&self) -> Option<&str> {
+        match (&self.content_type, &self.content) {
+            (Some(media_type), _) => Some(media_type),
+            (None, Content::File(file)) => Some(file.media_type()),
+            (None, Content::Text(_)) => None,
+        }
     }
 }
 
@@ -288,8 +315,18 @@ pub struct RequestBuilder {
     pub(crate) streaming: bool,
     pub(crate) envelope: Option<Envelope>,
     pub(crate) mfa_operation: Option<String>,
+    pub(crate) session: Option<SessionEffect>,
     pub(crate) options: RequestOptions,
     pub(crate) invalid: Option<String>,
+}
+
+/// What a request does to the client's session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SessionEffect {
+    /// The response carries a new token pair that replaces the session (password change).
+    Replace,
+    /// The session ends after the request, whatever its outcome (logout).
+    End,
 }
 
 impl RequestBuilder {
@@ -307,6 +344,7 @@ impl RequestBuilder {
             streaming: false,
             envelope: None,
             mfa_operation: None,
+            session: None,
             options,
             invalid: None,
         }
@@ -359,6 +397,66 @@ impl RequestBuilder {
         self
     }
 
+    /// Adds a query parameter unless one with this name was added.
+    pub(crate) fn default_query(self, name: &str, value: impl Serialize) -> Self {
+        if self.query.iter().any(|(key, _)| key == name) {
+            self
+        } else {
+            self.query(name, value)
+        }
+    }
+
+    /// Adds a header unless one with this name was added.
+    #[allow(
+        dead_code,
+        reason = "used by generated code when a header parameter has a default"
+    )]
+    pub(crate) fn default_header(self, name: &str, value: impl Serialize) -> Self {
+        if self
+            .headers
+            .iter()
+            .any(|(key, _)| key.eq_ignore_ascii_case(name))
+        {
+            self
+        } else {
+            self.header(name, value)
+        }
+    }
+
+    /// Sets a field of the object body (JSON, form or multipart) unless it is set.
+    pub(crate) fn default_field(mut self, name: &str, value: impl Serialize) -> Self {
+        match &mut self.body {
+            Body::Json(Value::Object(fields)) | Body::Form(Value::Object(fields)) => {
+                if fields.get(name).is_none_or(Value::is_null) {
+                    match serde_json::to_value(value) {
+                        Ok(value) => {
+                            fields.insert(name.to_owned(), value);
+                        }
+                        Err(error) => {
+                            self.invalid =
+                                Some(format!("cannot encode body field {name}: {error}"));
+                        }
+                    }
+                }
+            }
+            Body::Multipart(form) if !form.has(name) => {
+                *form = std::mem::take(form).text(name, value);
+            }
+            _ => {}
+        }
+        self
+    }
+
+    pub(crate) fn ends_session(mut self) -> Self {
+        self.session = Some(SessionEffect::End);
+        self
+    }
+
+    pub(crate) fn replaces_session(mut self) -> Self {
+        self.session = Some(SessionEffect::Replace);
+        self
+    }
+
     /// Sets a multipart body.
     pub fn multipart(mut self, form: Multipart) -> Self {
         if let Some(media_type) = form.invalid_media_type() {
@@ -401,9 +499,29 @@ impl RequestBuilder {
     /// [`Error::Transport`] when the API cannot be reached and [`Error::Config`] for an invalid
     /// request.
     pub async fn send(self) -> Result<Response> {
-        let response = match &self.mfa_operation {
-            Some(operation) => self.client.execute_with_mfa(&self, operation).await?,
-            None => self.client.execute(&self).await?,
+        let generation = self.client.session_generation();
+        let result = match &self.mfa_operation {
+            Some(operation) => self.client.execute_with_mfa(&self, operation).await,
+            None => self.client.execute(&self).await,
+        };
+        let response = match self.session {
+            Some(SessionEffect::End) => {
+                self.client.end_session();
+                result?
+            }
+            Some(SessionEffect::Replace) => {
+                // A password change: later logins use the new password.
+                let new_password = match &self.body {
+                    Body::Json(Value::Object(fields)) | Body::Form(Value::Object(fields)) => {
+                        fields.get("newPassword").and_then(Value::as_str)
+                    }
+                    _ => None,
+                };
+                self.client
+                    .replace_session(result?, generation, new_password)
+                    .await?
+            }
+            None => result?,
         };
         Ok(Response {
             inner: response,
@@ -501,6 +619,41 @@ impl Response {
         }
     }
 
+    /// Like [`json`](Self::json), for payloads without a fixed shape (`T` is `String` or
+    /// `serde_json::Value`): a body that is not JSON of that type is returned as text.
+    #[allow(
+        dead_code,
+        reason = "used by generated code when an operation returns untyped JSON"
+    )]
+    pub(crate) async fn json_or_text<T: DeserializeOwned>(self) -> Result<T> {
+        if self.envelope.is_some() {
+            return self.json().await;
+        }
+        let bytes = self.inner.bytes().await?;
+        let text = || Value::String(String::from_utf8_lossy(&bytes).into_owned());
+        if bytes.trim_ascii().is_empty() {
+            return serde_json::from_value(Value::Null)
+                .or_else(|_| serde_json::from_value(text()))
+                .map_err(|error| Error::decode(error, &bytes));
+        }
+        serde_json::from_slice(&bytes).or_else(|error| {
+            serde_json::from_value(text()).map_err(|_| Error::decode(error, &bytes))
+        })
+    }
+
+    /// Reads the whole body of `response`, returning a response that still has it.
+    pub(crate) async fn buffer(response: reqwest::Response) -> Result<(reqwest::Response, Bytes)> {
+        let status = response.status();
+        let version = response.version();
+        let headers = response.headers().clone();
+        let body = response.bytes().await?;
+        let mut rebuilt = http::Response::new(body.clone());
+        *rebuilt.status_mut() = status;
+        *rebuilt.version_mut() = version;
+        *rebuilt.headers_mut() = headers;
+        Ok((reqwest::Response::from(rebuilt), body))
+    }
+
     /// Returns the raw body.
     ///
     /// # Errors
@@ -527,25 +680,52 @@ impl Response {
 fn unwrap_retcode<T: DeserializeOwned>(status: StatusCode, body: &[u8]) -> Result<T> {
     #[derive(serde::Deserialize)]
     struct Retcode<'a> {
-        #[serde(rename = "retCode")]
-        code: i64,
+        #[serde(rename = "retCode", default)]
+        ret_code: Option<Value>,
+        #[serde(default)]
+        code: Option<Value>,
         #[serde(rename = "retMsg", default)]
-        message: String,
-        #[serde(borrow, default)]
+        ret_msg: Option<Value>,
+        #[serde(default)]
+        message: Option<Value>,
+        #[serde(borrow, default, deserialize_with = "present")]
         result: Option<&'a RawValue>,
     }
 
-    let envelope: Retcode<'_> =
-        serde_json::from_slice(body).map_err(|error| Error::decode(error, body))?;
-    if envelope.code != 0 {
-        return Err(
-            ApiError::new(ErrorKind::Other, status, envelope.message, body)
-                .with_code(envelope.code)
-                .into(),
-        );
+    /// Keeps `"result": null` apart from a missing `result`.
+    fn present<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Option<&'de RawValue>, D::Error> {
+        serde::Deserialize::deserialize(deserializer).map(Some)
     }
-    let result = envelope.result.map_or("null", RawValue::get);
-    serde_json::from_str(result).map_err(|error| Error::decode(error, result.as_bytes()))
+
+    let decode = |payload: &[u8]| {
+        serde_json::from_slice(payload).map_err(|error| Error::decode(error, payload))
+    };
+    // A body that is not an object has no envelope.
+    let envelope = match serde_json::from_slice::<Retcode<'_>>(body) {
+        Ok(envelope) if body.trim_ascii_start().starts_with(b"{") => envelope,
+        _ => return decode(body),
+    };
+    let number = |value: Option<&Value>| match value {
+        Some(Value::Number(number)) => number.as_i64(),
+        Some(Value::String(text)) => text.trim().parse().ok(),
+        _ => None,
+    };
+    let code = number(envelope.ret_code.as_ref()).or_else(|| number(envelope.code.as_ref()));
+    if let Some(code) = code.filter(|code| !matches!(code, 0 | 200)) {
+        let message = [&envelope.ret_msg, &envelope.message]
+            .into_iter()
+            .find_map(|text| text.as_ref()?.as_str().filter(|text| !text.is_empty()))
+            .unwrap_or_default();
+        return Err(ApiError::new(ErrorKind::Other, status, message, body)
+            .with_code(code)
+            .into());
+    }
+    match envelope.result {
+        Some(result) => decode(result.get().as_bytes()),
+        None => decode(body),
+    }
 }
 
 /// Flattens a serialized parameter into the strings sent on the wire.
@@ -558,21 +738,30 @@ fn scalars(value: Value) -> Vec<String> {
     }
 }
 
-/// Percent-encodes a path parameter.
-pub(crate) fn path_segment(value: impl fmt::Display) -> String {
-    const SEGMENT: &AsciiSet = &CONTROLS
-        .add(b' ')
-        .add(b'"')
-        .add(b'#')
-        .add(b'%')
-        .add(b'/')
-        .add(b'<')
-        .add(b'>')
-        .add(b'?')
-        .add(b'`')
-        .add(b'{')
-        .add(b'}');
-    utf8_percent_encode(&value.to_string(), SEGMENT).to_string()
+/// Replaces the `{}` placeholders of `template` with the percent-encoded `params`. Values that
+/// would change the path, such as `..`, are rejected.
+pub(crate) fn fill_path(template: &str, params: &[&dyn fmt::Display]) -> Result<String, String> {
+    const SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'_')
+        .remove(b'~');
+    let mut path = String::with_capacity(template.len());
+    let mut pieces = template.split("{}");
+    path.push_str(pieces.next().unwrap_or_default());
+    let mut params = params.iter();
+    for piece in pieces {
+        let value = params
+            .next()
+            .ok_or_else(|| format!("missing path parameter in {template}"))?
+            .to_string();
+        if matches!(value.as_str(), "" | "." | "..") {
+            return Err(format!("invalid path parameter {value:?} for {template}"));
+        }
+        path.extend(utf8_percent_encode(&value, SEGMENT));
+        path.push_str(piece);
+    }
+    Ok(path)
 }
 
 #[cfg(test)]
@@ -590,8 +779,34 @@ mod tests {
     }
 
     #[test]
-    fn path_segments_are_encoded() {
-        assert_eq!(path_segment("a b/c?d"), "a%20b%2Fc%3Fd");
-        assert_eq!(path_segment(42), "42");
+    fn path_parameters_are_encoded() {
+        let fill = |value: &dyn fmt::Display| fill_path("/a/{}/b", &[value]);
+        assert_eq!(fill(&"x y/c?d").unwrap(), "/a/x%20y%2Fc%3Fd/b");
+        assert_eq!(fill(&r"..\..\x").unwrap(), "/a/..%5C..%5Cx/b");
+        assert_eq!(fill(&"%2e%2e").unwrap(), "/a/%252e%252e/b");
+        assert_eq!(fill(&"v1.2_x-y~z").unwrap(), "/a/v1.2_x-y~z/b");
+        assert_eq!(fill(&42).unwrap(), "/a/42/b");
+        for value in ["", ".", ".."] {
+            assert!(fill(&value).is_err(), "{value:?}");
+        }
+        assert_eq!(fill_path("/{}/{}", &[&"a", &7]).unwrap(), "/a/7");
+    }
+
+    #[test]
+    fn retcode_envelopes() {
+        let ok = |body: &str| unwrap_retcode::<Value>(StatusCode::OK, body.as_bytes());
+        assert_eq!(ok(r#"{"retCode": 0, "result": [1]}"#).unwrap(), json!([1]));
+        assert_eq!(
+            ok(r#"{"retCode": 200, "result": null}"#).unwrap(),
+            Value::Null
+        );
+        assert_eq!(ok(r#"{"id": 5}"#).unwrap(), json!({ "id": 5 }));
+        assert_eq!(ok("[1, 2]").unwrap(), json!([1, 2]));
+        let error = ok(r#"{"code": "19", "message": "Order not found"}"#).unwrap_err();
+        let api = error.api().unwrap();
+        assert_eq!(api.code(), Some(19));
+        assert_eq!(api.message(), "Order not found");
+        let error = ok(r#"{"retCode": 10001, "retMsg": "params error"}"#).unwrap_err();
+        assert_eq!(error.api().unwrap().message(), "params error");
     }
 }

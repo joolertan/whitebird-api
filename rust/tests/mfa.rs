@@ -60,7 +60,7 @@ async fn confirm_operation_stores_the_issued_token() {
     let client = client(&server, None);
 
     let token = client
-        .confirm_operation("WITHDRAWAL", Some("123456"))
+        .confirm_operation("WITHDRAWAL", Some(" 123456\n"))
         .await
         .unwrap();
 
@@ -139,13 +139,13 @@ async fn confirm_operation_needs_a_code() {
 }
 
 #[tokio::test]
-async fn obtains_a_token_before_the_first_sensitive_operation() {
+async fn obtains_a_token_when_the_first_operation_is_refused() {
     let server = MockServer::start().await;
     Mock::given(path(MFA_TOKEN_PATH))
         .and(body_json(
             json!({ "operation": "WITHDRAWAL", "mfaCode": "654321" }),
         ))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaToken": "mfa-1" })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaToken": " mfa-1\n" })))
         .expect(1)
         .mount(&server)
         .await;
@@ -158,11 +158,89 @@ async fn obtains_a_token_before_the_first_sensitive_operation() {
         .expect(2)
         .mount(&server)
         .await;
+    Mock::given(path(WITHDRAWAL_PATH))
+        .respond_with(mfa_denied())
+        .expect(1)
+        .mount(&server)
+        .await;
     let client = client(&server, Some("654321"));
 
     let withdrawals = client.balance().withdrawals();
     withdrawals.create_crypto(withdrawal()).await.unwrap();
     withdrawals.create_crypto(withdrawal()).await.unwrap();
+
+    // Like the web app, the operation goes first and the code is asked only when refused.
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests[0].url.path(), WITHDRAWAL_PATH);
+}
+
+#[tokio::test]
+async fn concurrent_refusals_share_one_confirmation() {
+    let server = MockServer::start().await;
+    Mock::given(path(MFA_TOKEN_PATH))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "mfaToken": "mfa-1" }))
+                .set_delay(std::time::Duration::from_millis(100)),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path(WITHDRAWAL_PATH))
+        .and(header("x-mfa-token", "mfa-1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": 1 })))
+        .expect(5)
+        .mount(&server)
+        .await;
+    Mock::given(path(WITHDRAWAL_PATH))
+        .respond_with(mfa_denied())
+        .mount(&server)
+        .await;
+    let client = client(&server, Some("654321"));
+
+    let calls = (0..5).map(|_| {
+        let client = client.clone();
+        tokio::spawn(async move {
+            client
+                .balance()
+                .withdrawals()
+                .create_crypto(withdrawal())
+                .await
+        })
+    });
+    for result in futures::future::join_all(calls).await {
+        result.unwrap().unwrap();
+    }
+}
+
+#[tokio::test]
+async fn detects_the_refusal_in_the_status_too() {
+    let server = MockServer::start().await;
+    issue_token(
+        &server,
+        ResponseTemplate::new(200).set_body_json(json!({ "mfaToken": "mfa-1" })),
+    )
+    .await;
+    Mock::given(path(WITHDRAWAL_PATH))
+        .and(header("x-mfa-token", "mfa-1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": 1 })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path(WITHDRAWAL_PATH))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+            "status": "Operation denied, requires mfa checking",
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    client(&server, Some("654321"))
+        .balance()
+        .withdrawals()
+        .create_crypto(withdrawal())
+        .await
+        .unwrap();
 }
 
 async fn withdraw_with_stale_token(

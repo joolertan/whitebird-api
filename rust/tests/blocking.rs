@@ -2,11 +2,13 @@
 
 mod common;
 
+use std::time::Duration;
+
 use common::*;
 use serde_json::{Value, json};
 use whitebird::params::BrokerageSubaccountsListParams;
 use whitebird::{CodeProvider, ErrorKind, Method, Service};
-use wiremock::matchers::{body_string_contains, header, path, query_param};
+use wiremock::matchers::{header, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// The blocking client runs its own runtime, so the mock server lives on another one.
@@ -22,6 +24,7 @@ impl Server {
             .build()
             .unwrap();
         let mock = runtime.block_on(MockServer::start());
+        runtime.block_on(mfa_check(true).mount(&mock));
         Self { mock, runtime }
     }
 
@@ -132,9 +135,9 @@ fn confirms_operations() {
 #[test]
 fn calls_a_blocking_code_provider() {
     let server = Server::start();
+    server.mount(code_requested());
     server.mount(
-        password_grant()
-            .and(body_string_contains("code=112233"))
+        code_grant("112233")
             .respond_with(grant(&jwt("me", 3600), "refresh-1"))
             .expect(1),
     );
@@ -145,4 +148,81 @@ fn calls_a_blocking_code_provider() {
         .unwrap();
 
     client.login().unwrap();
+}
+
+/// Serves `{}` to every request and closes connections idle for 300 ms, like a server with a
+/// short keep-alive timeout.
+fn closing_idle_connections() -> String {
+    use std::io::{Read, Write};
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            std::thread::spawn(move || {
+                stream
+                    .set_read_timeout(Some(Duration::from_millis(300)))
+                    .unwrap();
+                let mut buffer = Vec::new();
+                let mut chunk = [0; 4096];
+                loop {
+                    let Ok(read @ 1..) = stream.read(&mut chunk) else {
+                        let _ = stream.shutdown(std::net::Shutdown::Both);
+                        return;
+                    };
+                    buffer.extend_from_slice(&chunk[..read]);
+                    let text = String::from_utf8_lossy(&buffer).into_owned();
+                    let Some(end) = text.find("\r\n\r\n") else {
+                        continue;
+                    };
+                    let length = text[..end]
+                        .lines()
+                        .find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|value| value.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if buffer.len() >= end + 4 + length {
+                        buffer.drain(..end + 4 + length);
+                        stream
+                            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+                            .unwrap();
+                    }
+                }
+            });
+        }
+    });
+    format!("http://{address}")
+}
+
+#[test]
+fn notices_connections_the_server_closed_between_calls() {
+    let url = closing_idle_connections();
+    let client = whitebird::Client::builder()
+        .base_url(Service::Api, url)
+        .max_retries(0)
+        .build_blocking()
+        .unwrap();
+
+    for attempt in 0..3 {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(600));
+        }
+        client
+            .request(Service::Api, Method::POST, "/orders")
+            .public()
+            .json(json!({ "attempt": attempt }))
+            .send()
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn can_be_dropped_inside_an_async_context() {
+    let client = whitebird::Client::builder().build_blocking().unwrap();
+    let async_client = client.as_async().clone();
+    drop(client);
+    drop(async_client);
 }

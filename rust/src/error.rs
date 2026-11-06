@@ -152,15 +152,13 @@ impl ErrorKind {
             "SMS_VERIFICATION_REQUIRED",
             "LIVENESS_VERIFICATION_REQUIRED",
         ];
-        if error_code == Some("MFA_CHECKING_REQUIRED")
-            || message
-                .to_ascii_lowercase()
-                .contains("requires mfa checking")
+        // The refusal comes in `message` or in `status`, like the web app checks.
+        if [Some(message), error_code]
+            .into_iter()
+            .flatten()
+            .any(|text| text.to_ascii_lowercase().contains(MFA_REFUSAL))
         {
             return Self::MfaRequired;
-        }
-        if error_code.is_some_and(|code| code.to_ascii_uppercase().contains("CAPTCHA")) {
-            return Self::CaptchaRequired;
         }
         if status == StatusCode::BAD_REQUEST
             && error_code.is_some_and(|code| VERIFICATION.contains(&code))
@@ -181,13 +179,42 @@ impl ErrorKind {
             _ => Self::Other,
         }
     }
+
+    /// Refines the kind of an error answered to a sign-in request (password or refresh grant):
+    /// a rejection mentioning a captcha asks for one, and other 400 and 401 answers mean the
+    /// credentials, the refresh token or the code were wrong.
+    fn classify_login(self, status: StatusCode, error_code: Option<&str>, message: &str) -> Self {
+        if error_code.is_some_and(|code| code.to_ascii_uppercase().contains("CAPTCHA")) {
+            return Self::CaptchaRequired;
+        }
+        if message == TOO_MANY_REQUESTS {
+            return Self::RateLimited;
+        }
+        if matches!(status.as_u16(), 400 | 401)
+            && message != USER_BLOCKED
+            && !matches!(self, Self::MfaRequired | Self::VerificationRequired)
+        {
+            return Self::Authentication;
+        }
+        self
+    }
 }
+
+/// Part of the message (or `status`) refusing an operation that needs an MFA token.
+const MFA_REFUSAL: &str = "requires mfa checking";
+/// Message of a sign-in refused because of too many attempts.
+const TOO_MANY_REQUESTS: &str = "Too many requests";
+/// Message of a sign-in to a blocked account.
+const USER_BLOCKED: &str = "Username is blocked";
+/// Longest part of a non-JSON error body used as the message.
+const MAX_TEXT_MESSAGE: usize = 200;
 
 /// Error answered by the API.
 ///
 /// Whitebird services answer `{"code", "status", "subStatus", "message", "fields"}`, the OAuth server
-/// answers `{"error", "error_description"}` and market data answers `{"retCode", "retMsg"}`;
-/// all of them are normalized here.
+/// answers `{"error", "error_description"}` and trading services answer `{"retCode", "retMsg"}`;
+/// all of them are normalized here. A body that is not JSON, such as the HTML page of a proxy,
+/// becomes the message.
 #[derive(Clone)]
 pub struct ApiError(Box<Details>);
 
@@ -214,15 +241,21 @@ impl ApiError {
         };
         let error_code = text("status").or_else(|| text("error")).map(str::to_owned);
         let message = text("message")
+            .or_else(|| text("retMsg"))
             .or_else(|| text("error_description"))
             .or_else(|| text("error"))
-            .or_else(|| status.canonical_reason())
-            .unwrap_or_default()
-            .to_owned();
-        let code = json.get("code").and_then(|code| match code {
-            Value::String(code) => code.parse().ok(),
-            code => code.as_i64(),
-        });
+            .map(str::to_owned)
+            .or_else(|| plain_text(&json, body))
+            .or_else(|| status.canonical_reason().map(str::to_owned))
+            .unwrap_or_default();
+        let code = json
+            .get("code")
+            .filter(|code| !code.is_null())
+            .or_else(|| json.get("retCode"))
+            .and_then(|code| match code {
+                Value::String(code) => code.parse().ok(),
+                code => code.as_i64(),
+            });
         let fields = match json.get("fields") {
             Some(Value::Array(fields)) => fields.clone(),
             Some(Value::Null) | None => Vec::new(),
@@ -239,6 +272,21 @@ impl ApiError {
             body: String::from_utf8_lossy(body).into_owned(),
             retry_after: retry::retry_after(headers),
         }))
+    }
+
+    /// Like [`from_response`](Self::from_response), for answers of the token endpoint.
+    pub(crate) fn from_login_response(
+        status: StatusCode,
+        headers: &HeaderMap,
+        body: &[u8],
+    ) -> Self {
+        let mut error = Self::from_response(status, headers, body);
+        let details = &mut *error.0;
+        details.kind =
+            details
+                .kind
+                .classify_login(status, details.error_code.as_deref(), &details.message);
+        error
     }
 
     pub(crate) fn new(
@@ -265,6 +313,16 @@ impl ApiError {
         self
     }
 
+    pub(crate) fn with_kind(mut self, kind: ErrorKind) -> Self {
+        self.0.kind = kind;
+        self
+    }
+
+    pub(crate) fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.0.message = message.into();
+        self
+    }
+
     /// Category of the error.
     pub fn kind(&self) -> ErrorKind {
         self.0.kind
@@ -275,7 +333,7 @@ impl ApiError {
         self.0.status
     }
 
-    /// Numeric error code: `code` of a service error or `retCode` of an envelope.
+    /// Numeric error code: `code` of a service error or `retCode` of a trading service.
     pub fn code(&self) -> Option<i64> {
         self.0.code
     }
@@ -330,6 +388,22 @@ impl fmt::Display for ApiError {
 
 impl std::error::Error for ApiError {}
 
+/// The trimmed text of a body that is not JSON, shortened to [`MAX_TEXT_MESSAGE`] characters.
+fn plain_text(json: &Value, body: &[u8]) -> Option<String> {
+    if !json.is_null() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(body);
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    Some(match text.char_indices().nth(MAX_TEXT_MESSAGE) {
+        Some((end, _)) => format!("{}…", &text[..end]),
+        None => text.to_owned(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,9 +446,69 @@ mod tests {
 
     #[test]
     fn non_json_body() {
-        let error = parse(502, "<html>Bad Gateway</html>");
-        assert_eq!(error.kind(), ErrorKind::Server);
-        assert_eq!(error.message(), "Bad Gateway");
-        assert_eq!(error.body(), "<html>Bad Gateway</html>");
+        let error = parse(403, "  Access denied by DDoS-Guard\n");
+        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert_eq!(error.message(), "Access denied by DDoS-Guard");
+        assert_eq!(error.body(), "  Access denied by DDoS-Guard\n");
+        let long = parse(502, &"x".repeat(500));
+        assert_eq!(long.message().chars().count(), MAX_TEXT_MESSAGE + 1);
+        assert_eq!(parse(502, "").message(), "Bad Gateway");
+    }
+
+    #[test]
+    fn trading_error() {
+        let error = parse(400, r#"{"retCode": 10001, "retMsg": "params error"}"#);
+        assert_eq!(error.kind(), ErrorKind::BadRequest);
+        assert_eq!(error.code(), Some(10001));
+        assert_eq!(error.message(), "params error");
+    }
+
+    #[test]
+    fn mfa_refusal_in_message_or_status() {
+        for body in [
+            r#"{"message": "Operation denied, requires mfa checking"}"#,
+            r#"{"status": "Operation denied, requires mfa checking"}"#,
+        ] {
+            assert_eq!(parse(403, body).kind(), ErrorKind::MfaRequired, "{body}");
+        }
+        assert_eq!(
+            parse(400, r#"{"status": "MFA_CHECKING_REQUIRED"}"#).kind(),
+            ErrorKind::BadRequest
+        );
+    }
+
+    #[test]
+    fn captcha_codes_matter_only_on_sign_in() {
+        let body = br#"{"status": "INVALID_RECAPTCHA", "message": "Bad captcha"}"#;
+        let headers = HeaderMap::new();
+        let other = ApiError::from_response(StatusCode::FORBIDDEN, &headers, body);
+        let login = ApiError::from_login_response(StatusCode::BAD_REQUEST, &headers, body);
+        assert_eq!(other.kind(), ErrorKind::PermissionDenied);
+        assert_eq!(login.kind(), ErrorKind::CaptchaRequired);
+    }
+
+    #[test]
+    fn sign_in_rejections() {
+        let login = |status: u16, body: &str| {
+            ApiError::from_login_response(
+                StatusCode::from_u16(status).unwrap(),
+                &HeaderMap::new(),
+                body.as_bytes(),
+            )
+            .kind()
+        };
+        assert_eq!(
+            login(400, r#"{"error": "invalid_request"}"#),
+            ErrorKind::Authentication
+        );
+        assert_eq!(
+            login(400, r#"{"message": "Username is blocked"}"#),
+            ErrorKind::BadRequest
+        );
+        assert_eq!(
+            login(400, r#"{"message": "Too many requests"}"#),
+            ErrorKind::RateLimited
+        );
+        assert_eq!(login(503, ""), ErrorKind::Server);
     }
 }

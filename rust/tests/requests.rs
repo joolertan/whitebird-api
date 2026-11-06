@@ -9,7 +9,7 @@ use whitebird::params::{
     BrokerageOtcOrdersCreateParams, BrokerageOtcOrdersListParams, KycQualificationSubmitParams,
 };
 use whitebird::{
-    Client, Decimal, Envelope, Error, ErrorKind, Method, Multipart, RequestOptions, Service,
+    Client, Decimal, Envelope, Error, ErrorKind, File, Method, Multipart, RequestOptions, Service,
 };
 use wiremock::matchers::{body_json, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -171,14 +171,19 @@ async fn classifies_every_error_kind() {
             ErrorKind::VerificationRequired,
         ),
         (
-            400,
-            json!({ "status": "MFA_CHECKING_REQUIRED", "message": "Enter code" }),
+            403,
+            json!({ "message": "Operation denied, requires mfa checking" }),
             ErrorKind::MfaRequired,
         ),
         (
             403,
-            json!({ "message": "Operation denied, requires mfa checking" }),
+            json!({ "status": "Operation denied, requires mfa checking" }),
             ErrorKind::MfaRequired,
+        ),
+        (
+            403,
+            json!({ "status": "INVALID_RECAPTCHA", "message": "Invalid recaptcha" }),
+            ErrorKind::PermissionDenied,
         ),
         (
             401,
@@ -253,19 +258,37 @@ async fn exposes_the_service_error_body() {
 }
 
 #[tokio::test]
-async fn non_json_errors_fall_back_to_the_status() {
+async fn non_json_errors_keep_the_text() {
     let server = MockServer::start().await;
-
     let error = get_public(
         &server,
-        ResponseTemplate::new(502).set_body_string("<html>Bad gateway</html>"),
+        ResponseTemplate::new(403).set_body_string("Access denied by DDoS-Guard\n"),
     )
     .await;
 
     let api = error.api().unwrap();
-    assert_eq!(api.kind(), ErrorKind::Server);
-    assert_eq!(api.message(), "Bad Gateway");
-    assert_eq!(api.body(), "<html>Bad gateway</html>");
+    assert_eq!(api.kind(), ErrorKind::PermissionDenied);
+    assert_eq!(api.message(), "Access denied by DDoS-Guard");
+
+    let server = MockServer::start().await;
+    let empty = get_public(&server, ResponseTemplate::new(502)).await;
+    assert_eq!(empty.api().unwrap().message(), "Bad Gateway");
+}
+
+#[tokio::test]
+async fn reads_trading_error_bodies() {
+    let server = MockServer::start().await;
+
+    let error = get_public(
+        &server,
+        ResponseTemplate::new(400)
+            .set_body_json(json!({ "retCode": 10001, "retMsg": "params error" })),
+    )
+    .await;
+
+    let api = error.api().unwrap();
+    assert_eq!(api.code(), Some(10001));
+    assert_eq!(api.message(), "params error");
 }
 
 #[tokio::test]
@@ -403,7 +426,8 @@ async fn escape_hatch_sends_forms_and_multipart() {
     ));
     assert!(body.contains("name=\"meta\"\r\nContent-Type: application/json\r\n\r\n{\"pages\":2}"));
     assert_eq!(
-        body.matches("name=\"scans\"; filename=\"scans\"").count(),
+        body.matches("name=\"scans\"; filename=\"scans.pdf\"\r\nContent-Type: application/pdf")
+            .count(),
         2
     );
     assert!(body.contains(
@@ -459,7 +483,10 @@ async fn generated_multipart_methods_send_typed_parts() {
                         .certified_expert(true)
                         .build(),
                 )
-                .files(vec![b"%PDF".to_vec(), b"%PDF-2".to_vec()])
+                .files(vec![
+                    File::new(b"%PDF-1.7".to_vec()),
+                    File::new(b"plain".to_vec()).with_name("diploma.pdf"),
+                ])
                 .build(),
         )
         .await
@@ -476,10 +503,12 @@ async fn generated_multipart_methods_send_typed_parts() {
         serde_json::from_str::<Value>(part).unwrap(),
         json!({"requestedInvestorStatus": "QUALIFIED_INVESTOR", "certifiedExpert": true})
     );
-    assert_eq!(
-        body.matches("name=\"files\"; filename=\"files\"").count(),
-        2
-    );
+    assert!(body.contains(
+        "name=\"files\"; filename=\"files.pdf\"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.7"
+    ));
+    assert!(body.contains(
+        "name=\"files\"; filename=\"diploma.pdf\"\r\nContent-Type: application/pdf\r\n\r\nplain"
+    ));
 }
 
 #[tokio::test]
@@ -603,4 +632,250 @@ async fn rejects_invalid_configuration() {
         .build()
         .unwrap_err();
     assert!(matches!(error, Error::Config(_)), "{error:?}");
+}
+
+#[tokio::test]
+async fn retries_other_methods_only_when_the_request_was_not_processed() {
+    let server = MockServer::start().await;
+    Mock::given(path("/limited"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "0"))
+        .mount(&server)
+        .await;
+    Mock::given(path("/failing"))
+        .respond_with(unavailable())
+        .mount(&server)
+        .await;
+    let client = client(&server, 2);
+    let send = |method: Method, path: &'static str| {
+        client
+            .request(Service::Brokerage, method, path)
+            .json(json!({}))
+            .send()
+    };
+
+    send(Method::POST, "/limited").await.unwrap_err();
+    for method in [Method::POST, Method::PUT, Method::DELETE] {
+        send(method, "/failing").await.unwrap_err();
+    }
+
+    assert_eq!(requests_to(&server, "/limited").await.len(), 3);
+    assert_eq!(requests_to(&server, "/failing").await.len(), 3);
+}
+
+#[tokio::test]
+async fn survives_absurd_retry_after_values() {
+    for value in ["1e20", "-1", "Wed, 21 Oct 2015 07:28:00 GMT"] {
+        let server = MockServer::start().await;
+        Mock::given(path(ME_PATH))
+            .respond_with(ResponseTemplate::new(429).insert_header("retry-after", value))
+            .mount(&server)
+            .await;
+
+        let error = client(&server, 1)
+            .brokerage()
+            .subaccounts()
+            .me()
+            .await
+            .unwrap_err();
+
+        assert!(error.is_rate_limited(), "{value}");
+        assert!(error.api().unwrap().retry_after().is_some(), "{value}");
+    }
+}
+
+#[tokio::test]
+async fn rejects_path_parameters_that_change_the_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(&server)
+        .await;
+    let client = signed_in(&server, &jwt("me", 3600));
+
+    for id in ["", ".", ".."] {
+        let error = client.brokerage().subaccounts().get(id).await.unwrap_err();
+        assert!(matches!(error, Error::Config(_)), "{id:?}: {error:?}");
+    }
+    client
+        .brokerage()
+        .subaccounts()
+        .get(r"..\a/b")
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 1);
+    assert!(
+        requests[0].url.path().ends_with("/..%5Ca%2Fb"),
+        "{}",
+        requests[0].url
+    );
+}
+
+#[tokio::test]
+async fn sends_spec_defaults_for_unset_parameters() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v1/client/features"))
+        .and(query_param(
+            "merchantId",
+            "11111111-1111-1111-1111-111111111111",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/api/v1/client/features"))
+        .and(query_param("merchantId", "mine"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = signed_in(&server, &jwt("me", 3600));
+
+    client
+        .client()
+        .features(whitebird::params::ClientFeaturesParams::default())
+        .await
+        .unwrap();
+    client
+        .client()
+        .features(
+            whitebird::params::ClientFeaturesParams::builder()
+                .merchant_id("mine")
+                .build(),
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn sends_spec_defaults_for_unset_body_fields() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/orders"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "retCode": 0,
+            "retMsg": "OK",
+            "result": { "orderId": "1" },
+        })))
+        .mount(&server)
+        .await;
+    let client = builder(&server)
+        .base_url(Service::OrderManagement, server.uri())
+        .token_store(whitebird::MemoryTokenStore::from(whitebird::Tokens::new(
+            jwt("me", 3600),
+            None,
+        )))
+        .build()
+        .unwrap();
+
+    client
+        .trading()
+        .orders()
+        .create(
+            whitebird::params::TradingOrdersCreateParams::builder()
+                .symbol("BTCUSDT")
+                .side(whitebird::models::TradingOrderSide::Buy)
+                .r#type(whitebird::models::TradingOrderType::Market)
+                .qty("0.01")
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(body["timeInForce"], "GTC", "{body}");
+    assert_eq!(body["category"], "spot", "{body}");
+}
+
+#[tokio::test]
+async fn untyped_responses_accept_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/referrer/generate"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("OK"))
+        .mount(&server)
+        .await;
+
+    let answer = signed_in(&server, &jwt("me", 3600))
+        .referral()
+        .join()
+        .await
+        .unwrap();
+
+    assert_eq!(answer, json!("OK"));
+}
+
+#[tokio::test]
+async fn sends_timestamps_like_the_web_app() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "content": [] })))
+        .mount(&server)
+        .await;
+    let client = builder(&server)
+        .base_url(Service::Ico, server.uri())
+        .token_store(whitebird::MemoryTokenStore::from(whitebird::Tokens::new(
+            jwt("me", 3600),
+            None,
+        )))
+        .build()
+        .unwrap();
+
+    client
+        .ico()
+        .buybacks()
+        .list_offers(
+            whitebird::params::IcoBuybacksListOffersParams::builder()
+                .from_date("2024-05-01T12:00:00.123+03:00".parse().unwrap())
+                .build(),
+        )
+        .first_page()
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(body["fromDate"], "2024-05-01T09:00:00+0000");
+}
+
+#[tokio::test]
+async fn envelopes_accept_retcode_200_and_code_fallbacks() {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "retCode": 200, "result": [1] })),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/failed"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "code": 19, "message": "Order does not exist" })),
+        )
+        .mount(&server)
+        .await;
+    let client = builder(&server).build().unwrap();
+    let get = |path: &'static str| {
+        client
+            .request(Service::Exchange, Method::GET, path)
+            .public()
+            .envelope(Envelope::Retcode)
+            .send()
+    };
+
+    let ok: Value = get("/ok").await.unwrap().json().await.unwrap();
+    let failed = get("/failed")
+        .await
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap_err();
+
+    assert_eq!(ok, json!([1]));
+    assert_eq!(failed.api().unwrap().code(), Some(19));
+    assert_eq!(failed.api().unwrap().message(), "Order does not exist");
 }

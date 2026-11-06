@@ -1,11 +1,12 @@
 //! Blocking client, for programs that do not use async Rust.
 //!
 //! [`Client`] wraps the asynchronous [`crate::Client`] and runs each call to completion on an
-//! internal current-thread Tokio runtime. Resources, parameters and models are the same; paginated
-//! endpoints return an [`Iterator`] and event streams an [`Iterator`] too.
+//! internal Tokio runtime, whose single worker thread keeps the connections alive between calls.
+//! Resources, parameters and models are the same; paginated endpoints return an [`Iterator`] and
+//! event streams an [`Iterator`] too.
 //!
-//! The blocking client must not be used from inside an async runtime: blocking calls panic
-//! there. Use the asynchronous client instead.
+//! Blocking calls must not be made from inside an async runtime: they panic there. Use the
+//! asynchronous client, available from [`Client::as_async`], instead.
 //!
 //! ```no_run
 //! use whitebird::params::BrokerageOtcOrdersListParams;
@@ -25,6 +26,7 @@
 
 mod stream;
 
+use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -48,18 +50,53 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Client {
     inner: crate::Client,
-    runtime: Arc<Runtime>,
+    runtime: Arc<BackgroundRuntime>,
+}
+
+/// Runtime of the blocking client. Its worker thread runs the connection tasks between calls,
+/// so that a connection closed by the server is noticed before it is reused, and the async
+/// client keeps working from other runtimes. It is shut down without blocking when the last
+/// handle is dropped, which is then fine inside an async context too.
+pub(crate) struct BackgroundRuntime(Option<Runtime>);
+
+impl BackgroundRuntime {
+    fn new() -> Result<Self> {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .thread_name("whitebird-blocking")
+            .enable_all()
+            .build()
+            .map(|runtime| Self(Some(runtime)))
+            .map_err(|error| Error::Config(format!("cannot start the runtime: {error}")))
+    }
+
+    pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
+        match &self.0 {
+            Some(runtime) => runtime.block_on(future),
+            None => unreachable!("the runtime is only taken when dropped"),
+        }
+    }
+}
+
+impl Drop for BackgroundRuntime {
+    fn drop(&mut self) {
+        if let Some(runtime) = self.0.take() {
+            runtime.shutdown_background();
+        }
+    }
+}
+
+impl fmt::Debug for BackgroundRuntime {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BackgroundRuntime").finish_non_exhaustive()
+    }
 }
 
 impl Client {
     pub(crate) fn new(inner: crate::Client) -> Result<Self> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| Error::Config(format!("cannot start the runtime: {error}")))?;
         Ok(Self {
             inner,
-            runtime: Arc::new(runtime),
+            runtime: Arc::new(BackgroundRuntime::new()?),
         })
     }
 
@@ -231,7 +268,7 @@ impl RequestBuilder {
 #[derive(Debug)]
 pub struct Response {
     inner: crate::Response,
-    runtime: Arc<Runtime>,
+    runtime: Arc<BackgroundRuntime>,
 }
 
 impl Response {

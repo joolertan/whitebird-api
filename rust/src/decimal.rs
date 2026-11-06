@@ -70,8 +70,27 @@ impl FromStr for Decimal {
         let value = value.trim();
         rust_decimal::Decimal::from_str(value)
             .or_else(|_| rust_decimal::Decimal::from_scientific(value))
+            .or_else(|error| tiny(value).ok_or(error))
             .map(Self)
     }
+}
+
+/// Scientific notation beyond the 28 decimal places of the type, such as `1E-30` or
+/// `1.5E-29`, rounded to 28 places instead of failing the whole response.
+fn tiny(value: &str) -> Option<rust_decimal::Decimal> {
+    let (mantissa, exponent) = value.split_once(['e', 'E'])?;
+    let mut remaining: i64 = exponent.parse().ok()?;
+    let mut result = rust_decimal::Decimal::from_str(mantissa).ok()?;
+    if remaining >= 0 {
+        return None;
+    }
+    while remaining < 0 && !result.is_zero() {
+        let step = remaining.max(-28);
+        let divisor = 10_i128.pow(u32::try_from(-step).ok()?);
+        result = result.checked_div(rust_decimal::Decimal::from_i128_with_scale(divisor, 0))?;
+        remaining -= step;
+    }
+    Some(result.normalize())
 }
 
 impl fmt::Display for Decimal {
@@ -128,6 +147,18 @@ mod tests {
     fn serializes_as_string() {
         let value: Decimal = "10.50".parse().unwrap();
         assert_eq!(serde_json::to_string(&value).unwrap(), r#""10.50""#);
+    }
+
+    #[test]
+    fn rounds_values_below_the_precision_to_zero() {
+        for text in ["1e-29", "0E-29", "\"-5.5e-40\"", "1E-1000000000"] {
+            let value: Decimal = serde_json::from_str(text).unwrap();
+            assert_eq!(value, Decimal::ZERO, "{text}");
+        }
+        let value: Decimal = serde_json::from_str("123e-30").unwrap();
+        assert_eq!(value.to_string(), "0.0000000000000000000000000001");
+        assert!(serde_json::from_str::<Decimal>("8e28").is_err());
+        assert!("1e-29x".parse::<Decimal>().is_err());
     }
 
     #[test]

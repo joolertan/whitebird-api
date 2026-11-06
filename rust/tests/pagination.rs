@@ -243,3 +243,28 @@ async fn yields_the_error_and_ends() {
     let error = results[1].as_ref().unwrap_err();
     assert_eq!(error.kind(), Some(ErrorKind::NotFound));
 }
+
+#[tokio::test]
+async fn stops_when_the_server_ignores_the_page_number() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(LIST_PATH))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "content": [subaccount("sub-0")],
+            "number": 0,
+            "last": false,
+        })))
+        .mount(&server)
+        .await;
+
+    let items: Vec<_> = client(&server)
+        .brokerage()
+        .subaccounts()
+        .list(BrokerageSubaccountsListParams::default())
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(names(&items), ["sub-0"]);
+    assert_eq!(pages_requested(&server).await, ["0", "1"]);
+}

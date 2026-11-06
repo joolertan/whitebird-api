@@ -14,11 +14,8 @@ async fn main() -> Result<(), Error> {
 
     let report = client
         .reports()
-        .download_exchange(
-            ReportsDownloadExchangeParams::builder()
-                .format("PDF")
-                .build(),
-        )
+        // Like the web app: the latest 20 operations of any date.
+        .download_exchange(ReportsDownloadExchangeParams::default())
         .await?;
     std::fs::write(&path, &report)?;
     println!("Saved {} bytes to {path}", report.len());

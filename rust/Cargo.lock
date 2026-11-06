@@ -2112,6 +2112,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hmac",
+ "http",
  "percent-encoding",
  "reqwest",
  "rust_decimal",

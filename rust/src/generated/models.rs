@@ -292,14 +292,6 @@ pub struct AuthMfaStatus {
     pub mfa_enabled: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AuthMfaToken {
-    /// Inferred from how the web application uses the response; may be absent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mfa_token: Option<String>,
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, bon::Builder)]
 #[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]
@@ -335,6 +327,14 @@ pub struct BalanceCalculation {
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub withdrawal_amount: Option<Decimal>,
+    /// Amount debited; the web app shows it as the withdrawal amount.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gross_amount: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creation_date: Option<Timestamp>,
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiration_date: Option<Timestamp>,
@@ -650,15 +650,6 @@ pub struct CryptoWithdrawalCalculation {
     pub received_amount: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiration_date: Option<Timestamp>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, bon::Builder)]
-#[builder(on(String, into))]
-pub struct CurrentAccountDateFrame {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -2348,6 +2339,54 @@ pub struct MerchantCurrencyPair {
     pub to_currency: Option<String>,
 }
 
+/// Exchange order of a merchant's client.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MerchantOrder {
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Application number shown to the client.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number: Option<i64>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<ExchangeOrderStatus>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<ExchangeLeg>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<ExchangeLeg>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conditions: Option<ExchangeOrderConditions>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange_rate_value: Option<Decimal>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_form: Option<ExchangePostForm>,
+    /// Why the terms were recalculated, e.g. `WRONG_AMOUNT` (a different amount was received).
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recalculation_reason: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creation_date: Option<Timestamp>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion_date: Option<Timestamp>,
+    /// The client who placed the order.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MerchantPair {
@@ -2647,12 +2686,12 @@ pub struct PaymentCommission {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PaymentCommissionPair {
-    /// Percent, decimal comma.
+    /// Percent as a decimal string, e.g. `1.5`.
     ///
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub buy: Option<String>,
-    /// Percent, decimal comma.
+    /// Percent as a decimal string, e.g. `1.5`.
     ///
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3057,7 +3096,7 @@ pub struct SupportResponse {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TradingExecution {
-    /// Execution id.
+    /// Execution id; the main web app treats it as the id of the order.
     ///
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3560,8 +3599,7 @@ string_enum! {
 }
 
 string_enum! {
-    /// Same as the path segment (`crypto` or `fiat`).
-    pub enum BalanceRejectRequestOperationType {
+    pub enum BalanceRejectOperationType {
         Crypto = "crypto",
         Fiat = "fiat",
         _ => Unknown,
@@ -3637,7 +3675,10 @@ string_enum! {
     pub enum ExchangeAssetCategory {
         Crypto = "CRYPTO",
         Stablecoin = "STABLECOIN",
+        Gold = "GOLD",
+        Etf = "ETF",
         Stock = "STOCK",
+        Earn = "EARN",
         Fiat = "FIAT",
         _ => Unknown,
     }

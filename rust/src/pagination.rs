@@ -61,7 +61,8 @@ pub enum PageParam {
 /// Lazy stream over the items of a paginated endpoint.
 ///
 /// Pages are requested one at a time as the stream is polled and the stream ends after the last
-/// page, so dropping it early saves the remaining requests. Use [`pages`](Self::pages) to see
+/// page, so dropping it early saves the remaining requests. It also ends after an error, and when
+/// the server answers with another page than the one requested. Use [`pages`](Self::pages) to see
 /// page metadata while iterating or [`page`](Self::page) to fetch a single page.
 ///
 /// # Examples
@@ -160,8 +161,12 @@ impl<T: DeserializeOwned + Send + 'static> Pages<T> {
             async move {
                 let number = next?;
                 Some(match fetch(request, param, number).await {
+                    // A server that ignores the page parameter would repeat a page forever.
+                    Ok(page) if page.number.is_some_and(|returned| returned != number) => {
+                        return None;
+                    }
                     Ok(page) => {
-                        let next = (!page.is_last()).then_some(number + 1);
+                        let next = (!page.is_last()).then(|| number.checked_add(1)).flatten();
                         (Ok(page), next)
                     }
                     Err(error) => (Err(error), None),

@@ -30,7 +30,7 @@ impl Client {
 {% endfor %}
     pub {{ "async " if method.is_async }}fn {{ method.name }}(&self{{ method.args }}) -> {{ method.returns }} {
         self.client
-            .request({{ method.request }})
+            .{{ method.request }}
 {% for call in method.chain + method.tail %}
             {{ call }}
 {% endfor %}

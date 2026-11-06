@@ -14,7 +14,7 @@ async fn main() -> Result<(), Error> {
 
     let params = ExchangeOrdersHistoryParams::builder()
         .size(20)
-        .sort(vec!["creationDate,desc".into()])
+        .sort("creationDate,desc")
         .build();
     // Pages are fetched as the stream is consumed, so `take` stops the requests too.
     let mut orders = client.exchange().orders().history(params).take(limit);

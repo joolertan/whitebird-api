@@ -74,6 +74,45 @@ pub fn mfa_check(enabled: bool) -> Mock {
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaEnabled": enabled })))
 }
 
+/// Whether a token request carries a one-time code.
+pub fn has_code(request: &Request) -> bool {
+    form(request).iter().any(|(name, _)| name == "code")
+}
+
+/// The password grant without a code of an account with two-factor authentication, answered
+/// like the server does: with a request for the code.
+pub fn code_requested() -> Mock {
+    password_grant()
+        .and(|request: &Request| !has_code(request))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaEnabled": true })))
+}
+
+/// The password grant carrying `code`.
+pub fn code_grant(code: &str) -> MockBuilder {
+    password_grant().and(body_string_contains(format!("code={code}")))
+}
+
+/// Mounts the sign-in of an account with two-factor authentication that accepts `code`.
+pub async fn two_factor_login(server: &MockServer, code: &str, access_token: &str) {
+    mfa_check(true).mount(server).await;
+    code_requested().mount(server).await;
+    code_grant(code)
+        .respond_with(grant(access_token, "refresh-1"))
+        .mount(server)
+        .await;
+}
+
+/// Requests sent to `target`.
+pub async fn requests_to(server: &MockServer, target: &str) -> Vec<Request> {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|request| request.url.path() == target)
+        .collect()
+}
+
 pub fn subaccount(name: &str) -> Value {
     json!({ "uuid": format!("id-{name}"), "displayName": name, "status": "ACTIVE" })
 }
