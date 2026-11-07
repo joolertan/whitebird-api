@@ -41,7 +41,9 @@
 
 The client signs in on the first call that needs an account, using the email and password. For
 accounts with two-factor authentication, give it the authenticator secret (or a function
-returning the current code). The examples read credentials from the environment.
+returning the current code). Accounts without it have to pass a slider captcha when signing in,
+through a solver you provide: see [Authentication](guides/authentication.md#captcha). The
+examples read credentials from the environment.
 
 === "Python"
 
@@ -182,6 +184,110 @@ See [Pagination](guides/pagination.md).
     while let Some(order) = orders.try_next().await? {
         println!("{:?} {:?}", order.number, order.status);
     }
+    ```
+
+## Send files
+
+Uploads (support attachments, qualification documents) take raw bytes or a file with its name and
+media type. Without a type the client guesses it from the name, then from the content.
+
+=== "Python"
+
+    ```python
+    from pathlib import Path
+
+    from whitebird.models import SupportRequest
+
+    client.support.send(
+        request=SupportRequest(name="Ann", email="ann@example.com", topic="Documents", message="..."),
+        files=[("passport.jpg", Path("passport.jpg").read_bytes(), "image/jpeg")],
+    )
+    ```
+
+    A file is `bytes`, a binary file object, `(filename, content)` or
+    `(filename, content, media_type)`.
+
+=== "Node.js"
+
+    ```ts
+    import { openAsBlob } from 'node:fs';
+
+    const passport = new File([await openAsBlob('passport.jpg')], 'passport.jpg', { type: 'image/jpeg' });
+    await client.support.send({
+      request: { name: 'Ann', email: 'ann@example.com', topic: 'Documents', message: '...' },
+      files: [passport],
+    });
+    ```
+
+    A file is a `Blob` or `File` (its name is kept), or a `Uint8Array`/`Buffer`.
+
+=== "Go"
+
+    ```go
+    f, err := os.Open("passport.jpg")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer f.Close()
+    _, err = client.Support.Send(ctx, whitebird.SupportSendParams{
+        Request: whitebird.SupportRequest{Name: "Ann", Email: "ann@example.com", Topic: "Documents", Message: "..."},
+        Files:   []io.Reader{whitebird.File{Name: "passport.jpg", ContentType: "image/jpeg", Body: f}},
+    })
+    ```
+
+    Any `io.Reader` works; an `*os.File` keeps its name.
+
+=== "Rust"
+
+    ```rust
+    use whitebird::File;
+    use whitebird::models::SupportRequest;
+    use whitebird::params::SupportSendParams;
+
+    let request = SupportRequest::builder()
+        .name("Ann")
+        .email("ann@example.com")
+        .topic("Documents")
+        .message("...")
+        .build();
+    let params = SupportSendParams::builder()
+        .request(request)
+        .files(vec![File::read("passport.jpg")?])
+        .build();
+    client.support().send(params).await?;
+    ```
+
+    `File::new(bytes).with_name(..).with_content_type(..)` builds one from memory; a `Vec<u8>`
+    works too.
+
+## Language of messages
+
+The web application tells Whitebird the user's interface language in the `Accept-Language`
+header. To do the same, set it once on the client; it is sent with every request and the
+notification stream:
+
+=== "Python"
+
+    ```python
+    client = Whitebird(username, password, language="en")
+    ```
+
+=== "Node.js"
+
+    ```ts
+    const client = new Whitebird({ username, password, language: 'en' });
+    ```
+
+=== "Go"
+
+    ```go
+    client, err := whitebird.NewClient(whitebird.WithCredentials(username, password), whitebird.WithLanguage("en"))
+    ```
+
+=== "Rust"
+
+    ```rust
+    let client = Client::builder().credentials(username, password).language("en").build()?;
     ```
 
 ## Close the client

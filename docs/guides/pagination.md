@@ -3,7 +3,9 @@
 Listings such as order history, balance operations or notifications are paginated on the server
 (Spring Data pages: `content`, `totalElements`, `totalPages`, ...). Their methods return an object
 that is iterable over **items** in the language's own way. Pages are fetched lazily: the next one
-is requested only when the loop reaches it, so breaking out of the loop stops fetching.
+is requested only when the loop reaches it, so breaking out of the loop stops fetching. The loop
+ends after the last page, and also if the server answers a request with a different page than the
+one asked for. A page that failed to load is requested again when you iterate again.
 
 `page` (zero-based) chooses where to start and `size` how many items each request returns.
 

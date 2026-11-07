@@ -132,15 +132,16 @@ while let Some(order) = orders.try_next().await? {
 
 Every SDK also takes care of:
 
-- **Sign-in:** password with a TOTP code, the slider captcha through your own solver, token
-  refresh before expiry and pluggable session storage.
-- **Withdrawals:** the operation MFA token is obtained automatically when a TOTP secret is set.
+- **Sign-in:** the web application's flow: password, a 2FA code from your callback or a TOTP
+  secret, the slider captcha through your own solver; token refresh before expiry and pluggable
+  session storage.
+- **Withdrawals:** the operation MFA token is obtained automatically when a code provider is set.
 - **Models:** typed responses and decimal amounts without floating point; unknown fields and enum
   values do not break parsing.
 - **Pagination:** listings are iterated with the language's own loop: `for`, `for await`,
   `range`, `Stream`.
-- **Errors and retries:** typed errors with the API's code and invalid fields, retries with
-  backoff for idempotent requests.
+- **Errors and retries:** typed errors with the API's code and invalid fields; reads are retried
+  with backoff, orders and payments only when they never reached the server.
 - **Raw requests:** `client.request(...)` reaches endpoints that have no method yet, with the same
   authentication and retries.
 

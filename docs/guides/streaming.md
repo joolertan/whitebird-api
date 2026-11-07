@@ -7,8 +7,10 @@ native stream type. Each event's data is a `NotificationStreamMessage` with a `t
 a value this version does not know yet), a timestamp and a `payload`.
 
 The stream is reopened automatically when the connection drops, with `Last-Event-ID` so that the
-server can resume where it stopped. It ends when you stop iterating, or with an error the client
-cannot recover from (for example when the session is revoked).
+server can resume after the last event you received. It ends when you stop iterating or cancel it
+(quietly, without an error), when the server answers 204 (no more events), or with an error the
+client cannot recover from (for example when the session is revoked). An event whose data cannot
+be decoded is skipped rather than ending the stream.
 
 === "Python"
 
@@ -53,15 +55,18 @@ cannot recover from (for example when the session is revoked).
 
 === "Rust"
 
-    Events keep the raw data; `json()` decodes it into the message type.
+    Events keep the raw data; `json()` decodes it into the message type. Dropping the stream
+    closes it.
 
     ```rust
     use futures::TryStreamExt;
 
     let mut events = client.notifications().stream();
     while let Some(event) = events.try_next().await? {
-        let message = event.json()?;
-        println!("{:?} {:?}", message.r#type, message.payload);
+        match event.json() {
+            Ok(message) => println!("{:?} {:?}", message.r#type, message.payload),
+            Err(error) => eprintln!("skipped an event: {error}"),
+        }
     }
     ```
 

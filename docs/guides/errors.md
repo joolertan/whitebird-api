@@ -7,12 +7,25 @@ Every failure is one of two kinds:
 
 Whitebird services describe errors as
 `{"code": 400, "status": "INVALID_SMS_CODE", "subStatus": "...", "message": "...", "fields": [...]}`.
-API errors carry these values: the HTTP status, `code`, `error_code` (the `status` string, the
-most useful one to branch on), `sub_status`, `message`, the per-field validation `fields` and the
-raw body. The OAuth endpoint's `{"error", "error_description"}` and market data's non-zero
-`retCode` are mapped onto the same fields.
+The OAuth endpoint's `{"error", "error_description"}` and the `{"retCode", "retMsg"}` of market
+data and trading are mapped onto the same values. When the body is not JSON, its text becomes the
+message.
+
+| Value | Python | Node.js | Go | Rust |
+|---|---|---|---|---|
+| HTTP status | `status_code` | `status` | `StatusCode` | `status()` |
+| numeric `code` or `retCode` | `code` | `code` | `Code` | `code()` |
+| `status` string, the one to branch on | `error_code` | `errorCode` | `ErrorCode` | `error_code()` |
+| `subStatus` | `sub_status` | `subStatus` | `SubStatus` | `sub_status()` |
+| message | `message` | `message` | `Message` | `message()` |
+| per-field validation errors | `fields` | `fields` | `Fields` | `fields()` |
+| raw body | `body` | `body` | `Body` | `body()` |
 
 ## Classes
+
+The class names below are the Python and Node.js ones. Go has a sentinel for each class
+(`ErrBadRequest`, `ErrVerificationRequired`, `ErrAuthentication`, ...), Rust an `ErrorKind`
+variant (`BadRequest`, `VerificationRequired`, `Authentication`, ...).
 
 ```
 WhitebirdError
@@ -20,13 +33,13 @@ WhitebirdError
 └── APIError
     ├── BadRequestError            400
     │   └── VerificationRequiredError   SMS or liveness check pending
-    ├── AuthenticationError        401, rejected credentials or code
-    │   ├── MFARequiredError       a 2FA code or an operation MFA token is needed
+    ├── AuthenticationError        401, rejected credentials or code, unknown username
+    │   ├── MFARequiredError       a 2FA code or an operation confirmation is missing
     │   └── CaptchaRequiredError   sign-in needs a captcha and no solver is configured
     ├── PermissionDeniedError      403
     ├── NotFoundError              404
     ├── ConflictError              409
-    ├── RateLimitError             429, with retry_after
+    ├── RateLimitError             429, with the server's Retry-After
     └── ServerError                5xx
 ```
 
@@ -102,11 +115,19 @@ WhitebirdError
 
 ## Retries and timeouts
 
-Idempotent requests (`GET`, `HEAD`, `PUT`, `DELETE`) are retried on connection errors and on
-HTTP 429, 502, 503 and 504, with exponential backoff and jitter, honouring `Retry-After`. `POST`
-requests, which create orders and move money, are never retried automatically. The defaults are
-2 retries and a 30 second timeout per request; both can be changed on the client and for a single
-request:
+The web application never repeats a request, so the SDKs repeat only those that are safe to
+repeat:
+
+- requests that only read (`GET`, `HEAD`, `OPTIONS`) are retried on network errors, timeouts and
+  HTTP 429, 502, 503 and 504;
+- all other requests, which place orders, cancel them and move money, are retried only when they
+  certainly did not reach Whitebird: the connection could not be established, or the server
+  answered 429 (too many requests). A timeout or a server error after the request was sent is
+  raised, because the operation may have gone through.
+
+Retries wait with exponential backoff and jitter, or as long as `Retry-After` asks. The defaults
+are 2 retries and a 30 second timeout per request; both can be changed on the client and for a
+single request:
 
 === "Python"
 
@@ -137,5 +158,6 @@ request:
     let order = quick.exchange().orders().get(&order_id).await?;
     ```
 
-Rate limiting answers `RateLimitError`, whose `retry_after` tells how long to wait when the server
+Rate limiting answers `RateLimitError` once the retries are used up; its retry-after value
+(`retry_after`, `retryAfter`, `RetryAfter`, `retry_after()`) tells how long to wait when the server
 said so.

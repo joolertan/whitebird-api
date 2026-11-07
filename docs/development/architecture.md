@@ -48,11 +48,13 @@ Operation level:
 | `x-wb-first-seen` | no | Date the endpoint first appeared in a scan |
 | `x-wb-response` | no | `json` (default), `binary`, `text`, `empty`, `sse` |
 | `x-wb-envelope` | no | Response wrapper to unwrap; also allowed at document level (see below) |
+| `x-wb-session` | no | What the call does to the client's session: `end` (logout: forget it after the call, whatever the outcome) or `replace` (password change: store the token pair from the response) |
 
 Most services answer with the payload directly. Market data answers with a Bybit-style envelope
 `{"retCode": 0, "retMsg": "OK", "result": ...}`; such operations are marked
 `x-wb-envelope: retcode`, the response schema describes `result` only, and the client unwraps it,
-raising `APIError` (with `code = retCode`, `message = retMsg`) when `retCode` is not 0.
+raising `APIError` (with `code = retCode`, `message = retMsg`) when `retCode` is present and
+neither 0 nor 200, as the web application does.
 
 Numbers without a `format` are treated as decimals: Springdoc renders Java `BigDecimal` that
 way, and on an exchange they are amounts, prices and rates. `format: double` or `float` marks a
@@ -62,10 +64,15 @@ Schema properties may carry `x-wb-inferred: true` when the field was inferred fr
 application uses the response rather than observed on the wire. Inferred fields are never
 `required`.
 
-Pagination is detected from the response schema: an object with `content` (array) and
-`totalElements` is a Spring Data page. Paginated operations take `page`/`size` (query or body)
-and are exposed as auto-paginating iterables (see below). Page wrapper schemas are not generated
-as models; every SDK has one generic `Page` type.
+Pagination is detected from the response schema and the parameters: an operation whose response
+is a Spring Data page (an object with `content` (array) and `totalElements`) and that takes a
+`page` parameter (query or body) is exposed as an auto-paginating iterable (see below). A page
+response without a `page` parameter is a single page. Page wrapper schemas are not generated as
+models; every SDK has one generic `Page` type.
+
+A scalar `default` of a parameter or body field is what the web application always sends; the
+SDKs send it too when the caller leaves the value unset. Query parameter names may end in `[]`
+(`assets[]`, the axios array style): the name is sent as is and the argument drops the brackets.
 
 ## Generated vs handwritten code
 
@@ -111,8 +118,11 @@ Request bodies:
   missing `@RequestBody`. Operations without a request body send none;
 - a multipart field with a `content_type` (from `encoding.<field>.contentType`) is sent as a part
   of that media type, JSON-encoded for `application/json`; other objects are JSON-encoded parts
-  too, scalars are text parts, binaries are file parts. An array of binaries is sent as one part
-  per file under the same name.
+  too, scalars are text parts, binaries are file parts. A `text/plain` object part carries the
+  JSON text of the value as a plain text part. Files may carry a file name and a content type. An
+  array of binaries is sent as one part per file under the same name.
+- a response typed as free-form JSON or a string tolerates a body that is not JSON: its text is
+  returned.
 
 ### Pagination
 
@@ -142,54 +152,79 @@ while let Some(order) = orders.try_next().await? { ... }
 ```
 
 Single pages with metadata (`total_elements`, `total_pages`, ...) stay available in every
-language.
+language. Iteration stops after the last page, on an empty page, and when the server answers with
+a page number other than the one requested (a server that ignores `page` would otherwise loop
+forever). A page that failed to load is fetched again on the next attempt.
 
 ### Authentication
 
-- OAuth2 password grant at `auth` `/oauth/token`, form-encoded, `Authorization: Basic <oauth.basic>`.
-  Fields: `grant_type=password`, `username` (lowercased), `password`, optional `code` (TOTP).
-- `POST <oauth.mfa_status_path> {"username": ...}` on `auth` returns `{"mfaEnabled": bool}`; the
-  web app uses it to decide whether to ask for a code or for a captcha.
-- A 200 response without `access_token` but with `mfaEnabled: true` means a code is required.
-- Refresh: same endpoint, `grant_type=refresh_token`, `refresh_token=...`. The client refreshes
-  proactively when the JWT `exp` is less than 30 s away and reactively once on a 401. If refresh
-  fails and a password is known, it logs in again.
-- Login is lazy (first authenticated call) and can be triggered explicitly.
-- Tokens are kept in a pluggable token store (in-memory by default) so sessions survive restarts.
+The client signs in the way the web application's sign-in form does (bundle `app-pages`,
+`core-logic`):
+
+1. Credentials missing: error before any request.
+2. `POST <oauth.mfa_status_path> {"username": ...}` on `auth`, with the username as given. If this
+   fails, no password is sent: 404 or status `NOT_FOUND` raises `AuthenticationError` (unknown
+   username), anything else is raised as it is. A 2xx answer means 2FA is on when `mfaEnabled`
+   is truthy.
+3. 2FA on: password grant without code and captcha. An answer with `access_token` ends the
+   sign-in. A 2xx answer with `mfaEnabled: true` and no token asks the code provider
+   (`MFARequiredError` without one) and sends the grant again with `code`.
+4. 2FA off: the slider captcha is required. Without a solver `CaptchaRequiredError` is raised
+   before any grant. Otherwise the client generates a UUID v4 `requestId`, calls
+   `GET <oauth.captcha_path>?requestId=...` on `auth` (`{backgroundImage, puzzlePiece, positionY}`,
+   images base64 PNG), passes `{request_id, background_image: bytes, puzzle_piece: bytes,
+   position_y}` to the solver and sends the grant with the header
+   `captcha: base64(JSON {"sliderPosition": "<position as a decimal string>", "requestId": str})`.
+   A rejection with status `INVALID_CAPTCHA` is retried with a fresh captcha, 3 attempts in all.
+   An answer asking for a code continues as in step 3.
+5. Grants: OAuth2 password grant at `auth` `/oauth/token`, form-encoded,
+   `Authorization: Basic <oauth.basic>`, fields `grant_type=password`, `username` (lowercased),
+   `password`, optional `code`. A rejected grant raises `AuthenticationError`; captcha errors
+   are recognised only on this endpoint.
+
+An explicit `login(code)` follows the same steps with the code as a one-shot provider. Codes and
+tokens from callbacks are trimmed.
+
+Session:
+
+- Refresh: same endpoint, `grant_type=refresh_token`. The client refreshes proactively when less
+  than 60 s of the access token is left (the JWT `exp` when the server gave no `expires_in`), and
+  reactively once on a 401. A token that cannot be renewed is used until it actually expires.
+- Inside the refresh lock the token store is read again: a valid token saved by another process
+  is adopted instead of refreshing. An expired refresh JWT is not sent.
+- A refresh rejected with 400 or 401 forgets the session (memory, store, operation MFA token) and
+  signs in with the password when it is known, otherwise raises `AuthenticationError`. Other
+  refresh failures are raised and keep the session. A refresh answer without `refresh_token`
+  keeps the previous one.
+- Login is lazy (first authenticated call) and can be triggered explicitly. Concurrent calls
+  share one sign-in or refresh; a sign-in stuck in a callback does not block later calls forever.
+- Tokens are kept in a pluggable token store (`load`, `save`, `clear`; in memory by default).
+  Unreadable stored data counts as no session, and a failing `save` does not fail the call.
+- `x-wb-session: end` (logout) forgets the session after the call whatever its outcome; a sign-in
+  in flight at that moment does not store its tokens afterwards. `x-wb-session: replace`
+  (password change) stores the returned token pair.
 - TOTP codes come from a code provider: a static code, a callback, or the `otp` extra that
   computes codes from the base32 secret.
-- Before a password login without an explicit code the client always posts the username to
-  `<oauth.mfa_status_path>`, as the web application does. With 2FA on it sends the code from the
-  provider (`MFARequiredError` without one) and no captcha; with 2FA off it never asks the
-  provider. If the check fails, a code is sent exactly when a provider is configured.
-- Captcha: the sign-in form makes accounts without 2FA solve a slider captcha. The client
-  generates a UUID v4 `requestId`, calls `GET <oauth.captcha_path>?requestId=...` on `auth`
-  (`{backgroundImage, puzzlePiece, positionY}`, images base64 PNG) and sends the answer with the
-  token request as header `captcha: base64(JSON {"sliderPosition": int, "requestId": str})`.
-  The SDKs never solve captchas themselves: a captcha solver callback (option `captcha`) receives
-  `{request_id, background_image: bytes, puzzle_piece: bytes, position_y}` and returns the slider
-  position. When the account has no 2FA and a solver is configured, the captcha is solved before
-  the token request; a rejection with status `INVALID_CAPTCHA` is retried with a fresh captcha, up
-  to 3 attempts. When the account has no 2FA and no solver is configured, the client raises
-  `CaptchaRequiredError` before sending the password. If the 2FA check failed, the token request
-  goes out without the header, and a rejection whose `status` or `error` mentions `CAPTCHA`
-  raises `CaptchaRequiredError`.
-- Operation MFA: operations marked `x-wb-auth: mfa` (withdrawals) need an MFA token sent as
-  `x-mfa-token`. `confirm_operation(operation, code=None)` posts
-  `{"operation": operation, "mfaCode": code}` to `operation_mfa.token_path` on
-  `operation_mfa.service` (the code comes from the OTP provider when omitted), takes the token from
-  the body field `mfaToken`, a body that is a bare (JSON or plain) string, or the `x-mfa-token`
-  response header, stores it on the client and returns it. Before an `mfa` operation the client
-  obtains a token this way when none is set and an OTP provider is configured; when the operation
-  is refused with `MFARequiredError` it obtains a new one and retries once. Without an OTP provider
-  the error propagates.
-- Every request sends `Authorization: Bearer <token>` unless the operation is `x-wb-auth: none`.
+
+Operation MFA: some operations (withdrawals) are refused with `message` or `status`
+`Operation denied, requires mfa checking` until the request carries an `x-mfa-token`.
+`confirm_operation(operation, code=None)` posts `{"operation": operation, "mfaCode": code}` to
+`operation_mfa.token_path` on `operation_mfa.service` (the code comes from the provider when
+omitted), takes the token from the body field `mfaToken`, a body that is a bare (JSON or plain)
+string, or the `x-mfa-token` response header, stores it on the client and returns it. The token
+is sent with every request. As in the web application the client asks for a token only after a
+refusal: with a code provider it confirms (concurrent refusals share one confirmation) and retries
+the operation once; without one the `MFARequiredError` propagates.
+
+Every request sends `Authorization: Bearer <token>` unless the operation is `x-wb-auth: none`,
+and `Accept-Language` when the client was given a language.
 
 ### Errors
 
 Whitebird services answer errors as `{"code": int, "status": "MACHINE_CODE", "subStatus": str,
 "message": str, "fields": [...]}`; the OAuth endpoint answers `{"error": ...,
-"error_description": ...}`.
+"error_description": ...}`, trading services `{"retCode": ..., "retMsg": ...}`. A body that is not
+JSON becomes the message.
 
 ```
 WhitebirdError
@@ -197,8 +232,8 @@ WhitebirdError
 └── APIError                       http status, code, error_code (status), sub_status, message, fields, raw body
     ├── BadRequestError            400
     │   └── VerificationRequiredError   status SMS_VERIFICATION_REQUIRED / LIVENESS_VERIFICATION_REQUIRED
-    ├── AuthenticationError        401, invalid_grant
-    │   ├── MFARequiredError       login needs a TOTP code, or "requires mfa checking" / MFA_CHECKING_REQUIRED
+    ├── AuthenticationError        401, invalid_grant, unknown username at sign-in
+    │   ├── MFARequiredError       login needs a TOTP code, or "requires mfa checking" in message or status
     │   └── CaptchaRequiredError   login needs a solved captcha and no solver is configured
     ├── PermissionDeniedError      403
     ├── NotFoundError              404
@@ -209,15 +244,19 @@ WhitebirdError
 
 ### Retries and timeouts
 
-Idempotent requests (GET, HEAD, PUT, DELETE) are retried on connection errors, 429, 502, 503 and
-504 with exponential backoff and jitter, honouring `Retry-After`. Default: 2 retries, 30 s
-timeout. POST is never retried automatically.
+The web application never retries. The SDKs retry GET, HEAD and OPTIONS (and requests marked
+idempotent through the request options) on network errors, timeouts, 429, 502, 503 and 504; other
+methods only when the request certainly was not processed: the connection could not be
+established, or HTTP 429. Backoff is exponential with jitter and capped, `Retry-After` (seconds or
+an HTTP date) is honoured within the cap. Default: 2 retries, 30 s timeout.
 
 ### Tolerance to API changes
 
 - Unknown response fields are ignored (Python keeps them in `model_extra`).
 - Enums are open: unknown values are preserved instead of failing.
-- Timestamps accept RFC 3339, naive ISO-8601 (treated as UTC) and epoch milliseconds.
+- Timestamps accept RFC 3339, `+HHMM` offsets and naive ISO-8601 (treated as UTC) where the
+  language parses them. Request timestamps are sent as `YYYY-MM-DDTHH:mm:ss+HHMM`, the format of
+  the web application (dayjs `ZZ`); values without a zone are taken as UTC.
 - Decimal amounts are lossless where the language allows it.
 - `client.request(service, method, path, ...)` calls any endpoint with the same auth, retries and
   error handling, for endpoints not yet in the SDK.
@@ -226,4 +265,7 @@ timeout. POST is never retried automatically.
 
 Notifications are delivered over Server-Sent Events (`notification` `/api/v1/sse/connect`, bearer
 auth). Each SDK exposes them as a native stream (Python iterator / async iterator, TS async
-iterable, Go `iter.Seq2`, Rust `Stream`) with automatic reconnect using `Last-Event-ID`.
+iterable, Go `iter.Seq2`, Rust `Stream`) with automatic reconnect using `Last-Event-ID` (the id of
+the last dispatched event). A 200 answer that is not `text/event-stream` is retried like a dropped
+connection, HTTP 204 ends the stream, an event whose data cannot be decoded is skipped, and
+cancelling the stream ends it quietly.

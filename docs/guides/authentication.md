@@ -4,9 +4,11 @@ Whitebird uses the OAuth 2 password grant of its web application. The client kee
 you:
 
 - it signs in on the first call that needs an account, or when you call `login`;
-- it refreshes the access token shortly before it expires, and once more if a request is
-  rejected with HTTP 401;
-- if the refresh token is no longer valid and the password is known, it signs in again.
+- it refreshes the access token when less than a minute of it is left, and once more if a request
+  is rejected with HTTP 401;
+- if Whitebird rejects the refresh (the session expired or was revoked), it forgets the session
+  and signs in again when the password is known. Network and server errors during a refresh are
+  raised as they are and keep the session for the next call.
 
 Public endpoints (market data, ICO showcase, payment provider lists) work without credentials.
 
@@ -21,8 +23,9 @@ withdrawals. Configure a code provider:
   programs that run unattended;
 - a fixed code, which only suits a single sign-in.
 
-The provider is called on every sign-in and before operations that need confirmation, so a
-function keeps working when the client signs in again hours later.
+The client asks the provider only when Whitebird wants a code: after the password of a 2FA
+account is accepted, and when an operation is refused until it is confirmed. A function therefore
+keeps working when the client signs in again hours later.
 
 === "Python"
 
@@ -46,7 +49,11 @@ function keeps working when the client signs in again hours later.
 === "Node.js"
 
     ```ts
+    import { createInterface } from 'node:readline/promises';
+    import { Whitebird } from 'whitebird-api';
     import { totp } from 'whitebird-api/otp';
+
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
 
     // The function may return the code or a promise of it.
     const client = new Whitebird({ username, password, otp: () => rl.question('2FA code: ') });
@@ -124,16 +131,22 @@ has three operations: load, save and clear.
 
     Implement `whitebird::TokenStore` and pass it with `ClientBuilder::token_store`.
 
-`user.logout()` ends the session on the server; clear the store as well so the next run signs in
-again. In Node.js, `client.logout()` forgets the client's tokens and clears the store.
+`user.logout()` ends the session on the server, and the client forgets it whatever the server
+answers: its tokens and operation MFA token are dropped and the store is cleared, so the next call
+signs in again. In Node.js, `client.logout()` does the same and ignores server errors.
+
+`user.password.change(...)` answers with a new token pair, which the client stores in place of
+the old session; the new password replaces the old one for later sign-ins.
 
 ## Captcha
 
 The sign-in form makes accounts **without** 2FA solve a slider captcha: a background image with a
 cut-out and a puzzle piece that has to be slid into place. The SDKs never solve captchas
-themselves. Before signing in, the client asks whether the account has 2FA; if it has not and no
-solver is configured, signing in raises `CaptchaRequiredError` without sending the password.
-Enabling 2FA on the account avoids the captcha altogether.
+themselves. Before signing in, the client asks whether the account has 2FA, as the sign-in form
+does; if it has not and no solver is configured, signing in raises `CaptchaRequiredError`
+without sending the password. If Whitebird does not know the username, signing in raises
+`AuthenticationError`, again without sending the password. Enabling 2FA on the account avoids
+the captcha altogether.
 
 A solver receives the captcha (request id, both PNG images, the piece's vertical offset) and
 returns the horizontal offset of the piece. The client sends the answer with the sign-in request
@@ -142,7 +155,11 @@ and retries with a new captcha, up to three attempts, when the answer is rejecte
 === "Python"
 
     ```python
+    from pathlib import Path
+
+    from whitebird import Whitebird
     from whitebird.types import Captcha
+
 
     def solve(captcha: Captcha) -> int:
         Path("captcha.png").write_bytes(captcha.background_image)
@@ -154,6 +171,8 @@ and retries with a new captcha, up to three attempts, when the answer is rejecte
 === "Node.js"
 
     ```ts
+    import { writeFile } from 'node:fs/promises';
+
     const client = new Whitebird({
       username,
       password,
@@ -180,14 +199,27 @@ and retries with a new captcha, up to three attempts, when the answer is rejecte
 
 === "Rust"
 
-    See `ClientBuilder::captcha` in the [Rust reference](../reference/rust.md).
+    ```rust
+    use whitebird::{CaptchaSolver, Client};
+
+    // Runs on a blocking thread; CaptchaSolver::new takes an async function instead.
+    let solve = CaptchaSolver::from_fn(|captcha| {
+        std::fs::write("captcha.png", &captcha.background_image)?;
+        let mut position = String::new();
+        std::io::stdin().read_line(&mut position)?;
+        Ok(position.trim().parse()?)
+    });
+    let client = Client::builder().credentials(username, password).captcha(solve).build()?;
+    ```
 
 ## Confirming withdrawals (operation MFA)
 
 Withdrawals are refused until the request carries an operation MFA token, obtained by exchanging a
-fresh TOTP code. With a code provider configured the client does this by itself: before a
-withdrawal it obtains a token if it has none, and if the token is rejected it gets a new one and
-retries once. The token is then sent with every request.
+fresh 2FA code. With a code provider configured the client does this by itself, like the web
+application: when an operation is refused for lack of confirmation, it asks the provider for a
+code, exchanges it for a token and repeats the request once. Operations refused at the same time
+share one confirmation. The token is then sent with every request. Without a code provider the
+refusal is raised as `MFARequiredError`.
 
 To do it by hand, for example with a code typed by the user, call `confirm_operation`:
 
@@ -267,8 +299,11 @@ Any request may be refused with `VerificationRequiredError` when Whitebird wants
 === "Rust"
 
     ```rust
-    match client.exchange().orders().create(params.clone()).await {
-        Err(e) if e.is_verification_required() => { /* send_code, verify_code, retry */ }
+    let order = match client.exchange().orders().create(params.clone()).await {
+        Err(e) if e.is_verification_required() => {
+            // send_code, verify_code, then repeat the call
+            client.exchange().orders().create(params).await?
+        }
         other => other?,
     };
     ```

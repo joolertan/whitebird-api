@@ -16,11 +16,15 @@ endpoints show up quickly (see [API changes](guides/api-changes.md)).
 
 - Every endpoint the web application calls: brokerage, exchange, balances, trading, market data,
   KYC, notifications, ICO tokens, payment providers and more, grouped into resources.
-- Sign-in with password and TOTP, automatic token refresh, pluggable session storage, and the
-  operation MFA flow for withdrawals.
-- Typed models with lossless decimal amounts, open enums and tolerant timestamp parsing.
+- Sign-in as in the web application: password, a 2FA code from your callback or a TOTP secret,
+  the slider captcha through your own solver; automatic token refresh, pluggable session storage
+  and the operation MFA flow for withdrawals.
+- Typed models with lossless decimal amounts and open enums: unknown fields and values do not
+  break parsing.
 - Paginated endpoints that are natively iterable, and Server-Sent Events as native streams.
-- Retries with backoff for idempotent requests, and an escape hatch for endpoints not covered yet.
+- Retries that never repeat an order or a payment: reads are retried on transient failures, other
+  requests only when they did not reach the server. An escape hatch calls endpoints not covered
+  yet.
 
 ## Install
 

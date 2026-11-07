@@ -6,10 +6,11 @@ all, and every method is sent to the right one.
 
 ## Production and demo
 
-The `demo` environment is Whitebird's sandbox for trading: the `api`, `market_data`,
-`order_management`, `trading` and `trading_admin` services have demo hosts with demo balances
-(top them up with `trading.demo.deposit`). Services without a demo host are reached on production
-in both environments, and accounts are shared between the two.
+The `demo` environment is Whitebird's sandbox for trading: the `accounting_spot` (wallet balances
+read by the trading terminal), `market_data`, `order_management`, `trading` and `trading_admin`
+services have demo hosts with demo balances (top them up with `trading.demo.deposit`). Services
+without a demo host are reached on production in both environments, and accounts are shared
+between the two.
 
 === "Python"
 
@@ -69,8 +70,9 @@ moved before a new SDK version is out:
 | Key | Production host | Demo host |
 |---|---|---|
 | `accounting` | `accounting-service.whitebird.io` | |
+| `accounting_spot` | `api.whitebird.io` | `api-demo.whitebird.io` |
 | `alfa` | `alfa-service.whitebird.io` | |
-| `api` | `api.whitebird.io` | `api-demo.whitebird.io` |
+| `api` | `api.whitebird.io` | |
 | `assist` | `assist-service.whitebird.io` | |
 | `auth` | `authorization-server.whitebird.io` | |
 | `bepaid` | `bepaid-service.whitebird.io` | |
@@ -86,6 +88,7 @@ moved before a new SDK version is out:
 | `order_management` | `order-management-service.whitebird.io` | `order-management-demo-service.whitebird.io` |
 | `statusbank` | `status-bank-service.whitebird.io` | |
 | `trading` | `trading-service.whitebird.io` | `trading-demo-service.whitebird.io` |
+| `trading_admin` | `trading-admin-service.whitebird.io` | `trading-admin-demo-service.whitebird.io` |
 | `vtb` | `vtb-service.whitebird.io` | |
 
 `spec/environments.yaml` in the repository lists a few more hosts that the web application
