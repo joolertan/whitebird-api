@@ -7,11 +7,18 @@ on:
 permissions:
   contents: read
 
+# Merging several release pull requests in a row must not run release-please concurrently: the
+# runs would race to create the same labels and tags.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write # labels belong to the issues API
       pull-requests: write
     outputs:
       python: ${{ steps.release.outputs['python--release_created'] }}
