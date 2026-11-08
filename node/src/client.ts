@@ -163,7 +163,7 @@ export class Whitebird extends Resources {
   }
 
   /**
-   * Logs in now instead of on the first authenticated call, like the web application: asks
+   * Logs in now instead of on the first authenticated call: asks
    * whether the account has two-factor authentication, sends the password (with a solved captcha
    * when it has not) and, when Whitebird asks for it, the two-factor code.
    *

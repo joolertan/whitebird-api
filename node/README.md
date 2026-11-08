@@ -42,7 +42,7 @@ for await (const { data } of client.notifications.stream({ signal })) {
 
 ## Authentication
 
-The client logs in on the first authenticated call the way the web application does, refreshes
+The client logs in on the first authenticated call, refreshes
 the session when it has less than a minute left and keeps it in a `tokenStore` (in memory by
 default; implement `TokenStore` to persist it). `client.logout()` revokes the session and forgets
 it.

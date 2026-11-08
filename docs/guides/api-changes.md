@@ -1,35 +1,12 @@
-# How the SDKs keep up with the API
+# API changes
 
-Whitebird ships its web application several times a week, and the backend changes with it. Since
-there is no published API reference, this project reconstructs the API from the application
-itself and watches it for changes.
+Whitebird may change its API at any time. This page lists what stays stable for your code.
 
-## Where the API description comes from
+## Experimental operations
 
-`spec/` holds one OpenAPI 3.1 document per backend service. Every operation records where its
-shape comes from (`x-wb-source`):
-
-| Source | Meaning |
-|---|---|
-| `openapi` | imported from the service's own published OpenAPI document |
-| `live` | checked against the running service (public endpoints only) |
-| `bundle` | reconstructed from the web application's code; marked *experimental* |
-
-Response fields that were inferred from how the application uses a response, rather than seen in
-one, are marked as inferred and are never required.
-
-## The daily drift check
-
-`tools/wbscan` downloads the current build of whitebird.io, deobfuscates it with
-[webcrack](https://github.com/j4k0xb/webcrack) and finds every HTTP request in it with a small
-static evaluator, without running the code. The result is compared with `spec/`; a scheduled
-workflow opens an issue labelled `api-drift` listing:
-
-- new and removed hosts, and a changed OAuth client;
-- new endpoints, and endpoints the application no longer calls;
-- request fields the application sends but the specification lacks.
-
-The specification is then updated, the SDKs are regenerated and a new version is released.
+Operations marked *experimental* in the [endpoint reference](../reference/endpoints.md) may
+change without notice, and their response models may be incomplete. Response fields that are not
+guaranteed are never required.
 
 ## What your code can rely on
 

@@ -1,28 +1,21 @@
 # Architecture
 
 The repository holds four SDKs (Python, Node.js, Go, Rust) generated from one description of
-the Whitebird API. Whitebird does not publish an API reference, so that description is
-reconstructed from the public web application and kept up to date by an automated drift check.
+the Whitebird API.
 
 ```
 spec/                     source of truth
   environments.yaml       service hosts per environment, OAuth client
   services/<service>.yaml one OpenAPI 3.1 document per backend service
 tools/
-  wbscan/                 extracts endpoints from the whitebird.io bundles, diffs them with spec/
   codegen/                turns spec/ into models and resource classes for every language
 python/ node/ go/ rust/   SDKs: handwritten core + generated layer
 ```
 
 ## Pipeline
 
-1. `wbscan scan` downloads the current frontend build, deobfuscates it with webcrack and extracts
-   every HTTP call into `inventory.json`.
-2. `wbscan diff` compares the inventory with `spec/` and reports new, removed and changed endpoints.
-   The scheduled `api-drift` workflow runs it daily and opens an issue when the API moves.
-3. The spec is updated (imported from a public OpenAPI document where one exists, written by hand
-   from the inventory otherwise).
-4. `codegen` regenerates the SDKs. CI fails if generated files are out of date.
+1. Endpoints are described in `spec/services/<service>.yaml`.
+2. `codegen` regenerates the SDKs. CI fails if generated files are out of date.
 
 ## Spec conventions
 
@@ -44,8 +37,6 @@ Operation level:
 | `x-wb-name` | yes | Method name in snake_case, unique within the resource |
 | `x-wb-auth` | no | `user` (default, bearer token), `none` (public), `mfa` (needs an operation MFA token) |
 | `x-wb-status` | no | `stable` (default), `experimental`, `deprecated` |
-| `x-wb-source` | no | `openapi`, `bundle` or `live`: where the shape comes from |
-| `x-wb-first-seen` | no | Date the endpoint first appeared in a scan |
 | `x-wb-response` | no | `json` (default), `binary`, `text`, `empty`, `sse` |
 | `x-wb-envelope` | no | Response wrapper to unwrap; also allowed at document level (see below) |
 | `x-wb-session` | no | What the call does to the client's session: `end` (logout: forget it after the call, whatever the outcome) or `replace` (password change: store the token pair from the response) |
@@ -54,14 +45,13 @@ Most services answer with the payload directly. Market data answers with a Bybit
 `{"retCode": 0, "retMsg": "OK", "result": ...}`; such operations are marked
 `x-wb-envelope: retcode`, the response schema describes `result` only, and the client unwraps it,
 raising `APIError` (with `code = retCode`, `message = retMsg`) when `retCode` is present and
-neither 0 nor 200, as the web application does.
+neither 0 nor 200.
 
 Numbers without a `format` are treated as decimals: Springdoc renders Java `BigDecimal` that
 way, and on an exchange they are amounts, prices and rates. `format: double` or `float` marks a
 plain floating-point number.
 
-Schema properties may carry `x-wb-inferred: true` when the field was inferred from how the web
-application uses the response rather than observed on the wire. Inferred fields are never
+Schema properties marked `x-wb-inferred: true` may be missing from responses and are never
 `required`.
 
 Pagination is detected from the response schema and the parameters: an operation whose response
@@ -70,9 +60,9 @@ is a Spring Data page (an object with `content` (array) and `totalElements`) and
 response without a `page` parameter is a single page. Page wrapper schemas are not generated as
 models; every SDK has one generic `Page` type.
 
-A scalar `default` of a parameter or body field is what the web application always sends; the
-SDKs send it too when the caller leaves the value unset. Query parameter names may end in `[]`
-(`assets[]`, the axios array style): the name is sent as is and the argument drops the brackets.
+A scalar `default` of a parameter or body field is sent when the caller leaves the value unset.
+Query parameter names may end in `[]` (`assets[]`): the name is sent as is and the argument drops
+the brackets.
 
 ## Generated vs handwritten code
 
@@ -158,8 +148,7 @@ forever). A page that failed to load is fetched again on the next attempt.
 
 ### Authentication
 
-The client signs in the way the web application's sign-in form does (bundle `app-pages`,
-`core-logic`):
+The client signs in as follows:
 
 1. Credentials missing: error before any request.
 2. `POST <oauth.mfa_status_path> {"username": ...}` on `auth`, with the username as given. If this
@@ -212,8 +201,7 @@ Operation MFA: some operations (withdrawals) are refused with `message` or `stat
 `operation_mfa.token_path` on `operation_mfa.service` (the code comes from the provider when
 omitted), takes the token from the body field `mfaToken`, a body that is a bare (JSON or plain)
 string, or the `x-mfa-token` response header, stores it on the client and returns it. The token
-is sent with every request. As in the web application the client asks for a token only after a
-refusal: with a code provider it confirms (concurrent refusals share one confirmation) and retries
+is sent with every request. The client asks for a token only after a refusal: with a code provider it confirms (concurrent refusals share one confirmation) and retries
 the operation once; without one the `MFARequiredError` propagates.
 
 Every request sends `Authorization: Bearer <token>` unless the operation is `x-wb-auth: none`,
@@ -244,7 +232,7 @@ WhitebirdError
 
 ### Retries and timeouts
 
-The web application never retries. The SDKs retry GET, HEAD and OPTIONS (and requests marked
+The SDKs retry GET, HEAD and OPTIONS (and requests marked
 idempotent through the request options) on network errors, timeouts, 429, 502, 503 and 504; other
 methods only when the request certainly was not processed: the connection could not be
 established, or HTTP 429. Backoff is exponential with jitter and capped, `Retry-After` (seconds or
@@ -255,8 +243,8 @@ an HTTP date) is honoured within the cap. Default: 2 retries, 30 s timeout.
 - Unknown response fields are ignored (Python keeps them in `model_extra`).
 - Enums are open: unknown values are preserved instead of failing.
 - Timestamps accept RFC 3339, `+HHMM` offsets and naive ISO-8601 (treated as UTC) where the
-  language parses them. Request timestamps are sent as `YYYY-MM-DDTHH:mm:ss+HHMM`, the format of
-  the web application (dayjs `ZZ`); values without a zone are taken as UTC.
+  language parses them. Request timestamps are sent as `YYYY-MM-DDTHH:mm:ss+HHMM`; values without
+  a zone are taken as UTC.
 - Decimal amounts are lossless where the language allows it.
 - `client.request(service, method, path, ...)` calls any endpoint with the same auth, retries and
   error handling, for endpoints not yet in the SDK.

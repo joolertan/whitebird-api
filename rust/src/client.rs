@@ -67,7 +67,7 @@ impl Client {
     /// Logs in with the configured credentials and returns the new tokens.
     ///
     /// Login otherwise happens lazily on the first authenticated call; calling this first
-    /// surfaces credential and two-factor problems early. Like the web app, the client first
+    /// surfaces credential and two-factor problems early. The client first
     /// asks whether the account has two-factor authentication on. If it has, the password is
     /// sent alone and, when the server asks for it, again with a code from the
     /// [code provider](ClientBuilder::otp). Otherwise the password goes with a captcha answer
@@ -494,7 +494,7 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// Sets the account email and password. Like the web app, the client sends the email as
+    /// Sets the account email and password. The client sends the email as
     /// given to ask whether the account has two-factor authentication, and lowercased with the
     /// password.
     pub fn credentials(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {

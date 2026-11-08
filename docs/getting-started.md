@@ -262,9 +262,8 @@ media type. Without a type the client guesses it from the name, then from the co
 
 ## Language of messages
 
-The web application tells Whitebird the user's interface language in the `Accept-Language`
-header. To do the same, set it once on the client; it is sent with every request and the
-notification stream:
+Whitebird reads the user's language from the `Accept-Language` header. Set it once on the
+client; it is sent with every request and the notification stream:
 
 === "Python"
 

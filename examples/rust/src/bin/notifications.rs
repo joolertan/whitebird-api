@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error> {
             event = events.try_next() => event?,
         };
         let Some(event) = event else { return Ok(()) };
-        // Like the web app, skip events that are not notifications instead of stopping.
+        // Skip events that are not notifications instead of stopping.
         let message = match event.json() {
             Ok(message) => message,
             Err(error) => {

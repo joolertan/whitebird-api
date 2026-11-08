@@ -1,7 +1,6 @@
 # Authentication
 
-Whitebird uses the OAuth 2 password grant of its web application. The client keeps the session for
-you:
+Whitebird uses the OAuth 2 password grant. The client keeps the session for you:
 
 - it signs in on the first call that needs an account, or when you call `login`;
 - it refreshes the access token when less than a minute of it is left, and once more if a request

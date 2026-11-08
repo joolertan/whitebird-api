@@ -7,7 +7,7 @@ from pathlib import Path
 from account import connect
 from whitebird.models import ReportDateFrame
 
-# The format the web app sends, e.g. 2026-11-07T00:00:00+0300.
+# Whitebird's timestamp format, e.g. 2026-11-07T00:00:00+0300.
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
 
 

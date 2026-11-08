@@ -12,8 +12,8 @@ in Rust).
 | user | Sends the access token |
 | user + MFA | Also needs an operation MFA token |
 
-Operations marked *experimental* were recovered from the web application without a public
-schema; their response models may be incomplete.
+Operations marked *experimental* may change without notice; their response models may be
+incomplete.
 
 ## `accounting`
 

@@ -3,20 +3,19 @@
 Unofficial clients for the [Whitebird](https://whitebird.io) crypto exchange API in **Python**,
 **Node.js**, **Go** and **Rust**.
 
-Whitebird publishes no API reference. These SDKs are generated from a specification
-reconstructed from the public web application and checked daily against it, so new and changed
-endpoints show up quickly (see [API changes](guides/api-changes.md)).
+All four SDKs are generated from one OpenAPI specification, so they offer the same resources and
+behave the same way (see [API changes](guides/api-changes.md) for what your code can rely on).
 
 !!! warning "Unofficial"
     This project is not affiliated with Whitebird. Endpoints marked *experimental* in the
-    [endpoint reference](reference/endpoints.md) were reconstructed from the web application and
-    have not been observed on the wire.
+    [endpoint reference](reference/endpoints.md) may change, and their response models may be
+    incomplete.
 
 ## Features
 
-- Every endpoint the web application calls: brokerage, exchange, balances, trading, market data,
-  KYC, notifications, ICO tokens, payment providers and more, grouped into resources.
-- Sign-in as in the web application: password, a 2FA code from your callback or a TOTP secret,
+- Brokerage, exchange, balances, trading, market data, KYC, notifications, ICO tokens, payment
+  providers and more, grouped into resources.
+- Sign-in: password, a 2FA code from your callback or a TOTP secret,
   the slider captcha through your own solver; automatic token refresh, pluggable session storage
   and the operation MFA flow for withdrawals.
 - Typed models with lossless decimal amounts and open enums: unknown fields and values do not

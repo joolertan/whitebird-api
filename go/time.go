@@ -13,7 +13,7 @@ import (
 //
 // Decoding is lenient: it accepts RFC 3339, ISO 8601 with a "+0300" offset or without a time
 // zone (taken as UTC) and milliseconds since the Unix epoch, as a number or a string. Time
-// encodes as the web application sends times, to the second and with the offset of its
+// encodes to the second and with the offset of its
 // location: "2026-01-02T15:04:05+0300". The zero Time encodes as null.
 type Time struct {
 	time.Time

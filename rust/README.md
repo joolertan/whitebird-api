@@ -8,8 +8,8 @@ Unofficial Rust client for the [Whitebird](https://whitebird.io) crypto exchange
 - Typed methods for market data, exchange and spot trading, deposits and withdrawals, payment
   cards, brokerage, ICO tokens, KYC, notifications and account settings, grouped by resource:
   `client.brokerage().otc_orders().list(params)`.
-- Signs in like the web app: the TOTP code when two-factor authentication is on, a captcha
-  through your solver otherwise, and the MFA token when a withdrawal asks for one. Sessions are
+- Signs in with the TOTP code when two-factor authentication is on and with a captcha through
+  your solver otherwise, and gets the MFA token when a withdrawal asks for one. Sessions are
   refreshed a minute before they expire and after a 401, and end with `client.user().logout()`.
 - Retries GET requests on network errors, timeouts, 429, 502, 503 and 504, and other requests
   only when they did not reach the server (connection failures, 429), honouring `Retry-After`.

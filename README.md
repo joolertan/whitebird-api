@@ -132,7 +132,7 @@ while let Some(order) = orders.try_next().await? {
 
 Every SDK also takes care of:
 
-- **Sign-in:** the web application's flow: password, a 2FA code from your callback or a TOTP
+- **Sign-in:** password, a 2FA code from your callback or a TOTP
   secret, the slider captcha through your own solver; token refresh before expiry and pluggable
   session storage.
 - **Withdrawals:** the operation MFA token is obtained automatically when a code provider is set.

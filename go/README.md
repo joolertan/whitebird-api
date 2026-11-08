@@ -50,7 +50,7 @@ func main() {
 }
 ```
 
-- **Sessions:** the client signs in on the first call that needs it, as the web application does,
+- **Sessions:** the client signs in on the first call that needs it,
   refreshes the token a minute before it expires and keeps it in a `TokenStore`;
   `client.User.Logout` ends the session.
 - **Two-factor codes:** `WithCodeProvider` takes an `*otp.TOTP`, a `CodeFunc` that asks for the

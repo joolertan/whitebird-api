@@ -91,6 +91,6 @@ moved before a new SDK version is out:
 | `trading_admin` | `trading-admin-service.whitebird.io` | `trading-admin-demo-service.whitebird.io` |
 | `vtb` | `vtb-service.whitebird.io` | |
 
-`spec/environments.yaml` in the repository lists a few more hosts that the web application
-configures but that no SDK method uses yet; they can still be called with
+`spec/environments.yaml` in the repository lists a few more hosts that no SDK method uses
+yet; they can still be called with
 [raw requests](raw-requests.md).

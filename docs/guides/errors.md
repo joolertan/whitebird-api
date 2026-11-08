@@ -115,8 +115,7 @@ WhitebirdError
 
 ## Retries and timeouts
 
-The web application never repeats a request, so the SDKs repeat only those that are safe to
-repeat:
+The SDKs repeat only requests that are safe to repeat:
 
 - requests that only read (`GET`, `HEAD`, `OPTIONS`) are retried on network errors, timeouts and
   HTTP 429, 502, 503 and 504;

@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// ISO-8601 without an offset (`2024-05-01T09:00:00.123`, taken as UTC), a bare date
 /// (`2024-05-01`, midnight UTC) and Unix time in milliseconds, as a number or a string.
 ///
-/// Timestamps are sent the way the web app sends them, to the second with a numeric offset:
+/// Timestamps are sent to the second with a numeric offset:
 /// `2024-05-01T09:00:00+0000`. [`Display`](fmt::Display) shows them in RFC 3339.
 ///
 /// # Examples

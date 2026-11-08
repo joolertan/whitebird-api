@@ -1,9 +1,8 @@
 // Package whitebird is an unofficial client for the API of the Whitebird crypto exchange
 // (whitebird.io).
 //
-// Whitebird publishes no API reference. The API described here is reconstructed from the web
-// application, so endpoints may change without notice; see [Client.Request] for calling
-// endpoints this package does not cover yet.
+// Endpoints may change without notice; see [Client.Request] for calling endpoints this package
+// does not cover yet.
 //
 // # Getting started
 //
@@ -30,7 +29,7 @@
 // # Authentication
 //
 // The client logs in with the password grant on the first call that needs a token, or when
-// [Client.Login] is called. Like the web application, it refreshes the access token when less
+// [Client.Login] is called. It refreshes the access token when less
 // than a minute is left and once when the API rejects it. When the authorization server
 // refuses the refresh token, the session is over: the client forgets it, also in the token
 // store, and logs in again with the password if it has one. Other refresh failures, such as an
@@ -56,8 +55,8 @@
 //		whitebird.WithCodeProvider(totp),
 //	)
 //
-// Before a password login the client asks whether the account has two-factor authentication,
-// as the web application does; an unknown username fails with [ErrAuthentication] and the
+// Before a password login the client asks whether the account has two-factor authentication;
+// an unknown username fails with [ErrAuthentication] and the
 // password is not sent. For an account with two-factor authentication it sends the password,
 // then the code when the server asks for one; without a code provider, the login fails with
 // [ErrMFARequired]. Accounts without two-factor authentication solve a slider captcha instead:
@@ -122,7 +121,7 @@
 // Parameter structs follow one rule: required fields are plain values and optional fields are
 // pointers, which [Ptr] helps to set. Slices, maps, and the [Decimal], [Time] and [Date] types
 // are not pointers, as their zero value already means "not set". Fields documented with a
-// default get it when left unset, as the web application always sends them. Uploads take any
+// default get it when left unset. Uploads take any
 // [io.Reader]; a [File] gives the file a name and a media type.
 //
 // In response types every field is a plain value that holds its zero value when the API omits
@@ -130,7 +129,7 @@
 //
 // Enumerations are string or integer types with a constant per known value. Values added to the
 // API later are kept as they are, not rejected. Amounts of type [Decimal] keep every digit, and
-// [Time] accepts the timestamp formats the services use and sends times as the web application
-// does. Unknown response fields are ignored, and an amount that is not a number decodes as
+// [Time] accepts the timestamp formats the services use and sends times with a numeric
+// offset. Unknown response fields are ignored, and an amount that is not a number decodes as
 // the zero Decimal rather than failing the response.
 package whitebird

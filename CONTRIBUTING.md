@@ -22,18 +22,10 @@ The generator needs `ruff` (through uv), `npm ci` in `node/`, `gofmt` and `rustf
 
 ## A new or changed endpoint
 
-1. Run the drift check to see what changed:
-
-    ```sh
-    cd tools/wbscan
-    npm ci
-    npm run scan && node src/cli.ts diff
-    ```
-
-2. Describe the endpoint in `spec/services/<service>.yaml` (see the conventions in the
-   architecture document), including `x-wb-source` and, for shapes taken from the web
-   application, `x-wb-status: experimental`.
-3. Regenerate and run the checks below.
+1. Describe the endpoint in `spec/services/<service>.yaml` (see the conventions in the
+   architecture document). Mark it `x-wb-status: experimental` while its response shape is not
+   confirmed.
+2. Regenerate and run the checks below.
 
 Please do not send requests with real accounts to Whitebird from tests; every test runs against a
 local mock server.
@@ -47,7 +39,6 @@ local mock server.
 | `go/` | `gofmt -l . && go vet ./... && go test -race ./...` |
 | `rust/` | `cargo fmt --check && cargo clippy --all-targets --all-features && cargo test --all-features` |
 | `tools/codegen/` | `uv run pytest && uv run python -m whitebird_codegen generate --check` |
-| `tools/wbscan/` | `npm test && npm run typecheck` |
 | docs | `bash scripts/docs-reference.sh && pip install -r docs/requirements.txt && mkdocs serve` |
 
 ## Commits and releases

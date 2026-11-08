@@ -67,8 +67,7 @@ impl<T> From<RawEvent> for Event<T> {
 ///
 /// # Examples
 ///
-/// An event whose data cannot be decoded is best skipped, like the web app does, rather than
-/// ending the loop:
+/// An event whose data cannot be decoded is best skipped rather than ending the loop:
 ///
 /// ```no_run
 /// use futures::TryStreamExt;
