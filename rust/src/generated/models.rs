@@ -1760,11 +1760,9 @@ pub struct IcoOperation {
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<String>,
-    /// Russian label, e.g. `Покупка токенов` (buy tokens), `Получение дохода` (income
-    /// received), `Выплата дохода` (income paid), `Выкуп токенов по оферте` (buyback by offer),
-    /// `Возврат по оферте` (offer refund), `Продажа токенов` (token sale), `Выпуск токенов`
-    /// (issue), `Перевод средств` (transfer), `Погашение токенов` (redemption), `Пополнение
-    /// счета` (top-up), fee and tax labels; see `type_names`.
+    /// Operation type as the Russian label the server returns, such as buy tokens, income
+    /// received, income paid, buyback by offer, offer refund, token sale, issue, transfer,
+    /// redemption, top-up, or a fee or tax label; see `type_names`.
     ///
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]

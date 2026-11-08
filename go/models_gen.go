@@ -1147,11 +1147,10 @@ type IcoOperation struct {
 	ID string `json:"id,omitzero"`
 	// ISO-8601. Inferred from the web application; not yet observed in responses.
 	Date string `json:"date,omitzero"`
-	// Russian label, e.g. `Покупка токенов` (buy tokens), `Получение дохода` (income received),
-	// `Выплата дохода` (income paid), `Выкуп токенов по оферте` (buyback by offer), `Возврат по
-	// оферте` (offer refund), `Продажа токенов` (token sale), `Выпуск токенов` (issue), `Перевод
-	// средств` (transfer), `Погашение токенов` (redemption), `Пополнение счета` (top-up), fee and tax
-	// labels; see `type_names`. Inferred from the web application; not yet observed in responses.
+	// Operation type as the Russian label the server returns, such as buy tokens, income received,
+	// income paid, buyback by offer, offer refund, token sale, issue, transfer, redemption, top-up, or
+	// a fee or tax label; see `type_names`. Inferred from the web application; not yet observed in
+	// responses.
 	Type string `json:"type,omitzero"`
 	// Inferred from the web application; not yet observed in responses.
 	Status IcoOperationStatus `json:"status,omitzero"`
