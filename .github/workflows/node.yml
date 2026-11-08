@@ -6,6 +6,7 @@ on:
     paths: [node/**, examples/node/**, .github/workflows/node.yml]
   pull_request:
     paths: [node/**, examples/node/**, .github/workflows/node.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read

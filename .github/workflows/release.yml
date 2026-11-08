@@ -1,5 +1,7 @@
 name: Release
 
+# release-please keeps one release pull request for all packages, which share one version.
+# Merging it tags and publishes every package.
 on:
   push:
     branches: [main]
@@ -7,8 +9,8 @@ on:
 permissions:
   contents: read
 
-# Merging several release pull requests in a row must not run release-please concurrently: the
-# runs would race to create the same labels and tags.
+# Pushes in quick succession must not run release-please concurrently: the runs would race to
+# create the same labels and tags.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -21,6 +23,8 @@ jobs:
       issues: write # labels belong to the issues API
       pull-requests: write
     outputs:
+      released: ${{ steps.release.outputs.releases_created }}
+      version: ${{ steps.release.outputs['python--version'] }}
       python: ${{ steps.release.outputs['python--release_created'] }}
       node: ${{ steps.release.outputs['node--release_created'] }}
       go: ${{ steps.release.outputs['go--release_created'] }}
@@ -102,3 +106,16 @@ jobs:
       - run: curl -fsS "https://proxy.golang.org/github.com/joolertan/whitebird-api/go/@v/${TAG#go/}.info"
         env:
           TAG: ${{ needs.release-please.outputs.go-tag }}
+
+  docs-version:
+    needs: release-please
+    if: needs.release-please.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # The project-wide tag vX.Y.Z: Read the Docs builds a documentation version for it.
+      - run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.release-please.outputs.version }}

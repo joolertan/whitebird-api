@@ -45,5 +45,5 @@ local mock server.
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) with the
 package as scope: `feat(python): ...`, `fix(go): ...`, `feat(spec): ...`. release-please uses them
-to propose versions and changelogs; [publishing](docs/development/publishing.md) explains the
+to propose the next project version and the changelogs; [publishing](docs/development/publishing.md) explains the
 release process.

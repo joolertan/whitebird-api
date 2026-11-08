@@ -6,6 +6,7 @@ on:
     paths: [go/**, examples/go/**, .github/workflows/go.yml]
   pull_request:
     paths: [go/**, examples/go/**, .github/workflows/go.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read

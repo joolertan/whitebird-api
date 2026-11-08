@@ -1,15 +1,20 @@
 # Publishing
 
-Releases are automated: merging a release pull request publishes the package to its registry.
-This page lists the one-time setup a maintainer has to do.
+The project has one version: all four packages are released together under the same number.
+Merging the release pull request publishes every package to its registry. This page describes the
+flow and the one-time setup a maintainer has to do.
 
 ## How a release happens
 
 1. Commits follow [Conventional Commits](https://www.conventionalcommits.org/) with the package
    directory as scope (`feat(python): ...`, `fix(go): ...`).
 2. On every push to `main`, [release-please](https://github.com/googleapis/release-please) opens
-   or updates one release pull request per package with the version bump and changelog.
-3. Merging a release pull request creates a tag and a GitHub release:
+   or updates a single release pull request, *release whitebird-api libraries*, with the next
+   version for every package and their changelogs.
+3. Optionally run the checks on it before merging: each CI workflow (Python, Node.js, Go, Rust,
+   Codegen, Docs) has **Run workflow** in the Actions tab; pick the branch
+   `release-please--branches--main--groups--whitebird-api`.
+4. Merging the pull request creates the tags and GitHub releases:
 
     | Package | Tag | Registry |
     |---|---|---|
@@ -17,8 +22,10 @@ This page lists the one-time setup a maintainer has to do.
     | Node.js | `node-v1.2.3` | npm |
     | Go | `go/v1.2.3` | Go module proxy |
     | Rust | `rust-v1.2.3` | crates.io |
+    | Docs | `v1.2.3` | Read the Docs |
 
-4. The `release` workflow publishes the tagged package. PyPI, npm and crates.io use
+5. The `release` workflow publishes the packages. If a publish job fails, fix the cause and use
+   **Re-run failed jobs** on that run; the release itself is not repeated. PyPI, npm and crates.io use
    [trusted publishing](https://docs.pypi.org/trusted-publishers/): GitHub Actions exchanges a
    short-lived OIDC token for upload rights, so no registry tokens are stored in the repository.
 
@@ -69,6 +76,9 @@ published by hand.
 
 3. On the package page, open **Settings → Trusted publishing**, choose GitHub Actions and enter
    owner `joolertan`, repository `whitebird-api`, workflow `release.yml`, environment `npm`.
+   Under **Allowed actions**, allow it to publish directly: by default a trusted publisher may
+   only stage a version, and the workflow's `npm publish` fails with
+   `403 OIDC permission denied for this action`.
 4. In the same settings, select **Require two-factor authentication and disallow tokens**.
 
 ## crates.io
@@ -103,8 +113,14 @@ few minutes later. If it does not, open that page and press **Request**.
    the site lives at `https://whitebird-api.readthedocs.io`. The build is configured by
    `.readthedocs.yaml` in the repository.
 3. In **Settings → Pull request builds**, enable previews for pull requests.
+4. In **Settings → Automation rules**, add a rule: match **SemVer versions**, version type
+   **Tag**, action **Activate version**. Each release tag `v1.2.3` then gets its own documentation
+   version; the per-package tags (`python-v1.2.3`, ...) do not match.
+5. In **Settings → General**, set **Default version** to `stable`. Read the Docs points `stable` at
+   the highest `v1.2.3` tag, and `latest` follows `main`.
 
-Read the Docs adds the GitHub webhook itself; every push to `main` rebuilds the site.
+Read the Docs adds the GitHub webhook itself; every push to `main` rebuilds `latest`, and every
+release adds a version to the version menu.
 
 ## Badges
 

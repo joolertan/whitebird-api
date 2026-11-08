@@ -6,6 +6,7 @@ on:
     paths: [tools/wbscan/**, .github/workflows/wbscan.yml]
   pull_request:
     paths: [tools/wbscan/**, .github/workflows/wbscan.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read

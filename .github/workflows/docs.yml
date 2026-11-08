@@ -6,6 +6,7 @@ on:
     paths: [docs/**, mkdocs.yml, scripts/docs/**, scripts/docs-reference.sh, python/src/**, node/src/**, go/**, .github/workflows/docs.yml]
   pull_request:
     paths: [docs/**, mkdocs.yml, scripts/docs/**, scripts/docs-reference.sh, python/src/**, node/src/**, go/**, .github/workflows/docs.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read
