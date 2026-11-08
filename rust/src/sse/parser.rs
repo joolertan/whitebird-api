@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn ignores_events_without_data_and_reads_retry() {
         let (events, mut parser) = parse(&["event: ping\n\nretry: 1500\nretry: soon\nid: 3\n\n"]);
-        assert!(events.is_empty());
+        assert_eq!(events, Vec::<RawEvent>::new());
         assert_eq!(parser.take_retry(), Some(Duration::from_millis(1500)));
         assert_eq!(parser.last_event_id(), Some("3"));
     }

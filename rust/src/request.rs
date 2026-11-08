@@ -772,7 +772,7 @@ mod tests {
 
     #[test]
     fn scalars_skip_null_and_repeat_sequences() {
-        assert!(scalars(Value::Null).is_empty());
+        assert_eq!(scalars(Value::Null), Vec::<String>::new());
         assert_eq!(scalars(json!(["A", "B"])), ["A", "B"]);
         assert_eq!(scalars(json!(5)), ["5"]);
         assert_eq!(scalars(json!(true)), ["true"]);
