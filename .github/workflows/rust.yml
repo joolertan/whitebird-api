@@ -37,7 +37,8 @@ jobs:
             examples/rust
       - run: cargo test --all-features --locked
       - run: cargo test --locked
-      - run: cargo check --all-targets --locked
+      # Not --locked: a release bumps the SDK version, which the examples' lock file records.
+      - run: cargo check --all-targets
         working-directory: examples/rust
 
   lint:
@@ -65,4 +66,4 @@ jobs:
         working-directory: examples/rust
         run: |
           cargo fmt --check
-          cargo clippy --all-targets --locked
+          cargo clippy --all-targets
