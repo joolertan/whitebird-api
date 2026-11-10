@@ -1,6 +1,6 @@
 [package]
 name = "whitebird-api"
-version = "0.1.1"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Unofficial Whitebird API client"

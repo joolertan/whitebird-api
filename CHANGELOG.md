@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.0.0](https://github.com/joolertan/whitebird-api/compare/v0.1.1...v1.0.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **providers:** providers.assist.card_bind_url() and the providers.bepaid resource are removed.
+* **auth:** auth.mfa_status() (MFAStatus in Go, mfaStatus in Node.js) and its AuthMfaStatus models are removed. A client without a captcha solver no longer fails before sending the password; it fails with CaptchaRequiredError only when the server asks for a captcha.
+
+### Features
+
+* **kyc:** withdrawals above the limit and the actualization identity reset ([2fa9138](https://github.com/joolertan/whitebird-api/commit/2fa9138baf3581b99b4bacbeb55f4dff12649d0c)), closes [#5](https://github.com/joolertan/whitebird-api/issues/5)
+
+
+### Bug Fixes
+
+* **auth:** sign in without the deprecated 2FA status check ([0e52424](https://github.com/joolertan/whitebird-api/commit/0e5242479a665bced10a58830a7b02c734722269))
+
+
+### Miscellaneous Chores
+
+* release 1.0.0 ([b7d1798](https://github.com/joolertan/whitebird-api/commit/b7d1798f4318064b00dc8fb46d0119591534e6ad))
+
+
+### Code Refactoring
+
+* **providers:** drop the unused Assist and bePaid card binding URLs ([5839086](https://github.com/joolertan/whitebird-api/commit/5839086fdbd6ad4a0f6ed2ce1489aabaf2a802ea))
+
 ## [0.1.1](https://github.com/joolertan/whitebird-api/releases/tag/v0.1.1) (2026-11-08)
 
 Every package had its own changelog and tag up to this version (`python-v0.1.1`, `node-v0.1.1`,
