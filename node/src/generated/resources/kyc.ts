@@ -21,6 +21,10 @@ import type {
   KycSumsubToken,
   KycVerification,
   KycVerificationRequest,
+  KycWithdrawalLimitSkip,
+  KycWithdrawalLimitSkipCause,
+  KycWithdrawalLimitSkipStatus,
+  KycWithdrawalLimitType,
 } from '../models.js';
 
 /** Endpoints under `client.kyc`. */
@@ -43,6 +47,8 @@ export class KycResource extends APIResource {
   readonly sdk = new KycSdkResource(this._client);
   /** Endpoints under `client.kyc.sumsub`. */
   readonly sumsub = new KycSumsubResource(this._client);
+  /** Endpoints under `client.kyc.withdrawalLimitSkip`. */
+  readonly withdrawalLimitSkip = new KycWithdrawalLimitSkipResource(this._client);
 
   /**
    * Accept the public offer
@@ -175,6 +181,31 @@ export class KycActualizationResource extends APIResource {
         service: 'api',
         method: 'GET',
         path: '/api/v2/actualization/client/is-candidate-for-actualization',
+      },
+      options,
+    );
+  }
+
+  /**
+   * Ask for the identity document again
+   *
+   * Sent during data actualization when the SumSub (Cyberity) WebSDK, started with a
+   * `kyc.sumsub.token` of level `MAIN`, loads an applicant whose review is already completed. It
+   * resets the identity document step, so that the WebSDK asks for a current document.
+   *
+   * `POST /api/v2/actualization/client/{applicantId}/reset/IDENTITY`
+   *
+   * @param applicantId - Applicant id reported by the WebSDK event `idCheck.onApplicantLoaded`.
+   * @experimental
+   */
+  resetIdentity(applicantId: string, options?: RequestOptions): Promise<unknown> {
+    return this._client.call(
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/actualization/client/{applicantId}/reset/IDENTITY',
+        pathParams: { applicantId },
+        responseType: 'auto',
       },
       options,
     );
@@ -462,6 +493,60 @@ export class KycSumsubResource extends APIResource {
   }
 }
 
+/** Endpoints under `client.kyc.withdrawalLimitSkip`. */
+export class KycWithdrawalLimitSkipResource extends APIResource {
+  /**
+   * Get the status of a withdrawal limit increase
+   *
+   * Returns the status as a bare string. `PROCESSING` means the additional check started by
+   * `kyc.withdrawal_limit_skip.confirm` is running; the web app polls every 10, 20 and then 30
+   * seconds for at most 5 minutes. `GREEN` means the check passed and the withdrawal may exceed the
+   * limit, `RED` that it failed.
+   *
+   * `GET /api/v2/kyc/additional-verification/withdrawal-limit-skip/status`
+   *
+   * @experimental
+   */
+  status(
+    params: KycWithdrawalLimitSkipStatusParams,
+    options?: RequestOptions,
+  ): Promise<KycWithdrawalLimitSkipStatus> {
+    return this._client.call(
+      {
+        service: 'api',
+        method: 'GET',
+        path: '/api/v2/kyc/additional-verification/withdrawal-limit-skip/status',
+        query: params,
+      },
+      options,
+    );
+  }
+
+  /**
+   * Ask to withdraw above the limit
+   *
+   * Offered by the withdrawal form when the amount is above the limit; the web app first checks
+   * `kyc.withdrawal_limit_skip.status` and does not call this while it is `PROCESSING`. The answer
+   * carries a SumSub (Cyberity) WebSDK access token for an additional liveness check, which the
+   * user passes in a browser; the outcome then appears in `kyc.withdrawal_limit_skip.status`.
+   *
+   * `POST /api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm`
+   *
+   * @experimental
+   */
+  confirm(type: KycWithdrawalLimitType, options?: RequestOptions): Promise<KycWithdrawalLimitSkip> {
+    return this._client.call(
+      {
+        service: 'api',
+        method: 'POST',
+        path: '/api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm',
+        pathParams: { type },
+      },
+      options,
+    );
+  }
+}
+
 /** Parameters of {@link KycResource.get}. */
 export interface KycGetParams {
   /**
@@ -497,4 +582,10 @@ export interface KycSdkLinkParams {
 /** Parameters of {@link KycSumsubResource.token}. */
 export interface KycSumsubTokenParams {
   levelType: KycSumsubLevelType;
+}
+
+/** Parameters of {@link KycWithdrawalLimitSkipResource.status}. */
+export interface KycWithdrawalLimitSkipStatusParams {
+  /** Which withdrawal limit the check is for. */
+  cause: KycWithdrawalLimitSkipCause;
 }

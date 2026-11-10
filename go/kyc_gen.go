@@ -11,15 +11,16 @@ import (
 
 // KYCResource holds the operations available as Client.KYC.
 type KYCResource struct {
-	Actualization  *KYCActualizationResource
-	CryptoTest     *KYCCryptoTestResource
-	Liveness       *KYCLivenessResource
-	Msi            *KYCMsiResource
-	PersonalData   *KYCPersonalDataResource
-	ProfileClosure *KYCProfileClosureResource
-	Qualification  *KYCQualificationResource
-	Sdk            *KYCSdkResource
-	Sumsub         *KYCSumsubResource
+	Actualization       *KYCActualizationResource
+	CryptoTest          *KYCCryptoTestResource
+	Liveness            *KYCLivenessResource
+	Msi                 *KYCMsiResource
+	PersonalData        *KYCPersonalDataResource
+	ProfileClosure      *KYCProfileClosureResource
+	Qualification       *KYCQualificationResource
+	Sdk                 *KYCSdkResource
+	Sumsub              *KYCSumsubResource
+	WithdrawalLimitSkip *KYCWithdrawalLimitSkipResource
 
 	core *core
 }
@@ -164,6 +165,22 @@ func (r *KYCActualizationResource) IsCandidate(ctx context.Context, opts ...Requ
 		service: ServiceAPI,
 		method:  http.MethodGet,
 		path:    "/api/v2/actualization/client/is-candidate-for-actualization",
+	}, opts)
+}
+
+// ResetIdentity calls POST /api/v2/actualization/client/{applicantId}/reset/IDENTITY.
+//
+// Sent during data actualization when the SumSub (Cyberity) WebSDK, started with a
+// `kyc.sumsub.token` of level `MAIN`, loads an applicant whose review is already completed. It
+// resets the identity document step, so that the WebSDK asks for a current document.
+//
+// This endpoint is experimental and may change without notice.
+func (r *KYCActualizationResource) ResetIdentity(ctx context.Context, applicantID string, opts ...RequestOption) (json.RawMessage, error) {
+	return call[json.RawMessage](ctx, r.core, &operation{
+		service:    ServiceAPI,
+		method:     http.MethodPost,
+		path:       "/api/v2/actualization/client/{applicantId}/reset/IDENTITY",
+		pathParams: []string{applicantID},
 	}, opts)
 }
 
@@ -465,5 +482,51 @@ func (r *KYCSumsubResource) Token(ctx context.Context, params KYCSumsubTokenPara
 		method:  http.MethodGet,
 		path:    "/api/v1/kyc/sumsub/sdk/token",
 		params:  params,
+	}, opts)
+}
+
+// KYCWithdrawalLimitSkipResource holds the operations available as Client.KYC.WithdrawalLimitSkip.
+type KYCWithdrawalLimitSkipResource struct {
+	core *core
+}
+
+// KYCWithdrawalLimitSkipStatusParams holds the parameters of
+// [KYCWithdrawalLimitSkipResource.Status].
+type KYCWithdrawalLimitSkipStatusParams struct {
+	// Which withdrawal limit the check is for.
+	Cause KYCWithdrawalLimitSkipCause `query:"cause"`
+}
+
+// Status returns the status as a bare string. `PROCESSING` means the additional check started by
+// `kyc.withdrawal_limit_skip.confirm` is running; the web app polls every 10, 20 and then 30
+// seconds for at most 5 minutes. `GREEN` means the check passed and the withdrawal may exceed the
+// limit, `RED` that it failed.
+//
+// It calls GET /api/v2/kyc/additional-verification/withdrawal-limit-skip/status.
+//
+// This endpoint is experimental and may change without notice.
+func (r *KYCWithdrawalLimitSkipResource) Status(ctx context.Context, params KYCWithdrawalLimitSkipStatusParams, opts ...RequestOption) (KYCWithdrawalLimitSkipStatus, error) {
+	return call[KYCWithdrawalLimitSkipStatus](ctx, r.core, &operation{
+		service: ServiceAPI,
+		method:  http.MethodGet,
+		path:    "/api/v2/kyc/additional-verification/withdrawal-limit-skip/status",
+		params:  params,
+	}, opts)
+}
+
+// Confirm calls POST /api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm.
+//
+// Offered by the withdrawal form when the amount is above the limit; the web app first checks
+// `kyc.withdrawal_limit_skip.status` and does not call this while it is `PROCESSING`. The answer
+// carries a SumSub (Cyberity) WebSDK access token for an additional liveness check, which the user
+// passes in a browser; the outcome then appears in `kyc.withdrawal_limit_skip.status`.
+//
+// This endpoint is experimental and may change without notice.
+func (r *KYCWithdrawalLimitSkipResource) Confirm(ctx context.Context, typeParam KYCWithdrawalLimitType, opts ...RequestOption) (*KYCWithdrawalLimitSkip, error) {
+	return call[*KYCWithdrawalLimitSkip](ctx, r.core, &operation{
+		service:    ServiceAPI,
+		method:     http.MethodPost,
+		path:       "/api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm",
+		pathParams: []string{string(typeParam)},
 	}, opts)
 }

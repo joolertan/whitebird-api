@@ -19,9 +19,9 @@ use crate::models::{
     IcoBuybackApplicationStatus, IcoBuybackOfferStatus, IcoBuybackPaymentStatus, IcoEmissionStatus,
     IcoObligationStatus, IcoOperationAccount, IcoOperationStatus, IcoPaymentInterval,
     IcoReportFormat, IcoYieldPeriod, KycProvider, KycQualificationRequest, KycSumsubLevelType,
-    MarketCategory, MarketKlineInterval, MerchantReportFileType, MtsCardCountry, Network,
-    OrderUnifiedOperationType, OtcOrderStatus, PaymentCountryGroup, PaymentOrderType,
-    PaymentProviderType, ProviderType, ReportDateFrame, ReportOperationType,
+    KycWithdrawalLimitSkipCause, MarketCategory, MarketKlineInterval, MerchantReportFileType,
+    MtsCardCountry, Network, OrderUnifiedOperationType, OtcOrderStatus, PaymentCountryGroup,
+    PaymentOrderType, PaymentProviderType, ProviderType, ReportDateFrame, ReportOperationType,
     StatusbankPaymentSystem, SubaccountAddressRequest, SubaccountDocType, SubaccountType,
     SupportRequest, TradingCategory, TradingOrderSide, TradingOrderType, TradingPortfolioPeriod,
     TradingReportFormat, TradingSortDirection, TradingTimeInForce, UserGender,
@@ -1631,6 +1631,14 @@ pub struct KycSdkLinkParams {
 #[derive(Debug, Clone, PartialEq, bon::Builder)]
 pub struct KycSumsubTokenParams {
     pub level_type: KycSumsubLevelType,
+}
+
+/// Parameters of
+/// [`KycWithdrawalLimitSkipResource::status`](crate::resources::KycWithdrawalLimitSkipResource::status).
+#[derive(Debug, Clone, PartialEq, bon::Builder)]
+pub struct KycWithdrawalLimitSkipStatusParams {
+    /// Which withdrawal limit the check is for.
+    pub cause: KycWithdrawalLimitSkipCause,
 }
 
 /// Parameters of [`Market::instruments`](crate::resources::Market::instruments).

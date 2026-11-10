@@ -1406,6 +1406,12 @@ type KYCQualificationRequest struct {
 	PersonalTradingExperience *bool             `json:"personalTradingExperience,omitzero"`
 }
 
+// KYCSumsubLevelAccess is used in [KYCWithdrawalLimitSkip].
+type KYCSumsubLevelAccess struct {
+	// SumSub WebSDK access token. Inferred from the web application; not yet observed in responses.
+	Token string `json:"token,omitzero"`
+}
+
 // KYCSumsubToken is returned by [KYCSumsubResource.Token].
 type KYCSumsubToken struct {
 	// SumSub WebSDK access token. Inferred from the web application; not yet observed in responses.
@@ -1440,6 +1446,15 @@ type KYCVerification struct {
 	// Public offer accepted in the provider SDK. Inferred from the web application; not yet observed
 	// in responses.
 	SdkOferta bool `json:"sdkOferta,omitzero"`
+}
+
+// KYCWithdrawalLimitSkip is returned by [KYCWithdrawalLimitSkipResource.Confirm].
+type KYCWithdrawalLimitSkip struct {
+	// SumSub verification level of the check. Inferred from the web application; not yet observed in
+	// responses.
+	Level string `json:"level,omitzero"`
+	// Inferred from the web application; not yet observed in responses.
+	SumsubLevelAccessInfo *KYCSumsubLevelAccess `json:"sumsubLevelAccessInfo,omitzero"`
 }
 
 // MarketInstrument is returned by [MarketResource.Instruments].

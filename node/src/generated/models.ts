@@ -724,6 +724,34 @@ export const KycSumsubLevelType = {
   LIVENESS: 'LIVENESS',
 } as const;
 
+export type KycWithdrawalLimitSkipCause =
+  | 'CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP'
+  | 'CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP'
+  | (string & {});
+
+/** Known values of {@link KycWithdrawalLimitSkipCause}; others may appear as the API evolves. */
+export const KycWithdrawalLimitSkipCause = {
+  CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP: 'CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP',
+  CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP: 'CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP',
+} as const;
+
+export type KycWithdrawalLimitSkipStatus = 'PROCESSING' | 'GREEN' | 'RED' | (string & {});
+
+/** Known values of {@link KycWithdrawalLimitSkipStatus}; others may appear as the API evolves. */
+export const KycWithdrawalLimitSkipStatus = {
+  PROCESSING: 'PROCESSING',
+  GREEN: 'GREEN',
+  RED: 'RED',
+} as const;
+
+export type KycWithdrawalLimitType = 'crypto' | 'fiat' | (string & {});
+
+/** Known values of {@link KycWithdrawalLimitType}; others may appear as the API evolves. */
+export const KycWithdrawalLimitType = {
+  CRYPTO: 'crypto',
+  FIAT: 'fiat',
+} as const;
+
 export type MarketCategory = 'spot' | (string & {});
 
 /** Known values of {@link MarketCategory}; others may appear as the API evolves. */
@@ -3635,6 +3663,14 @@ export interface KycQualificationSubmitRequest {
   files: (Blob | Uint8Array)[];
 }
 
+export interface KycSumsubLevelAccess {
+  /**
+   * SumSub WebSDK access token.
+   * Inferred from the web application, not observed in API responses.
+   */
+  token?: string;
+}
+
 export interface KycSumsubToken {
   /**
    * SumSub WebSDK access token.
@@ -3695,6 +3731,16 @@ export interface KycVerificationRequest {
   firstStageConfirmed?: boolean | undefined;
   secondStageConfirmed?: boolean | undefined;
   emailVerified?: boolean | undefined;
+}
+
+export interface KycWithdrawalLimitSkip {
+  /**
+   * SumSub verification level of the check.
+   * Inferred from the web application, not observed in API responses.
+   */
+  level?: string;
+  /** Inferred from the web application, not observed in API responses. */
+  sumsubLevelAccessInfo?: KycSumsubLevelAccess;
 }
 
 export interface MarketInstrument {

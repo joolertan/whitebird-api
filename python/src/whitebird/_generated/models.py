@@ -206,10 +206,15 @@ __all__ = [
     "KycProvider",
     "KycQualificationRequest",
     "KycQualificationSubmitRequest",
+    "KycSumsubLevelAccess",
     "KycSumsubLevelType",
     "KycSumsubToken",
     "KycVerification",
     "KycVerificationRequest",
+    "KycWithdrawalLimitSkip",
+    "KycWithdrawalLimitSkipCause",
+    "KycWithdrawalLimitSkipStatus",
+    "KycWithdrawalLimitType",
     "MarketCategory",
     "MarketInstrument",
     "MarketKline",
@@ -851,6 +856,28 @@ class KycSumsubLevelType(StrEnum):
 
     MAIN = "MAIN"
     LIVENESS = "LIVENESS"
+
+
+class KycWithdrawalLimitSkipCause(StrEnum):
+    """Values of the `cause` parameter of `client.kyc.withdrawal_limit_skip.status()`."""
+
+    CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP = "CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP"
+    CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP = "CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP"
+
+
+class KycWithdrawalLimitSkipStatus(StrEnum):
+    """Returned by `client.kyc.withdrawal_limit_skip.status()`."""
+
+    PROCESSING = "PROCESSING"
+    GREEN = "GREEN"
+    RED = "RED"
+
+
+class KycWithdrawalLimitType(StrEnum):
+    """Values of the `type` parameter of `client.kyc.withdrawal_limit_skip.confirm()`."""
+
+    CRYPTO = "crypto"
+    FIAT = "fiat"
 
 
 class MarketCategory(StrEnum):
@@ -4042,6 +4069,13 @@ class KycQualificationSubmitRequest(WhitebirdModel):
     """Supporting documents, sent as one part per file."""
 
 
+class KycSumsubLevelAccess(WhitebirdModel):
+    """Used in `KycWithdrawalLimitSkip.sumsub_level_access_info`."""
+
+    token: str | None = None
+    """SumSub WebSDK access token. Inferred from the web application; may be missing."""
+
+
 class KycSumsubToken(WhitebirdModel):
     """Returned by `client.kyc.sumsub.token()`."""
 
@@ -4116,6 +4150,16 @@ class KycVerificationRequest(WhitebirdModel):
     first_stage_confirmed: bool | None = None
     second_stage_confirmed: bool | None = None
     email_verified: bool | None = None
+
+
+class KycWithdrawalLimitSkip(WhitebirdModel):
+    """Returned by `client.kyc.withdrawal_limit_skip.confirm()`."""
+
+    level: str | None = None
+    """SumSub verification level of the check. Inferred from the web application; may be missing."""
+
+    sumsub_level_access_info: KycSumsubLevelAccess | None = None
+    """Inferred from the web application; may be missing."""
 
 
 class MarketInstrument(WhitebirdModel):

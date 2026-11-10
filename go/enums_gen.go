@@ -612,6 +612,33 @@ const (
 	KYCSumsubLevelTypeLiveness KYCSumsubLevelType = "LIVENESS"
 )
 
+// KYCWithdrawalLimitSkipCause is used in [KYCWithdrawalLimitSkipStatusParams].
+type KYCWithdrawalLimitSkipCause string
+
+// Known values of [KYCWithdrawalLimitSkipCause].
+const (
+	KYCWithdrawalLimitSkipCauseConfirmCryptoWithdrawalLimitSkip KYCWithdrawalLimitSkipCause = "CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP"
+	KYCWithdrawalLimitSkipCauseConfirmFiatWithdrawalLimitSkip   KYCWithdrawalLimitSkipCause = "CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP"
+)
+
+// KYCWithdrawalLimitSkipStatus is returned by [KYCWithdrawalLimitSkipResource.Status].
+type KYCWithdrawalLimitSkipStatus string
+
+// Known values of [KYCWithdrawalLimitSkipStatus].
+const (
+	KYCWithdrawalLimitSkipStatusProcessing KYCWithdrawalLimitSkipStatus = "PROCESSING"
+	KYCWithdrawalLimitSkipStatusGreen      KYCWithdrawalLimitSkipStatus = "GREEN"
+	KYCWithdrawalLimitSkipStatusRed        KYCWithdrawalLimitSkipStatus = "RED"
+)
+
+type KYCWithdrawalLimitType string
+
+// Known values of [KYCWithdrawalLimitType].
+const (
+	KYCWithdrawalLimitTypeCrypto KYCWithdrawalLimitType = "crypto"
+	KYCWithdrawalLimitTypeFiat   KYCWithdrawalLimitType = "fiat"
+)
+
 // MarketCategory is used in [MarketInstrumentsParams].
 type MarketCategory string
 

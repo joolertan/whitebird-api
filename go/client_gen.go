@@ -76,16 +76,17 @@ func (c *Client) initResources() {
 		Statistics:  &IcoStatisticsResource{core: c.core},
 	}
 	c.KYC = &KYCResource{
-		Actualization:  &KYCActualizationResource{core: c.core},
-		CryptoTest:     &KYCCryptoTestResource{core: c.core},
-		Liveness:       &KYCLivenessResource{core: c.core},
-		Msi:            &KYCMsiResource{core: c.core},
-		PersonalData:   &KYCPersonalDataResource{core: c.core},
-		ProfileClosure: &KYCProfileClosureResource{core: c.core},
-		Qualification:  &KYCQualificationResource{core: c.core},
-		Sdk:            &KYCSdkResource{core: c.core},
-		Sumsub:         &KYCSumsubResource{core: c.core},
-		core:           c.core,
+		Actualization:       &KYCActualizationResource{core: c.core},
+		CryptoTest:          &KYCCryptoTestResource{core: c.core},
+		Liveness:            &KYCLivenessResource{core: c.core},
+		Msi:                 &KYCMsiResource{core: c.core},
+		PersonalData:        &KYCPersonalDataResource{core: c.core},
+		ProfileClosure:      &KYCProfileClosureResource{core: c.core},
+		Qualification:       &KYCQualificationResource{core: c.core},
+		Sdk:                 &KYCSdkResource{core: c.core},
+		Sumsub:              &KYCSumsubResource{core: c.core},
+		WithdrawalLimitSkip: &KYCWithdrawalLimitSkipResource{core: c.core},
+		core:                c.core,
 	}
 	c.Market = &MarketResource{core: c.core}
 	c.Merchant = &MerchantResource{

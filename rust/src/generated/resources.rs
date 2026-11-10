@@ -22,10 +22,11 @@ use crate::models::{
     IcoPaymentSchedule, IcoRate, IcoStatistics, IcoYearAmount, IcoYield, KycActualData,
     KycActualizationClientStatus, KycCryptoTest, KycInvestorData, KycLivenessSession,
     KycLivenessStatus, KycMsiRedirect, KycPersonalData, KycSumsubToken, KycVerification,
-    MarketInstrument, MarketKline, MarketOrderbook, Merchant, MerchantClientCounts, MerchantOrder,
-    MerchantPair, MtsCardCountry, MtsQrCommission, MtsQrInfo, NotificationEvent,
-    NotificationStreamMessage, OrderUnifiedResponse, OtcOrderCalculateResponse, OtcOrderResponse,
-    PaymentCard, PaymentCardLimits, PaymentCommission, PaymentDirectionCommission, PaymentMethod,
+    KycWithdrawalLimitSkip, KycWithdrawalLimitSkipStatus, KycWithdrawalLimitType, MarketInstrument,
+    MarketKline, MarketOrderbook, Merchant, MerchantClientCounts, MerchantOrder, MerchantPair,
+    MtsCardCountry, MtsQrCommission, MtsQrInfo, NotificationEvent, NotificationStreamMessage,
+    OrderUnifiedResponse, OtcOrderCalculateResponse, OtcOrderResponse, PaymentCard,
+    PaymentCardLimits, PaymentCommission, PaymentDirectionCommission, PaymentMethod,
     PaymentMethodResponse, PaymentProvider, PaymentProviderType, Referral, ReferralTransaction,
     RegistrationSdkResult, RegistrationState, StatusbankCardDetails, StatusbankCardSystems,
     StatusbankOrderConfirmation, StatusbankRegistration, SubaccountDetailsResponse,
@@ -75,27 +76,28 @@ use crate::params::{
     IcoStatisticsIssuerPaymentScheduleParams, KycAgreeOfferParams, KycCryptoTestSubmitParams,
     KycGetParams, KycLivenessStartParams, KycMsiAuthenticateParams, KycProfileClosureConfirmParams,
     KycQualificationSubmitParams, KycSdkLinkParams, KycSubmitParams, KycSumsubTokenParams,
-    MarketInstrumentsParams, MarketKlinesParams, MarketOrderbookParams,
-    MerchantDownloadReportParams, MerchantOrdersHistoryParams, MerchantSetShowNameParams,
-    MerchantStatisticsCountByStatusParams, MerchantStatisticsExportCsvParams,
-    MerchantWebhooksSetUrlParams, NotificationsMarkViewedParams, NotificationsSearchParams,
-    PaymentsCardsRenameParams, PaymentsCommissionsListParams, PaymentsMethodsListParams,
-    PaymentsProvidersListParams, ProvidersAlfaCardBindUrlParams, ProvidersAlfaPaymentParams,
-    ProvidersAssistCardBindFormParams, ProvidersMtsBindCardParams, ProvidersMtsQrCommissionParams,
-    ProvidersMtsQrInfoParams, ProvidersStatusbankConfirmOrderParams,
-    ProvidersStatusbankRegisterCardParams, ProvidersVtbCortiMilliRateParams,
-    ReferralTransactionsListParams, RegistrationCompleteParams, RegistrationCompleteSdkParams,
-    RegistrationInitiateParams, RegistrationInitiateSdkParams, RegistrationResendEmailCodeParams,
-    RegistrationSendPhoneCodeParams, RegistrationVerifyEmailParams, RegistrationVerifyPhoneParams,
-    ReportsDownloadBalanceParams, ReportsDownloadExchangeParams, ReportsEmailBalanceParams,
-    ReportsEmailExchangeParams, SupportSendParams, TradingAccountFeeRateParams,
-    TradingAccountPortfolioStatisticsParams, TradingDemoDepositParams, TradingExecutionsListParams,
-    TradingOrdersActiveParams, TradingOrdersAmendParams, TradingOrdersCancelParams,
-    TradingOrdersCreateParams, TradingOrdersHistoryParams, TradingOrdersListParams,
-    TradingReportsOperationsParams, UserAntifraudVerifyCodeParams, UserEmailConfirmParams,
-    UserEmailSendCodeParams, UserEmailVerifyCodeParams, UserMfaVerifyParams,
-    UserPasswordChangeParams, UserPasswordResetParams, UserPasswordSendResetLinkParams,
-    UserPhoneChangeParams, UserPhoneSendChangeCodeParams, UserPhoneSetNotificationsParams,
+    KycWithdrawalLimitSkipStatusParams, MarketInstrumentsParams, MarketKlinesParams,
+    MarketOrderbookParams, MerchantDownloadReportParams, MerchantOrdersHistoryParams,
+    MerchantSetShowNameParams, MerchantStatisticsCountByStatusParams,
+    MerchantStatisticsExportCsvParams, MerchantWebhooksSetUrlParams, NotificationsMarkViewedParams,
+    NotificationsSearchParams, PaymentsCardsRenameParams, PaymentsCommissionsListParams,
+    PaymentsMethodsListParams, PaymentsProvidersListParams, ProvidersAlfaCardBindUrlParams,
+    ProvidersAlfaPaymentParams, ProvidersAssistCardBindFormParams, ProvidersMtsBindCardParams,
+    ProvidersMtsQrCommissionParams, ProvidersMtsQrInfoParams,
+    ProvidersStatusbankConfirmOrderParams, ProvidersStatusbankRegisterCardParams,
+    ProvidersVtbCortiMilliRateParams, ReferralTransactionsListParams, RegistrationCompleteParams,
+    RegistrationCompleteSdkParams, RegistrationInitiateParams, RegistrationInitiateSdkParams,
+    RegistrationResendEmailCodeParams, RegistrationSendPhoneCodeParams,
+    RegistrationVerifyEmailParams, RegistrationVerifyPhoneParams, ReportsDownloadBalanceParams,
+    ReportsDownloadExchangeParams, ReportsEmailBalanceParams, ReportsEmailExchangeParams,
+    SupportSendParams, TradingAccountFeeRateParams, TradingAccountPortfolioStatisticsParams,
+    TradingDemoDepositParams, TradingExecutionsListParams, TradingOrdersActiveParams,
+    TradingOrdersAmendParams, TradingOrdersCancelParams, TradingOrdersCreateParams,
+    TradingOrdersHistoryParams, TradingOrdersListParams, TradingReportsOperationsParams,
+    UserAntifraudVerifyCodeParams, UserEmailConfirmParams, UserEmailSendCodeParams,
+    UserEmailVerifyCodeParams, UserMfaVerifyParams, UserPasswordChangeParams,
+    UserPasswordResetParams, UserPasswordSendResetLinkParams, UserPhoneChangeParams,
+    UserPhoneSendChangeCodeParams, UserPhoneSetNotificationsParams,
     UserPhoneVerifyChangeCodeParams, UserPhoneVerifyConfirmationCodeParams, UserSetGenderParams,
 };
 use crate::sse::EventStream;
@@ -3615,6 +3617,13 @@ impl<'a> Kyc<'a> {
         }
     }
 
+    /// Endpoints of `client.kyc().withdrawal_limit_skip()`.
+    pub fn withdrawal_limit_skip(&self) -> KycWithdrawalLimitSkipResource<'a> {
+        KycWithdrawalLimitSkipResource {
+            client: self.client,
+        }
+    }
+
     /// Accept the public offer
     ///
     /// Sent once when the user profile has no `offerAgreement` yet: for SumSub and PIN after
@@ -3786,6 +3795,34 @@ impl KycActualization<'_> {
             .send()
             .await?
             .json()
+            .await
+    }
+
+    /// Ask for the identity document again
+    ///
+    /// Sent during data actualization when the SumSub (Cyberity) WebSDK, started with a
+    /// `kyc.sumsub.token` of level `MAIN`, loads an applicant whose review is already
+    /// completed. It resets the identity document step, so that the WebSDK asks for a current
+    /// document.
+    ///
+    /// `POST /api/v2/actualization/client/{applicantId}/reset/IDENTITY`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub async fn reset_identity(&self, applicant_id: &str) -> Result<Value> {
+        self.client
+            .request_path(
+                Service::Api,
+                Method::POST,
+                "/api/v2/actualization/client/{}/reset/IDENTITY",
+                &[&applicant_id],
+            )
+            .send()
+            .await?
+            .json_or_text()
             .await
     }
 }
@@ -4149,6 +4186,74 @@ impl KycSumsub<'_> {
         self.client
             .request(Service::Kyc, Method::GET, "/api/v1/kyc/sumsub/sdk/token")
             .query("levelType", &params.level_type)
+            .send()
+            .await?
+            .json()
+            .await
+    }
+}
+
+/// Endpoints of `client.kyc().withdrawal_limit_skip()`.
+#[derive(Debug, Clone, Copy)]
+pub struct KycWithdrawalLimitSkipResource<'a> {
+    client: &'a Client,
+}
+
+impl KycWithdrawalLimitSkipResource<'_> {
+    /// Get the status of a withdrawal limit increase
+    ///
+    /// Returns the status as a bare string. `PROCESSING` means the additional check started by
+    /// `kyc.withdrawal_limit_skip.confirm` is running; the web app polls every 10, 20 and then
+    /// 30 seconds for at most 5 minutes. `GREEN` means the check passed and the withdrawal may
+    /// exceed the limit, `RED` that it failed.
+    ///
+    /// `GET /api/v2/kyc/additional-verification/withdrawal-limit-skip/status`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub async fn status(
+        &self,
+        params: KycWithdrawalLimitSkipStatusParams,
+    ) -> Result<KycWithdrawalLimitSkipStatus> {
+        self.client
+            .request(
+                Service::Api,
+                Method::GET,
+                "/api/v2/kyc/additional-verification/withdrawal-limit-skip/status",
+            )
+            .query("cause", &params.cause)
+            .send()
+            .await?
+            .json()
+            .await
+    }
+
+    /// Ask to withdraw above the limit
+    ///
+    /// Offered by the withdrawal form when the amount is above the limit; the web app first
+    /// checks `kyc.withdrawal_limit_skip.status` and does not call this while it is
+    /// `PROCESSING`. The answer carries a SumSub (Cyberity) WebSDK access token for an
+    /// additional liveness check, which the user passes in a browser; the outcome then appears
+    /// in `kyc.withdrawal_limit_skip.status`.
+    ///
+    /// `POST /api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm`
+    ///
+    /// **Experimental:** the endpoint may change without notice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be decoded.
+    pub async fn confirm(&self, r#type: KycWithdrawalLimitType) -> Result<KycWithdrawalLimitSkip> {
+        self.client
+            .request_path(
+                Service::Api,
+                Method::POST,
+                "/api/v2/kyc/additional-verification/withdrawal-limit-skip/{}/confirm",
+                &[&r#type],
+            )
             .send()
             .await?
             .json()

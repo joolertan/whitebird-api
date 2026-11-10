@@ -23,6 +23,10 @@ from whitebird._generated.models import (
     KycSumsubLevelType,
     KycSumsubToken,
     KycVerification,
+    KycWithdrawalLimitSkip,
+    KycWithdrawalLimitSkipCause,
+    KycWithdrawalLimitSkipStatus,
+    KycWithdrawalLimitType,
 )
 from whitebird._resource import AsyncResource, SyncResource
 from whitebird.types import FileContent, RequestOptions
@@ -75,6 +79,11 @@ class KycResource(SyncResource):
     def sumsub(self) -> KycSumsubResource:
         """Operations of `client.kyc.sumsub`."""
         return KycSumsubResource(self._engine)
+
+    @cached_property
+    def withdrawal_limit_skip(self) -> KycWithdrawalLimitSkipResource:
+        """Operations of `client.kyc.withdrawal_limit_skip`."""
+        return KycWithdrawalLimitSkipResource(self._engine)
 
     def agree_offer(
         self,
@@ -315,6 +324,36 @@ class KycActualizationResource(SyncResource):
             "GET",
             "/api/v2/actualization/client/is-candidate-for-actualization",
             cast_to=bool,
+            options=options,
+        )
+
+    def reset_identity(
+        self,
+        applicant_id: str,
+        **options: Unpack[RequestOptions],
+    ) -> Any:
+        """Ask for the identity document again.
+
+        Sent during data actualization when the SumSub (Cyberity) WebSDK, started with a
+        `kyc.sumsub.token` of level `MAIN`, loads an applicant whose review is already completed. It
+        resets the identity document step, so that the WebSDK asks for a current document.
+
+        Args:
+            applicant_id: Applicant id reported by the WebSDK event `idCheck.onApplicantLoaded`.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The decoded JSON response.
+        """
+        return self._engine.request(
+            "api",
+            "POST",
+            "/api/v2/actualization/client/{applicantId}/reset/IDENTITY",
+            path_params={"applicantId": applicant_id},
             options=options,
         )
 
@@ -754,6 +793,79 @@ class KycSumsubResource(SyncResource):
         )
 
 
+class KycWithdrawalLimitSkipResource(SyncResource):
+    """Operations of `client.kyc.withdrawal_limit_skip`."""
+
+    def status(
+        self,
+        *,
+        cause: KycWithdrawalLimitSkipCause | str,
+        **options: Unpack[RequestOptions],
+    ) -> KycWithdrawalLimitSkipStatus | str:
+        """Get the status of a withdrawal limit increase.
+
+        Returns the status as a bare string. `PROCESSING` means the additional check started by
+        `kyc.withdrawal_limit_skip.confirm` is running; the web app polls every 10, 20 and then 30
+        seconds for at most 5 minutes. `GREEN` means the check passed and the withdrawal may exceed
+        the limit, `RED` that it failed.
+
+        Args:
+            cause: Which withdrawal limit the check is for.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The response as `KycWithdrawalLimitSkipStatus | str`.
+        """
+        return cast(
+            "KycWithdrawalLimitSkipStatus | str",
+            self._engine.request(
+                "api",
+                "GET",
+                "/api/v2/kyc/additional-verification/withdrawal-limit-skip/status",
+                params={"cause": cause},
+                cast_to=KycWithdrawalLimitSkipStatus | str,
+                options=options,
+            ),
+        )
+
+    def confirm(
+        self,
+        type: KycWithdrawalLimitType | str,
+        **options: Unpack[RequestOptions],
+    ) -> KycWithdrawalLimitSkip:
+        """Ask to withdraw above the limit.
+
+        Offered by the withdrawal form when the amount is above the limit; the web app first checks
+        `kyc.withdrawal_limit_skip.status` and does not call this while it is `PROCESSING`. The
+        answer carries a SumSub (Cyberity) WebSDK access token for an additional liveness check,
+        which the user passes in a browser; the outcome then appears in
+        `kyc.withdrawal_limit_skip.status`.
+
+        Args:
+            type: `type` path parameter.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The response as `KycWithdrawalLimitSkip`.
+        """
+        return self._engine.request(
+            "api",
+            "POST",
+            "/api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm",
+            path_params={"type": type},
+            cast_to=KycWithdrawalLimitSkip,
+            options=options,
+        )
+
+
 class AsyncKycResource(AsyncResource):
     """Operations of `client.kyc`."""
 
@@ -801,6 +913,11 @@ class AsyncKycResource(AsyncResource):
     def sumsub(self) -> AsyncKycSumsubResource:
         """Operations of `client.kyc.sumsub`."""
         return AsyncKycSumsubResource(self._engine)
+
+    @cached_property
+    def withdrawal_limit_skip(self) -> AsyncKycWithdrawalLimitSkipResource:
+        """Operations of `client.kyc.withdrawal_limit_skip`."""
+        return AsyncKycWithdrawalLimitSkipResource(self._engine)
 
     async def agree_offer(
         self,
@@ -1041,6 +1158,36 @@ class AsyncKycActualizationResource(AsyncResource):
             "GET",
             "/api/v2/actualization/client/is-candidate-for-actualization",
             cast_to=bool,
+            options=options,
+        )
+
+    async def reset_identity(
+        self,
+        applicant_id: str,
+        **options: Unpack[RequestOptions],
+    ) -> Any:
+        """Ask for the identity document again.
+
+        Sent during data actualization when the SumSub (Cyberity) WebSDK, started with a
+        `kyc.sumsub.token` of level `MAIN`, loads an applicant whose review is already completed. It
+        resets the identity document step, so that the WebSDK asks for a current document.
+
+        Args:
+            applicant_id: Applicant id reported by the WebSDK event `idCheck.onApplicantLoaded`.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The decoded JSON response.
+        """
+        return await self._engine.request(
+            "api",
+            "POST",
+            "/api/v2/actualization/client/{applicantId}/reset/IDENTITY",
+            path_params={"applicantId": applicant_id},
             options=options,
         )
 
@@ -1476,5 +1623,78 @@ class AsyncKycSumsubResource(AsyncResource):
             "/api/v1/kyc/sumsub/sdk/token",
             params={"levelType": level_type},
             cast_to=KycSumsubToken,
+            options=options,
+        )
+
+
+class AsyncKycWithdrawalLimitSkipResource(AsyncResource):
+    """Operations of `client.kyc.withdrawal_limit_skip`."""
+
+    async def status(
+        self,
+        *,
+        cause: KycWithdrawalLimitSkipCause | str,
+        **options: Unpack[RequestOptions],
+    ) -> KycWithdrawalLimitSkipStatus | str:
+        """Get the status of a withdrawal limit increase.
+
+        Returns the status as a bare string. `PROCESSING` means the additional check started by
+        `kyc.withdrawal_limit_skip.confirm` is running; the web app polls every 10, 20 and then 30
+        seconds for at most 5 minutes. `GREEN` means the check passed and the withdrawal may exceed
+        the limit, `RED` that it failed.
+
+        Args:
+            cause: Which withdrawal limit the check is for.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The response as `KycWithdrawalLimitSkipStatus | str`.
+        """
+        return cast(
+            "KycWithdrawalLimitSkipStatus | str",
+            await self._engine.request(
+                "api",
+                "GET",
+                "/api/v2/kyc/additional-verification/withdrawal-limit-skip/status",
+                params={"cause": cause},
+                cast_to=KycWithdrawalLimitSkipStatus | str,
+                options=options,
+            ),
+        )
+
+    async def confirm(
+        self,
+        type: KycWithdrawalLimitType | str,
+        **options: Unpack[RequestOptions],
+    ) -> KycWithdrawalLimitSkip:
+        """Ask to withdraw above the limit.
+
+        Offered by the withdrawal form when the amount is above the limit; the web app first checks
+        `kyc.withdrawal_limit_skip.status` and does not call this while it is `PROCESSING`. The
+        answer carries a SumSub (Cyberity) WebSDK access token for an additional liveness check,
+        which the user passes in a browser; the outcome then appears in
+        `kyc.withdrawal_limit_skip.status`.
+
+        Args:
+            type: `type` path parameter.
+            **options: Per-request options, see `RequestOptions`.
+
+        Note:
+            Experimental: the endpoint may change or disappear without notice. Reconstructed from
+            the Whitebird web application; fields may be missing.
+
+        Returns:
+            The response as `KycWithdrawalLimitSkip`.
+        """
+        return await self._engine.request(
+            "api",
+            "POST",
+            "/api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm",
+            path_params={"type": type},
+            cast_to=KycWithdrawalLimitSkip,
             options=options,
         )

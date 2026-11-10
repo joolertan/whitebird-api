@@ -4,8 +4,8 @@ info:
   version: '1'
   description: >-
     The `api` host parts that belong to verification: offer agreement, crypto test results,
-    liveness checks, MSI and PIN identification, client data actualization and investor
-    qualification. Reconstructed from the whitebird.io web app.
+    liveness checks, MSI and PIN identification, client data actualization, withdrawals above the
+    limit and investor qualification. Reconstructed from the whitebird.io web app.
 x-wb-service: api
 servers:
 - url: https://api.whitebird.io
@@ -201,6 +201,61 @@ paths:
                 oneOf:
                 - type: string
                 - $ref: '#/components/schemas/KycSdkLink'
+  /api/v2/kyc/additional-verification/withdrawal-limit-skip/status:
+    get:
+      operationId: kycWithdrawalLimitSkipStatus
+      x-wb-resource: kyc.withdrawal_limit_skip
+      x-wb-name: status
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-10'
+      summary: Get the status of a withdrawal limit increase
+      description: >-
+        Returns the status as a bare string. `PROCESSING` means the additional check started by
+        `kyc.withdrawal_limit_skip.confirm` is running; the web app polls every 10, 20 and then 30
+        seconds for at most 5 minutes. `GREEN` means the check passed and the withdrawal may exceed
+        the limit, `RED` that it failed.
+      parameters:
+      - name: cause
+        in: query
+        required: true
+        description: Which withdrawal limit the check is for.
+        schema:
+          $ref: '#/components/schemas/KycWithdrawalLimitSkipCause'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycWithdrawalLimitSkipStatus'
+  /api/v2/kyc/additional-verification/withdrawal-limit-skip/{type}/confirm:
+    post:
+      operationId: kycWithdrawalLimitSkipConfirm
+      x-wb-resource: kyc.withdrawal_limit_skip
+      x-wb-name: confirm
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-10'
+      summary: Ask to withdraw above the limit
+      description: >-
+        Offered by the withdrawal form when the amount is above the limit; the web app first checks
+        `kyc.withdrawal_limit_skip.status` and does not call this while it is `PROCESSING`. The answer
+        carries a SumSub (Cyberity) WebSDK access token for an additional liveness check, which the
+        user passes in a browser; the outcome then appears in `kyc.withdrawal_limit_skip.status`.
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/KycWithdrawalLimitType'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycWithdrawalLimitSkip'
   /api/v2/qualification:
     post:
       operationId: kycQualificationSubmit
@@ -320,6 +375,32 @@ paths:
             application/json:
               schema:
                 type: boolean
+  /api/v2/actualization/client/{applicantId}/reset/IDENTITY:
+    post:
+      operationId: kycActualizationResetIdentity
+      x-wb-resource: kyc.actualization
+      x-wb-name: reset_identity
+      x-wb-status: experimental
+      x-wb-source: bundle
+      x-wb-first-seen: '2026-11-10'
+      summary: Ask for the identity document again
+      description: >-
+        Sent during data actualization when the SumSub (Cyberity) WebSDK, started with a
+        `kyc.sumsub.token` of level `MAIN`, loads an applicant whose review is already completed. It
+        resets the identity document step, so that the WebSDK asks for a current document.
+      parameters:
+      - name: applicantId
+        in: path
+        required: true
+        description: Applicant id reported by the WebSDK event `idCheck.onApplicantLoaded`.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK (the web app does not read the body)
+          content:
+            application/json:
+              schema: {}
 components:
   schemas:
     KycOfferAgreement:
@@ -489,3 +570,29 @@ components:
     KycActualizationClientStatus:
       type: string
       enum: [NEW, IDENTIFIED, ON_VERIFICATION, ON_ADDITIONAL_CHECK, OPENED, PARTIALLY_OPENED, FROZEN, PAUSED, BLOCKED, CLOSED, ACTUALIZATION_REQUIRED]
+    KycWithdrawalLimitType:
+      type: string
+      enum: [crypto, fiat]
+    KycWithdrawalLimitSkipCause:
+      type: string
+      enum: [CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP, CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP]
+    KycWithdrawalLimitSkipStatus:
+      type: string
+      enum: [PROCESSING, GREEN, RED]
+    KycWithdrawalLimitSkip:
+      type: object
+      properties:
+        level:
+          type: string
+          description: SumSub verification level of the check.
+          x-wb-inferred: true
+        sumsubLevelAccessInfo:
+          $ref: '#/components/schemas/KycSumsubLevelAccess'
+          x-wb-inferred: true
+    KycSumsubLevelAccess:
+      type: object
+      properties:
+        token:
+          type: string
+          description: SumSub WebSDK access token.
+          x-wb-inferred: true

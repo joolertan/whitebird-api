@@ -2133,6 +2133,15 @@ pub struct KycQualificationRequest {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct KycSumsubLevelAccess {
+    /// SumSub WebSDK access token.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct KycSumsubToken {
     /// SumSub WebSDK access token.
     ///
@@ -2182,6 +2191,19 @@ pub struct KycVerification {
     /// Inferred from how the web application uses the response; may be absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sdk_oferta: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KycWithdrawalLimitSkip {
+    /// SumSub verification level of the check.
+    ///
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// Inferred from how the web application uses the response; may be absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sumsub_level_access_info: Option<KycSumsubLevelAccess>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -3970,6 +3992,31 @@ string_enum! {
     pub enum KycSumsubLevelType {
         Main = "MAIN",
         Liveness = "LIVENESS",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    pub enum KycWithdrawalLimitSkipCause {
+        ConfirmCryptoWithdrawalLimitSkip = "CONFIRM_CRYPTO_WITHDRAWAL_LIMIT_SKIP",
+        ConfirmFiatWithdrawalLimitSkip = "CONFIRM_FIAT_WITHDRAWAL_LIMIT_SKIP",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    pub enum KycWithdrawalLimitSkipStatus {
+        Processing = "PROCESSING",
+        Green = "GREEN",
+        Red = "RED",
+        _ => Unknown,
+    }
+}
+
+string_enum! {
+    pub enum KycWithdrawalLimitType {
+        Crypto = "crypto",
+        Fiat = "fiat",
         _ => Unknown,
     }
 }
