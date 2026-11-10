@@ -24,7 +24,7 @@ This crate is not affiliated with Whitebird.
 
 ```toml
 [dependencies]
-whitebird-api = { version = "0.1", features = ["otp"] }
+whitebird-api = { version = "1", features = ["otp"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
 ```

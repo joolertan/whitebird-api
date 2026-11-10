@@ -21,6 +21,13 @@ The clients are written to survive API changes between releases:
 
 ## Versioning
 
-Each SDK follows [semantic versioning](https://semver.org). Until 1.0, a minor version may change
-generated signatures when the API changes shape. Changes to stable (non-experimental) methods are
-listed in each package's changelog.
+The four SDKs are released together under one version and follow
+[semantic versioning](https://semver.org):
+
+- a breaking change to the client or to a stable (non-experimental) method comes only with a new
+  major version;
+- experimental operations may change shape in a minor version, following Whitebird;
+- a method whose endpoint Whitebird retires is marked *deprecated* first and removed in the next
+  major version.
+
+Every change is listed in each package's changelog.
