@@ -12,7 +12,6 @@ import (
 type ProvidersResource struct {
 	Alfa       *ProvidersAlfaResource
 	Assist     *ProvidersAssistResource
-	Bepaid     *ProvidersBepaidResource
 	Carusell   *ProvidersCarusellResource
 	Mts        *ProvidersMtsResource
 	Statusbank *ProvidersStatusbankResource
@@ -188,14 +187,6 @@ type ProvidersAssistCardBindFormParams struct {
 	ReturnURL string `query:"returnUrl"`
 }
 
-// ProvidersAssistCardBindURLParams holds the parameters of [ProvidersAssistResource.CardBindURL].
-type ProvidersAssistCardBindURLParams struct {
-	// Binding owner type; the web app always sends `CLIENT`. Defaults to "CLIENT".
-	Type *AssistCardBindType `query:"type"`
-	// Where Assist sends the browser after the binding.
-	ReturnURL string `query:"returnUrl"`
-}
-
 // CardBindForm creates an Assist card-binding session. Binding requires a browser:
 //
 //   - when the response has `action` and `fields` (the web app expects this for cards of
@@ -224,27 +215,6 @@ func (r *ProvidersAssistResource) CardBindForm(ctx context.Context, params Provi
 	}, opts)
 }
 
-// CardBindURL gets an Assist card binding URL.
-//
-// Older variant of `card_bind_form`. The current web app only builds this request in unused legacy
-// code and never sends it; it presumably returns a URL of the Assist binding page to open in a
-// browser, which sends the user back to `returnUrl`.
-//
-// It calls GET /api/v1/card/bind/url.
-//
-// This endpoint is experimental and may change without notice.
-func (r *ProvidersAssistResource) CardBindURL(ctx context.Context, params ProvidersAssistCardBindURLParams, opts ...RequestOption) (json.RawMessage, error) {
-	if params.Type == nil {
-		params.Type = Ptr[AssistCardBindType]("CLIENT")
-	}
-	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceAssist,
-		method:  http.MethodGet,
-		path:    "/api/v1/card/bind/url",
-		params:  params,
-	}, opts)
-}
-
 // UnbindCard calls POST /api/v1/card/unbind/{cardId}.
 //
 // The web app ignores the response body and reloads the payment methods list.
@@ -256,35 +226,6 @@ func (r *ProvidersAssistResource) UnbindCard(ctx context.Context, cardID string,
 		method:     http.MethodPost,
 		path:       "/api/v1/card/unbind/{cardId}",
 		pathParams: []string{cardID},
-	}, opts)
-}
-
-// ProvidersBepaidResource holds the operations available as Client.Providers.Bepaid.
-type ProvidersBepaidResource struct {
-	core *core
-}
-
-// ProvidersBepaidCardBindURLParams holds the parameters of [ProvidersBepaidResource.CardBindURL].
-type ProvidersBepaidCardBindURLParams struct {
-	// Where bePaid sends the browser after the binding.
-	ReturnURL string `query:"returnUrl"`
-}
-
-// CardBindURL gets a bePaid card binding URL.
-//
-// Legacy: the current web app only builds this request in unused code and never sends it. Like the
-// other binding endpoints it presumably returns the URL of the bePaid page where the user enters
-// the card details and passes 3-D Secure in a browser before being sent back to `returnUrl`.
-//
-// It calls GET /api/v1/card/bind/url.
-//
-// This endpoint is experimental and may change without notice.
-func (r *ProvidersBepaidResource) CardBindURL(ctx context.Context, params ProvidersBepaidCardBindURLParams, opts ...RequestOption) (json.RawMessage, error) {
-	return call[json.RawMessage](ctx, r.core, &operation{
-		service: ServiceBepaid,
-		method:  http.MethodGet,
-		path:    "/api/v1/card/bind/url",
-		params:  params,
 	}, opts)
 }
 

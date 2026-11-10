@@ -122,7 +122,7 @@ while let Some(order) = orders.try_next().await? {
 | `exchange` | Quotes, exchange orders and their history, limits and rates |
 | `trading` | Spot orders: place, amend, cancel; open orders, executions, fees, portfolio history |
 | `balance`, `accounting` | Balances, fiat and crypto deposits and withdrawals with fee calculation, ledger transactions and receipts |
-| `payments`, `providers` | Payment methods and commissions, bank cards (Alfa-Bank, Assist, bePaid, MTS Bank), SBP QR codes, crypto cards |
+| `payments`, `providers` | Payment methods and commissions, bank cards (Alfa-Bank, Assist, MTS Bank), SBP QR codes, crypto cards |
 | `brokerage` | OTC orders, subaccounts, crypto addresses and balance orders of a broker |
 | `ico` | Token emissions, purchases and buybacks, investor portfolio, issuer reports |
 | `kyc` | Verification questionnaire, liveness check, SumSub and MSI identification, investor qualification |

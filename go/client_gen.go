@@ -108,7 +108,6 @@ func (c *Client) initResources() {
 			core:       c.core,
 		},
 		Assist:   &ProvidersAssistResource{core: c.core},
-		Bepaid:   &ProvidersBepaidResource{core: c.core},
 		Carusell: &ProvidersCarusellResource{core: c.core},
 		Mts: &ProvidersMtsResource{
 			QR:   &ProvidersMtsQRResource{core: c.core},

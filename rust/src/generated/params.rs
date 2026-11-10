@@ -1852,28 +1852,6 @@ pub struct ProvidersAssistCardBindFormParams {
     pub return_url: String,
 }
 
-/// Parameters of
-/// [`ProvidersAssist::card_bind_url`](crate::resources::ProvidersAssist::card_bind_url).
-#[derive(Debug, Clone, PartialEq, bon::Builder)]
-#[builder(on(String, into))]
-pub struct ProvidersAssistCardBindUrlParams {
-    /// Binding owner type; the web app always sends `CLIENT`.
-    ///
-    /// Defaults to `"CLIENT"`.
-    pub r#type: Option<AssistCardBindType>,
-    /// Where Assist sends the browser after the binding.
-    pub return_url: String,
-}
-
-/// Parameters of
-/// [`ProvidersBepaid::card_bind_url`](crate::resources::ProvidersBepaid::card_bind_url).
-#[derive(Debug, Clone, PartialEq, bon::Builder)]
-#[builder(on(String, into))]
-pub struct ProvidersBepaidCardBindUrlParams {
-    /// Where bePaid sends the browser after the binding.
-    pub return_url: String,
-}
-
 /// Parameters of [`ProvidersMts::bind_card`](crate::resources::ProvidersMts::bind_card).
 #[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
 #[builder(on(String, into))]

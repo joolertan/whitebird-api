@@ -35,8 +35,6 @@ export class ProvidersResource extends APIResource {
   readonly alfa = new ProvidersAlfaResource(this._client);
   /** Endpoints under `client.providers.assist`. */
   readonly assist = new ProvidersAssistResource(this._client);
-  /** Endpoints under `client.providers.bepaid`. */
-  readonly bepaid = new ProvidersBepaidResource(this._client);
   /** Endpoints under `client.providers.carusell`. */
   readonly carusell = new ProvidersCarusellResource(this._client);
   /** Endpoints under `client.providers.mts`. */
@@ -241,34 +239,6 @@ export class ProvidersAssistResource extends APIResource {
   }
 
   /**
-   * Get an Assist card binding URL
-   *
-   * Older variant of `card_bind_form`. The current web app only builds this request in unused
-   * legacy code and never sends it; it presumably returns a URL of the Assist binding page to
-   * open in a browser, which sends the user back to `returnUrl`.
-   *
-   * `GET /api/v1/card/bind/url`
-   *
-   * @experimental
-   */
-  cardBindUrl(
-    params: ProvidersAssistCardBindUrlParams,
-    options?: RequestOptions,
-  ): Promise<unknown> {
-    return this._client.call(
-      {
-        service: 'assist',
-        method: 'GET',
-        path: '/api/v1/card/bind/url',
-        query: params,
-        responseType: 'auto',
-        defaults: { query: { type: 'CLIENT' } },
-      },
-      options,
-    );
-  }
-
-  /**
    * Unbind an Assist card
    *
    * The web app ignores the response body and reloads the payment methods list.
@@ -285,37 +255,6 @@ export class ProvidersAssistResource extends APIResource {
         method: 'POST',
         path: '/api/v1/card/unbind/{cardId}',
         pathParams: { cardId },
-        responseType: 'auto',
-      },
-      options,
-    );
-  }
-}
-
-/** Endpoints under `client.providers.bepaid`. */
-export class ProvidersBepaidResource extends APIResource {
-  /**
-   * Get a bePaid card binding URL
-   *
-   * Legacy: the current web app only builds this request in unused code and never sends it.
-   * Like the other binding endpoints it presumably returns the URL of the bePaid page where
-   * the user enters the card details and passes 3-D Secure in a browser before being sent back
-   * to `returnUrl`.
-   *
-   * `GET /api/v1/card/bind/url`
-   *
-   * @experimental
-   */
-  cardBindUrl(
-    params: ProvidersBepaidCardBindUrlParams,
-    options?: RequestOptions,
-  ): Promise<unknown> {
-    return this._client.call(
-      {
-        service: 'bepaid',
-        method: 'GET',
-        path: '/api/v1/card/bind/url',
-        query: params,
         responseType: 'auto',
       },
       options,
@@ -655,23 +594,6 @@ export interface ProvidersAssistCardBindFormParams {
    */
   type?: AssistCardBindType | undefined;
   /** Where Assist sends the browser after the binding. */
-  returnUrl: string;
-}
-
-/** Parameters of {@link ProvidersAssistResource.cardBindUrl}. */
-export interface ProvidersAssistCardBindUrlParams {
-  /**
-   * Binding owner type; the web app always sends `CLIENT`.
-   * @defaultValue `'CLIENT'`, sent when not set
-   */
-  type?: AssistCardBindType | undefined;
-  /** Where Assist sends the browser after the binding. */
-  returnUrl: string;
-}
-
-/** Parameters of {@link ProvidersBepaidResource.cardBindUrl}. */
-export interface ProvidersBepaidCardBindUrlParams {
-  /** Where bePaid sends the browser after the binding. */
   returnUrl: string;
 }
 

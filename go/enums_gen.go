@@ -43,8 +43,7 @@ const (
 	AlfaCryptoCardStatusCardRbsBindError AlfaCryptoCardStatus = "CARD_RBS_BIND_ERROR"
 )
 
-// AssistCardBindType is used in [ProvidersAssistCardBindFormParams] and
-// [ProvidersAssistCardBindURLParams].
+// AssistCardBindType is used in [ProvidersAssistCardBindFormParams].
 type AssistCardBindType string
 
 // Known values of [AssistCardBindType].

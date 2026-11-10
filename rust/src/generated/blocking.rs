@@ -81,8 +81,7 @@ use crate::params::{
     MerchantWebhooksSetUrlParams, NotificationsMarkViewedParams, NotificationsSearchParams,
     PaymentsCardsRenameParams, PaymentsCommissionsListParams, PaymentsMethodsListParams,
     PaymentsProvidersListParams, ProvidersAlfaCardBindUrlParams, ProvidersAlfaPaymentParams,
-    ProvidersAssistCardBindFormParams, ProvidersAssistCardBindUrlParams,
-    ProvidersBepaidCardBindUrlParams, ProvidersMtsBindCardParams, ProvidersMtsQrCommissionParams,
+    ProvidersAssistCardBindFormParams, ProvidersMtsBindCardParams, ProvidersMtsQrCommissionParams,
     ProvidersMtsQrInfoParams, ProvidersStatusbankConfirmOrderParams,
     ProvidersStatusbankRegisterCardParams, ProvidersVtbCortiMilliRateParams,
     ReferralTransactionsListParams, RegistrationCompleteParams, RegistrationCompleteSdkParams,
@@ -3959,13 +3958,6 @@ impl<'a> Providers<'a> {
         }
     }
 
-    /// Endpoints of `client.providers().bepaid()`.
-    pub fn bepaid(&self) -> ProvidersBepaid<'a> {
-        ProvidersBepaid {
-            client: self.client,
-        }
-    }
-
     /// Endpoints of `client.providers().carusell()`.
     pub fn carusell(&self) -> ProvidersCarusell<'a> {
         ProvidersCarusell {
@@ -4233,29 +4225,6 @@ impl ProvidersAssist<'_> {
         )
     }
 
-    /// Get an Assist card binding URL
-    ///
-    /// Older variant of `card_bind_form`. The current web app only builds this request in
-    /// unused legacy code and never sends it; it presumably returns a URL of the Assist binding
-    /// page to open in a browser, which sends the user back to `returnUrl`.
-    ///
-    /// `GET /api/v1/card/bind/url`
-    ///
-    /// **Experimental:** the endpoint may change without notice.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response cannot be decoded.
-    pub fn card_bind_url(&self, params: ProvidersAssistCardBindUrlParams) -> Result<Value> {
-        self.client.block_on(
-            self.client
-                .as_async()
-                .providers()
-                .assist()
-                .card_bind_url(params),
-        )
-    }
-
     /// Unbind an Assist card
     ///
     /// The web app ignores the response body and reloads the payment methods list.
@@ -4274,38 +4243,6 @@ impl ProvidersAssist<'_> {
                 .providers()
                 .assist()
                 .unbind_card(card_id),
-        )
-    }
-}
-
-/// Endpoints of `client.providers().bepaid()`.
-#[derive(Debug, Clone, Copy)]
-pub struct ProvidersBepaid<'a> {
-    client: &'a Client,
-}
-
-impl ProvidersBepaid<'_> {
-    /// Get a bePaid card binding URL
-    ///
-    /// Legacy: the current web app only builds this request in unused code and never sends it.
-    /// Like the other binding endpoints it presumably returns the URL of the bePaid page where
-    /// the user enters the card details and passes 3-D Secure in a browser before being sent
-    /// back to `returnUrl`.
-    ///
-    /// `GET /api/v1/card/bind/url`
-    ///
-    /// **Experimental:** the endpoint may change without notice.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response cannot be decoded.
-    pub fn card_bind_url(&self, params: ProvidersBepaidCardBindUrlParams) -> Result<Value> {
-        self.client.block_on(
-            self.client
-                .as_async()
-                .providers()
-                .bepaid()
-                .card_bind_url(params),
         )
     }
 }

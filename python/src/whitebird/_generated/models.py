@@ -397,11 +397,7 @@ class AlfaCryptoCardStatus(StrEnum):
 
 
 class AssistCardBindType(StrEnum):
-    """Assist card bind type.
-
-    Values of the `type` parameter of `client.providers.assist.card_bind_form()` and the `type`
-    parameter of `client.providers.assist.card_bind_url()`.
-    """
+    """Values of the `type` parameter of `client.providers.assist.card_bind_form()`."""
 
     CLIENT = "CLIENT"
 

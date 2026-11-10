@@ -54,36 +54,6 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AssistCardBindForm'}
-  /api/v1/card/bind/url:
-    get:
-      operationId: providersAssistCardBindUrl
-      x-wb-resource: providers.assist
-      x-wb-name: card_bind_url
-      x-wb-status: experimental
-      x-wb-source: bundle
-      x-wb-first-seen: '2026-11-07'
-      summary: Get an Assist card binding URL
-      description: |
-        Older variant of `card_bind_form`. The current web app only builds this request in unused
-        legacy code and never sends it; it presumably returns a URL of the Assist binding page to
-        open in a browser, which sends the user back to `returnUrl`.
-      parameters:
-      - name: type
-        in: query
-        description: Binding owner type; the web app always sends `CLIENT`.
-        schema:
-          $ref: '#/components/schemas/AssistCardBindType'
-          default: CLIENT
-      - name: returnUrl
-        in: query
-        required: true
-        description: Where Assist sends the browser after the binding.
-        schema: {type: string, format: uri}
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json: {}
   /api/v1/card/unbind/{cardId}:
     post:
       operationId: providersAssistUnbindCard

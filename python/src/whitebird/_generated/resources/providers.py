@@ -48,11 +48,6 @@ class ProvidersResource(SyncResource):
         return ProvidersAssistResource(self._engine)
 
     @cached_property
-    def bepaid(self) -> ProvidersBepaidResource:
-        """Operations of `client.providers.bepaid`."""
-        return ProvidersBepaidResource(self._engine)
-
-    @cached_property
     def carusell(self) -> ProvidersCarusellResource:
         """Operations of `client.providers.carusell`."""
         return ProvidersCarusellResource(self._engine)
@@ -350,39 +345,6 @@ class ProvidersAssistResource(SyncResource):
             options=options,
         )
 
-    def card_bind_url(
-        self,
-        *,
-        return_url: str,
-        type: AssistCardBindType | str = AssistCardBindType.CLIENT,
-        **options: Unpack[RequestOptions],
-    ) -> Any:
-        """Get an Assist card binding URL.
-
-        Older variant of `card_bind_form`. The current web app only builds this request in unused
-        legacy code and never sends it; it presumably returns a URL of the Assist binding page to
-        open in a browser, which sends the user back to `returnUrl`.
-
-        Args:
-            return_url: Where Assist sends the browser after the binding.
-            type: Binding owner type; the web app always sends `CLIENT`.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The decoded JSON response.
-        """
-        return self._engine.request(
-            "assist",
-            "GET",
-            "/api/v1/card/bind/url",
-            params={"type": type, "returnUrl": return_url},
-            options=options,
-        )
-
     def unbind_card(
         self,
         card_id: str,
@@ -408,42 +370,6 @@ class ProvidersAssistResource(SyncResource):
             "POST",
             "/api/v1/card/unbind/{cardId}",
             path_params={"cardId": card_id},
-            options=options,
-        )
-
-
-class ProvidersBepaidResource(SyncResource):
-    """Operations of `client.providers.bepaid`."""
-
-    def card_bind_url(
-        self,
-        *,
-        return_url: str,
-        **options: Unpack[RequestOptions],
-    ) -> Any:
-        """Get a bePaid card binding URL.
-
-        Legacy: the current web app only builds this request in unused code and never sends it. Like
-        the other binding endpoints it presumably returns the URL of the bePaid page where the user
-        enters the card details and passes 3-D Secure in a browser before being sent back to
-        `returnUrl`.
-
-        Args:
-            return_url: Where bePaid sends the browser after the binding.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The decoded JSON response.
-        """
-        return self._engine.request(
-            "bepaid",
-            "GET",
-            "/api/v1/card/bind/url",
-            params={"returnUrl": return_url},
             options=options,
         )
 
@@ -889,11 +815,6 @@ class AsyncProvidersResource(AsyncResource):
         return AsyncProvidersAssistResource(self._engine)
 
     @cached_property
-    def bepaid(self) -> AsyncProvidersBepaidResource:
-        """Operations of `client.providers.bepaid`."""
-        return AsyncProvidersBepaidResource(self._engine)
-
-    @cached_property
     def carusell(self) -> AsyncProvidersCarusellResource:
         """Operations of `client.providers.carusell`."""
         return AsyncProvidersCarusellResource(self._engine)
@@ -1191,39 +1112,6 @@ class AsyncProvidersAssistResource(AsyncResource):
             options=options,
         )
 
-    async def card_bind_url(
-        self,
-        *,
-        return_url: str,
-        type: AssistCardBindType | str = AssistCardBindType.CLIENT,
-        **options: Unpack[RequestOptions],
-    ) -> Any:
-        """Get an Assist card binding URL.
-
-        Older variant of `card_bind_form`. The current web app only builds this request in unused
-        legacy code and never sends it; it presumably returns a URL of the Assist binding page to
-        open in a browser, which sends the user back to `returnUrl`.
-
-        Args:
-            return_url: Where Assist sends the browser after the binding.
-            type: Binding owner type; the web app always sends `CLIENT`.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The decoded JSON response.
-        """
-        return await self._engine.request(
-            "assist",
-            "GET",
-            "/api/v1/card/bind/url",
-            params={"type": type, "returnUrl": return_url},
-            options=options,
-        )
-
     async def unbind_card(
         self,
         card_id: str,
@@ -1249,42 +1137,6 @@ class AsyncProvidersAssistResource(AsyncResource):
             "POST",
             "/api/v1/card/unbind/{cardId}",
             path_params={"cardId": card_id},
-            options=options,
-        )
-
-
-class AsyncProvidersBepaidResource(AsyncResource):
-    """Operations of `client.providers.bepaid`."""
-
-    async def card_bind_url(
-        self,
-        *,
-        return_url: str,
-        **options: Unpack[RequestOptions],
-    ) -> Any:
-        """Get a bePaid card binding URL.
-
-        Legacy: the current web app only builds this request in unused code and never sends it. Like
-        the other binding endpoints it presumably returns the URL of the bePaid page where the user
-        enters the card details and passes 3-D Secure in a browser before being sent back to
-        `returnUrl`.
-
-        Args:
-            return_url: Where bePaid sends the browser after the binding.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The decoded JSON response.
-        """
-        return await self._engine.request(
-            "bepaid",
-            "GET",
-            "/api/v1/card/bind/url",
-            params={"returnUrl": return_url},
             options=options,
         )
 
