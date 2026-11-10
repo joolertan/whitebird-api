@@ -30,4 +30,5 @@ The four SDKs are released together under one version and follow
 - a method whose endpoint Whitebird retires is marked *deprecated* first and removed in the next
   major version.
 
-Every change is listed in each package's changelog.
+Every change is listed in the
+[changelog](https://github.com/joolertan/whitebird-api/blob/main/CHANGELOG.md).

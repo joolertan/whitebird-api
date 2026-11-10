@@ -1,33 +1,35 @@
 # Publishing
 
-The project has one version: all four packages are released together under the same number.
-Merging the release pull request publishes every package to its registry. This page describes the
-flow and the one-time setup a maintainer has to do.
+The project is released as a whole: one version for all four packages, one tag, one GitHub release
+and one [changelog](https://github.com/joolertan/whitebird-api/blob/main/CHANGELOG.md). Merging the
+release pull request publishes every package to its registry. This page describes the flow and the
+one-time setup a maintainer has to do.
 
 ## How a release happens
 
 1. Commits follow [Conventional Commits](https://www.conventionalcommits.org/) with the package
    directory as scope (`feat(python): ...`, `fix(go): ...`).
 2. On every push to `main`, [release-please](https://github.com/googleapis/release-please) opens
-   or updates a single release pull request, *release whitebird-api libraries*, with the next
-   version for every package and their changelogs.
+   or updates the release pull request, *chore(main): release 1.2.3*. It sets the new version in
+   every package and adds the changes to `CHANGELOG.md`.
 3. Optionally run the checks on it before merging: each CI workflow (Python, Node.js, Go, Rust,
    Codegen, Docs) has **Run workflow** in the Actions tab; pick the branch
-   `release-please--branches--main--groups--whitebird-api`.
-4. Merging the pull request creates the tags and GitHub releases:
+   `release-please--branches--main`.
+4. Merging the pull request creates the tag `v1.2.3` and its GitHub release. Read the Docs builds a
+   documentation version for the tag.
+5. The `release` workflow publishes the packages:
 
-    | Package | Tag | Registry |
-    |---|---|---|
-    | Python | `python-v1.2.3` | PyPI |
-    | Node.js | `node-v1.2.3` | npm |
-    | Go | `go/v1.2.3` | Go module proxy |
-    | Rust | `rust-v1.2.3` | crates.io |
-    | Docs | `v1.2.3` | Read the Docs |
+    | Package | Registry |
+    |---|---|
+    | Python | PyPI |
+    | Node.js | npm |
+    | Go | Go module proxy, through the tag `go/v1.2.3` the workflow adds |
+    | Rust | crates.io |
 
-5. The `release` workflow publishes the packages. If a publish job fails, fix the cause and use
-   **Re-run failed jobs** on that run; the release itself is not repeated. PyPI, npm and crates.io use
-   [trusted publishing](https://docs.pypi.org/trusted-publishers/): GitHub Actions exchanges a
-   short-lived OIDC token for upload rights, so no registry tokens are stored in the repository.
+    If a publish job fails, fix the cause and use **Re-run failed jobs** on that run; the release
+    itself is not repeated. PyPI, npm and crates.io use
+    [trusted publishing](https://docs.pypi.org/trusted-publishers/): GitHub Actions exchanges a
+    short-lived OIDC token for upload rights, so no registry tokens are stored in the repository.
 
 ## GitHub
 
@@ -101,8 +103,9 @@ crates.io also needs the first version to be published with a token.
 
 ## Go
 
-Go has no registry to sign up for. A module version is a git tag: when the `go/v1.2.3` tag is
-pushed, the release workflow asks `proxy.golang.org` for it, and
+Go has no registry to sign up for. A module version is a git tag, and because the module lives in
+the `go/` directory, its tags are `go/v1.2.3`. The release workflow creates that tag next to
+`v1.2.3` and asks `proxy.golang.org` for the version, and
 [pkg.go.dev](https://pkg.go.dev/github.com/joolertan/whitebird-api/go) shows the documentation a
 few minutes later. If it does not, open that page and press **Request**.
 
@@ -115,7 +118,7 @@ few minutes later. If it does not, open that page and press **Request**.
 3. In **Settings → Pull request builds**, enable previews for pull requests.
 4. In **Settings → Automation rules**, add a rule: match **SemVer versions**, version type
    **Tag**, action **Activate version**. Each release tag `v1.2.3` then gets its own documentation
-   version; the per-package tags (`python-v1.2.3`, ...) do not match.
+   version; the Go tags `go/v1.2.3` do not match.
 5. In **Settings → General**, set **Default version** to `stable`. Read the Docs points `stable` at
    the highest `v1.2.3` tag, and `latest` follows `main`.
 

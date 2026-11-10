@@ -1,7 +1,7 @@
 name: Release
 
-# release-please keeps one release pull request for all packages, which share one version.
-# Merging it tags and publishes every package.
+# release-please keeps one release pull request for the whole project: one version, one changelog.
+# Merging it creates the release tag vX.Y.Z and publishes every package.
 on:
   push:
     branches: [main]
@@ -23,13 +23,9 @@ jobs:
       issues: write # labels belong to the issues API
       pull-requests: write
     outputs:
-      released: ${{ steps.release.outputs.releases_created }}
-      version: ${{ steps.release.outputs['python--version'] }}
-      python: ${{ steps.release.outputs['python--release_created'] }}
-      node: ${{ steps.release.outputs['node--release_created'] }}
-      go: ${{ steps.release.outputs['go--release_created'] }}
-      go-tag: ${{ steps.release.outputs['go--tag_name'] }}
-      rust: ${{ steps.release.outputs['rust--release_created'] }}
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -39,7 +35,7 @@ jobs:
 
   pypi:
     needs: release-please
-    if: needs.release-please.outputs.python == 'true'
+    if: needs.release-please.outputs.created == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -57,7 +53,7 @@ jobs:
 
   npm:
     needs: release-please
-    if: needs.release-please.outputs.node == 'true'
+    if: needs.release-please.outputs.created == 'true'
     runs-on: ubuntu-latest
     environment:
       name: npm
@@ -80,7 +76,7 @@ jobs:
 
   crates-io:
     needs: release-please
-    if: needs.release-please.outputs.rust == 'true'
+    if: needs.release-please.outputs.created == 'true'
     runs-on: ubuntu-latest
     environment:
       name: crates-io
@@ -99,23 +95,19 @@ jobs:
 
   go-proxy:
     needs: release-please
-    if: needs.release-please.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      # The tag is the release; asking the proxy for it makes pkg.go.dev pick it up.
-      - run: curl -fsS "https://proxy.golang.org/github.com/joolertan/whitebird-api/go/@v/${TAG#go/}.info"
-        env:
-          TAG: ${{ needs.release-please.outputs.go-tag }}
-
-  docs-version:
-    needs: release-please
-    if: needs.release-please.outputs.released == 'true'
+    if: needs.release-please.outputs.created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.release-please.outputs.tag }}
+      SHA: ${{ needs.release-please.outputs.sha }}
     steps:
-      # The project-wide tag vX.Y.Z: Read the Docs builds a documentation version for it.
-      - run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: v${{ needs.release-please.outputs.version }}
+      # The Go module lives in go/, so the go command only sees versions tagged go/vX.Y.Z.
+      # The tag is created once; a re-run finds it and goes on.
+      - run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/go/$TAG" --silent ||
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/go/$TAG" -f sha="$SHA"
+      # Asking the proxy for the version makes pkg.go.dev pick it up.
+      - run: curl -fsS "https://proxy.golang.org/github.com/joolertan/whitebird-api/go/@v/$TAG.info"
