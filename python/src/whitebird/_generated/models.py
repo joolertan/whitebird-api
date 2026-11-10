@@ -39,8 +39,6 @@ __all__ = [
     "AuthGeo",
     "AuthMediaCapabilities",
     "AuthMfaOperation",
-    "AuthMfaStatus",
-    "AuthMfaStatusRequest",
     "AuthMfaTokenRequest",
     "AuthWebGlData",
     "BalanceAccountType",
@@ -1697,20 +1695,6 @@ class AuthMediaCapabilities(WhitebirdModel):
     supported: bool | None = None
     smooth: bool | None = None
     power_efficient: bool | None = None
-
-
-class AuthMfaStatus(WhitebirdModel):
-    """Returned by `client.auth.mfa_status()`."""
-
-    mfa_enabled: bool | None = None
-    """Inferred from the web application; may be missing."""
-
-
-class AuthMfaStatusRequest(WhitebirdModel):
-    """Request body of `client.auth.mfa_status()`."""
-
-    username: str
-    """Account email as the user typed it."""
 
 
 class AuthMfaTokenRequest(WhitebirdModel):

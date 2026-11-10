@@ -139,13 +139,13 @@ the old session; the new password replaces the old one for later sign-ins.
 
 ## Captcha
 
-The sign-in form makes accounts **without** 2FA solve a slider captcha: a background image with a
-cut-out and a puzzle piece that has to be slid into place. The SDKs never solve captchas
-themselves. Before signing in, the client asks whether the account has 2FA, as the sign-in form
-does; if it has not and no solver is configured, signing in raises `CaptchaRequiredError`
-without sending the password. If Whitebird does not know the username, signing in raises
-`AuthenticationError`, again without sending the password. Enabling 2FA on the account avoids
-the captcha altogether.
+Whitebird may ask for a slider captcha when signing in: a background image with a cut-out and a
+puzzle piece that has to be slid into place. The SDKs never solve captchas themselves. Like the
+sign-in form, the client first sends the password without a captcha; only when the server answers
+that it wants one (status `REQUIRED_CAPTCHA`) does it ask the solver, and from then on every
+request of that sign-in, including the one with the 2FA code, carries a newly solved captcha.
+Without a solver, signing in then raises `CaptchaRequiredError`. If Whitebird does not know the
+username, signing in raises `AuthenticationError`.
 
 A solver receives the captcha (request id, both PNG images, the piece's vertical offset) and
 returns the horizontal offset of the piece. The client sends the answer with the sign-in request

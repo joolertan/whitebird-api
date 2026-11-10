@@ -61,7 +61,7 @@ function captchaPage({ backgroundImage, puzzlePiece, positionY }: Captcha): stri
 `;
 }
 
-/** Lets a person solve the sign-in captcha of accounts without two-factor authentication. */
+/** Lets a person solve the sign-in captcha that Whitebird may ask for. */
 async function solveCaptcha(captcha: Captcha): Promise<number> {
   const path = join(tmpdir(), 'whitebird-captcha.html');
   await writeFile(path, captchaPage(captcha));
@@ -74,8 +74,8 @@ async function solveCaptcha(captcha: Captcha): Promise<number> {
 /**
  * Client of the account in WHITEBIRD_USERNAME and WHITEBIRD_PASSWORD. Two-factor codes are asked
  * for in the terminal, or computed from WHITEBIRD_TOTP_SECRET (the base32 secret behind the
- * authenticator app QR code) when it is set; accounts without two-factor authentication solve
- * the sign-in captcha in a browser.
+ * authenticator app QR code) when it is set; a sign-in captcha, when Whitebird asks for one, is
+ * solved in a browser.
  */
 export function createClient(): Whitebird {
   const { WHITEBIRD_USERNAME, WHITEBIRD_PASSWORD, WHITEBIRD_TOTP_SECRET } = process.env;

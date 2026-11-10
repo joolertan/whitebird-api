@@ -10,7 +10,7 @@ use crate::blocking::{Client, EventStream, Paginator};
 use crate::models::{
     AccountingAccount, AccountingEnhancedAccount, AccountingTransaction, AlfaCardBindUrl,
     AlfaCryptoCardClientInfo, AlfaCryptoCardInit, AlfaCryptoCardReleaseDetails,
-    AlfaCryptoCardValidation, AlfaPayment, AssistCardBindForm, AuthCaptcha, AuthGeo, AuthMfaStatus,
+    AlfaCryptoCardValidation, AlfaPayment, AssistCardBindForm, AuthCaptcha, AuthGeo,
     BalanceCalculation, BalanceCryptoDeposit, BalanceCurrentOperations, BalanceFiatDeposit,
     BalanceOperation, BalanceOrderResponse, CarusellBank, ClientFeature, ClientModel,
     CryptoAddressResponse, CurrentAccountSystemAccount, DownloadTokenResponse, ExchangeAssets,
@@ -38,13 +38,13 @@ use crate::params::{
     AccountingAccountsGetEnhancedParams, AccountingAccountsGetParams,
     AccountingTransactionsDownloadReceiptParams, AccountingTransactionsEmailReceiptParams,
     AccountingTransactionsListParams, AuthAuthorizeParams, AuthCreateMfaTokenParams,
-    AuthGenerateCaptchaParams, AuthMfaStatusParams, AuthSendFingerprintParams,
-    BalanceDepositsCalculateCryptoParams, BalanceDepositsCalculateFiatParams,
-    BalanceDepositsCreateCryptoParams, BalanceDepositsCreateFiatParams,
-    BalanceOperationsListParams, BalanceOperationsRejectCryptoParams,
-    BalanceOperationsRejectFiatParams, BalanceWithdrawalsCalculateCryptoParams,
-    BalanceWithdrawalsCalculateFiatParams, BalanceWithdrawalsCreateCryptoParams,
-    BalanceWithdrawalsCreateFiatParams, BrokerageBalanceOrdersCancelCryptoDepositParams,
+    AuthGenerateCaptchaParams, AuthSendFingerprintParams, BalanceDepositsCalculateCryptoParams,
+    BalanceDepositsCalculateFiatParams, BalanceDepositsCreateCryptoParams,
+    BalanceDepositsCreateFiatParams, BalanceOperationsListParams,
+    BalanceOperationsRejectCryptoParams, BalanceOperationsRejectFiatParams,
+    BalanceWithdrawalsCalculateCryptoParams, BalanceWithdrawalsCalculateFiatParams,
+    BalanceWithdrawalsCreateCryptoParams, BalanceWithdrawalsCreateFiatParams,
+    BrokerageBalanceOrdersCancelCryptoDepositParams,
     BrokerageBalanceOrdersConfirmCryptoWithdrawalParams,
     BrokerageBalanceOrdersCreateCryptoDepositParams,
     BrokerageBalanceOrdersCreateCryptoWithdrawalParams,
@@ -386,29 +386,6 @@ impl Auth<'_> {
             .block_on(self.client.as_async().auth().create_mfa_token(params))
     }
 
-    /// Check whether an account has 2FA enabled
-    ///
-    /// Called by the sign-in form before `POST /oauth/token`, with the username as typed.
-    /// Accounts with 2FA first send the password grant without code and without captcha; when
-    /// the answer is `{"mfaEnabled": true}` without `access_token`, they send the grant again
-    /// with the TOTP code in `code`. Accounts without 2FA must solve the captcha from `GET
-    /// /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`; when this check
-    /// fails the web app does not send the password at all.
-    ///
-    /// `POST /api/v1/client/mfa`
-    ///
-    /// **Experimental:** the endpoint may change without notice.
-    ///
-    /// Public: works without signing in.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response cannot be decoded.
-    pub fn mfa_status(&self, params: AuthMfaStatusParams) -> Result<AuthMfaStatus> {
-        self.client
-            .block_on(self.client.as_async().auth().mfa_status(params))
-    }
-
     /// Generate a slider captcha
     ///
     /// Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution
@@ -419,6 +396,10 @@ impl Auth<'_> {
     /// registration form as a number. A wrong answer is rejected with status `INVALID_CAPTCHA`;
     /// the web app then generates a new captcha with a fresh `requestId`. Status/message `Too
     /// many requests` means the account is temporarily locked.
+    ///
+    /// The sign-in form first sends the password grant without a captcha and asks for one only
+    /// when the server answers status `REQUIRED_CAPTCHA` (or `INVALID_CAPTCHA`); from then on
+    /// every grant of that sign-in, including the one with the 2FA code, carries a new captcha.
     ///
     /// `GET /api/v1/captcha/generate`
     ///

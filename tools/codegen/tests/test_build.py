@@ -212,7 +212,6 @@ def test_object_body_without_properties_is_flattened(ir: IR) -> None:
 
 
 def test_sign_in_and_operation_mfa_paths(ir: IR) -> None:
-    assert ir.oauth.mfa_status_path == "/api/v1/client/mfa"
     assert ir.oauth.captcha_path == "/api/v1/captcha/generate"
     assert ir.operation_mfa.service == "auth"
     assert ir.operation_mfa.token_path == "/api/v1/mfa/token"

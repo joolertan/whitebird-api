@@ -111,8 +111,8 @@ client.confirm_operation("WITHDRAWAL", Some("123456")).await?;
 # }
 ```
 
-Accounts without two-factor authentication must pass a slider captcha to sign in. The SDK does
-not solve it: set a `CaptchaSolver` that shows the images to a person or calls a solving service.
+Whitebird may ask for a slider captcha at sign-in. The SDK does not solve it: set a
+`CaptchaSolver` that shows the images to a person or calls a solving service.
 
 ### Sessions
 

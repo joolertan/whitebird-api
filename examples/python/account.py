@@ -40,7 +40,7 @@ def two_factor_codes() -> CodeProvider:
 
 
 def solve_captcha(captcha: Captcha) -> int:
-    """Shows the sign-in captcha of accounts without 2FA on a local page; a person solves it."""
+    """Shows the sign-in captcha on a local page; a person solves it."""
     path = Path(tempfile.gettempdir()) / "whitebird-captcha.html"
     page = CAPTCHA_PAGE.substitute(
         background=base64.b64encode(captcha.background_image).decode(),

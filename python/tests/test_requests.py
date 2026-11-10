@@ -512,9 +512,8 @@ def test_path_parameters_are_quoted(client: Whitebird, respx_mock: respx.MockRou
 
 
 def test_language_is_sent_with_every_request(respx_mock: respx.MockRouter) -> None:
-    from tests.support import MFA_URL, TOKEN_URL, tokens
+    from tests.support import TOKEN_URL, tokens
 
-    respx_mock.post(MFA_URL).respond(json={"mfaEnabled": True})
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
     route = respx_mock.get(f"{API}/items").respond(json=[])
 

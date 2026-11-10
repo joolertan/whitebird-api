@@ -334,7 +334,6 @@ class View:
         self.oauth_service = naming.pascal(ir.oauth.service)
         self.oauth_token_path = literal(ir.oauth.token_path)
         self.oauth_basic = literal(ir.oauth.basic)
-        self.oauth_mfa_status_path = literal(ir.oauth.mfa_status_path)
         self.oauth_captcha_path = literal(ir.oauth.captcha_path)
         self.operation_mfa_service = naming.pascal(ir.operation_mfa.service)
         self.operation_mfa_token_path = literal(ir.operation_mfa.token_path)

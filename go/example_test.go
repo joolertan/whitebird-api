@@ -38,9 +38,6 @@ func fakeWhitebird() *httptest.Server {
 		}
 		reply(w, http.StatusOK, map[string]any{"access_token": "access", "refresh_token": "refresh", "expires_in": 3600})
 	})
-	mux.HandleFunc("POST /api/v1/client/mfa", func(w http.ResponseWriter, _ *http.Request) {
-		reply(w, http.StatusOK, map[string]bool{"mfaEnabled": true})
-	})
 	mux.HandleFunc("GET /api/v1/brokerage/subaccount/me", func(w http.ResponseWriter, _ *http.Request) {
 		reply(w, http.StatusOK, map[string]any{
 			"uuid": "4d1c", "displayName": "Main", "status": "ACTIVE",

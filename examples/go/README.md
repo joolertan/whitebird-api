@@ -11,8 +11,7 @@ export WHITEBIRD_PASSWORD=...
 export WHITEBIRD_TOTP_SECRET=...   # optional: base32 2FA secret, computes the codes instead of asking
 ```
 
-Accounts without two-factor authentication must pass a slider captcha to sign in: the examples
-write it to `whitebird-captcha.html` in the temporary directory and ask for the slider position
+When Whitebird asks for a slider captcha at sign-in, the examples write it to `whitebird-captcha.html` in the temporary directory and ask for the slider position
 shown there.
 
 Run them from this directory:

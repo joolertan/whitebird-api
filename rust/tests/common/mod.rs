@@ -10,7 +10,6 @@ use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockBuilder, MockServer, Request, ResponseTemplate};
 
 pub const TOKEN_PATH: &str = "/oauth/token";
-pub const MFA_PATH: &str = "/api/v1/client/mfa";
 pub const ME_PATH: &str = "/api/v1/brokerage/subaccount/me";
 pub const CAPTCHA_PATH: &str = "/api/v1/captcha/generate";
 pub const MFA_TOKEN_PATH: &str = "/api/v2/auth/mfa/merchant/client/token";
@@ -68,10 +67,17 @@ pub fn refresh_grant() -> MockBuilder {
         .and(body_string_contains("grant_type=refresh_token"))
 }
 
-pub fn mfa_check(enabled: bool) -> Mock {
-    Mock::given(method("POST"))
-        .and(path(MFA_PATH))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaEnabled": enabled })))
+/// The password grant without a captcha, answered like the server does when it wants one. Its
+/// priority makes it win over the other mocks of the token endpoint.
+pub fn captcha_required() -> Mock {
+    password_grant()
+        .and(|request: &Request| !request.headers.contains_key("captcha"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "code": 400,
+            "status": "REQUIRED_CAPTCHA",
+            "message": "Captcha required",
+        })))
+        .with_priority(1)
 }
 
 /// Whether a token request carries a one-time code.
@@ -94,7 +100,6 @@ pub fn code_grant(code: &str) -> MockBuilder {
 
 /// Mounts the sign-in of an account with two-factor authentication that accepts `code`.
 pub async fn two_factor_login(server: &MockServer, code: &str, access_token: &str) {
-    mfa_check(true).mount(server).await;
     code_requested().mount(server).await;
     code_grant(code)
         .respond_with(grant(access_token, "refresh-1"))

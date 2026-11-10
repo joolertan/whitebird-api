@@ -27,9 +27,8 @@ export interface WhitebirdOptions {
    */
   otp?: CodeProvider | undefined;
   /**
-   * Solves the slider captcha that accounts without two-factor authentication get when logging
-   * in. Without it such a login fails with {@link CaptchaRequiredError} before the password is
-   * sent.
+   * Solves the slider captcha that Whitebird may ask for when logging in. Without it such a
+   * login fails with {@link CaptchaRequiredError}.
    */
   captcha?: CaptchaSolver | undefined;
   /**
@@ -109,7 +108,6 @@ export class Whitebird extends Resources {
         authService: OAUTH.service,
         tokenPath: OAUTH.tokenPath,
         basic: OAUTH.basic,
-        mfaStatusPath: OAUTH.mfaStatusPath,
         captchaPath: OAUTH.captchaPath,
         operationMfa: OPERATION_MFA,
         logout: LOGOUT,
@@ -163,16 +161,15 @@ export class Whitebird extends Resources {
   }
 
   /**
-   * Logs in now instead of on the first authenticated call: asks
-   * whether the account has two-factor authentication, sends the password (with a solved captcha
-   * when it has not) and, when Whitebird asks for it, the two-factor code.
+   * Logs in now instead of on the first authenticated call: sends the password, solves a captcha
+   * when Whitebird asks for one and, when Whitebird asks for it, sends the two-factor code.
    *
    * @param code - Two-factor code for this login. @defaultValue the next code of `otp`
    * @param options - `signal` stops waiting, for example for a code nobody enters.
    * @throws {@link MFARequiredError} if Whitebird asks for a two-factor code and none is given
    * or configured.
-   * @throws {@link CaptchaRequiredError} if the account has no two-factor authentication and no
-   * `captcha` solver is configured, or the solved captchas were rejected three times.
+   * @throws {@link CaptchaRequiredError} if Whitebird asks for a captcha and no `captcha` solver
+   * is configured, or three solved captchas were rejected.
    * @throws {@link AuthenticationError} if there is no account with this username, or the
    * password or the code is wrong.
    */

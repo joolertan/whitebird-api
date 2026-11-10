@@ -66,10 +66,9 @@ class Whitebird(_Client, Resources):
             the program), or `whitebird.otp.TOTP`. Asked for a code only when Whitebird asks
             for one at login, and to confirm sensitive operations it refuses without an MFA
             token, see `confirm_operation`.
-        captcha: Solves the slider captcha that Whitebird asks of accounts without two-factor
-            authentication when they log in: called with a `Captcha`, returns the slider
-            position. The SDK does not solve captchas itself; without a solver such a login
-            raises `CaptchaRequiredError`.
+        captcha: Solves the slider captcha that Whitebird may ask for at login: called with a
+            `Captcha`, returns the slider position. The SDK does not solve captchas itself;
+            without a solver such a login raises `CaptchaRequiredError`.
         environment: `"production"`, or `"demo"` for the sandbox trading contour.
         base_urls: Base URL overrides by service key, e.g. `{"trading": "https://..."}`.
         token_store: Where the session is kept, in memory by default. A `FileTokenStore` keeps
@@ -94,7 +93,7 @@ class Whitebird(_Client, Resources):
                 print(order.uuid, order.status)
         ```
 
-        An account without two-factor authentication logs in through a captcha solver:
+        When Whitebird asks for a captcha at login, a solver answers it:
 
         ```python
         from pathlib import Path
@@ -149,8 +148,8 @@ class Whitebird(_Client, Resources):
 
         Raises:
             MFARequiredError: Whitebird asks for a one-time code and none is available.
-            CaptchaRequiredError: The account has no two-factor authentication and no
-                `captcha` solver is set, or the solver failed three times.
+            CaptchaRequiredError: Whitebird asks for a captcha and no `captcha` solver is set,
+                or three answers of the solver were rejected.
             AuthenticationError: There is no account with this username, or the password or
                 the code were rejected.
         """
@@ -330,8 +329,8 @@ class AsyncWhitebird(_Client, AsyncResources):
             function or coroutine function returning a fresh code, or
             `whitebird.otp.TOTP`. Asked for a code only when Whitebird asks for one at login,
             and to confirm sensitive operations, see `confirm_operation`.
-        captcha: Solves the login captcha of accounts without two-factor authentication, see
-            `Whitebird`: a function or a coroutine function.
+        captcha: Solves the captcha Whitebird may ask for at login, see `Whitebird`: a
+            function or a coroutine function.
         environment: `"production"`, or `"demo"` for the sandbox trading contour.
         base_urls: Base URL overrides by service key, e.g. `{"trading": "https://..."}`.
         token_store: Where the session is kept, in memory by default. A `FileTokenStore` keeps

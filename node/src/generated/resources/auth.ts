@@ -6,8 +6,6 @@ import type {
   AuthCaptcha,
   AuthDeviceFingerprint,
   AuthGeo,
-  AuthMfaStatus,
-  AuthMfaStatusRequest,
   AuthMfaTokenRequest,
 } from '../models.js';
 
@@ -43,29 +41,6 @@ export class AuthResource extends APIResource {
   }
 
   /**
-   * Check whether an account has 2FA enabled
-   *
-   * Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
-   * with 2FA first send the password grant without code and without captcha; when the answer
-   * is `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP
-   * code in `code`. Accounts without 2FA must solve the captcha from
-   * `GET /api/v1/captcha/generate`. Unknown users answer status `NOT_FOUND`; when this check
-   * fails the web app does not send the password at all.
-   *
-   * `POST /api/v1/client/mfa`
-   *
-   * Works without logging in.
-   *
-   * @experimental
-   */
-  mfaStatus(params: AuthMfaStatusRequest, options?: RequestOptions): Promise<AuthMfaStatus> {
-    return this._client.call(
-      { service: 'auth', method: 'POST', path: '/api/v1/client/mfa', body: params, auth: false },
-      options,
-    );
-  }
-
-  /**
    * Generate a slider captcha
    *
    * Returns a 290x192 PNG background with a cut-out and a 64x64 puzzle piece. The solution is
@@ -76,6 +51,10 @@ export class AuthResource extends APIResource {
    * A wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
    * captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
    * temporarily locked.
+   *
+   * The sign-in form first sends the password grant without a captcha and asks for one only
+   * when the server answers status `REQUIRED_CAPTCHA` (or `INVALID_CAPTCHA`); from then on
+   * every grant of that sign-in, including the one with the 2FA code, carries a new captcha.
    *
    * `GET /api/v1/captcha/generate`
    *

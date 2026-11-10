@@ -26,6 +26,9 @@ use crate::otp::CodeProvider;
 const REFRESH_MARGIN: Duration = Duration::from_secs(60);
 /// Captchas tried per login when the answers are rejected.
 const CAPTCHA_ATTEMPTS: u32 = 3;
+/// Message of the error when the server asks for a captcha and no solver is configured.
+const CAPTCHA_HINT: &str =
+    "Whitebird asks for a captcha to sign in: configure ClientBuilder::captcha";
 
 #[derive(Clone)]
 pub(crate) struct Credentials {
@@ -44,7 +47,6 @@ impl fmt::Debug for Credentials {
 
 pub(crate) struct Endpoints {
     pub(crate) token: String,
-    pub(crate) mfa_status: String,
     pub(crate) captcha: String,
     pub(crate) basic: String,
 }
@@ -77,6 +79,15 @@ enum Grant {
     Issued(Tokens),
     /// HTTP 200 without an access token: the server wants a (valid) one-time code.
     CodeRequired(Bytes),
+}
+
+/// Captcha state of one sign-in.
+#[derive(Default)]
+struct LoginCaptcha {
+    /// The server asked for a captcha: every later grant of the sign-in carries one.
+    required: bool,
+    /// Answers the server rejected.
+    rejected: u32,
 }
 
 impl Session {
@@ -255,14 +266,13 @@ impl Session {
         }
     }
 
-    /// Signs in like the web app: asks whether the account has two-factor authentication, then
-    /// sends the password alone (2FA) or with a solved captcha (no 2FA), and the one-time code
-    /// if the server asks for it.
+    /// Signs in like the web app: sends the password alone, solves a captcha once the server
+    /// asks for one (and for every later grant of the sign-in), and sends the one-time code if
+    /// the server asks for it.
     async fn password_grant(&self, generation: u64) -> Result<Tokens> {
         let Some(credentials) = self.credentials() else {
             return Err(not_signed_in());
         };
-        let two_factor = self.two_factor_enabled(&credentials.username).await?;
         let username = credentials.username.to_lowercase();
         let form = |code: Option<&'_ str>| {
             let mut form = vec![
@@ -273,22 +283,15 @@ impl Session {
             form.extend(code.map(|code| ("code", code.to_owned())));
             form
         };
-        let grant = if two_factor {
-            self.token_request(&pairs(&form(None)), None).await?
-        } else {
-            let Some(solver) = &self.captcha else {
-                return Err(captcha_required());
-            };
-            self.captcha_grant(solver, &pairs(&form(None))).await?
-        };
-        let tokens = match grant {
+        let mut captcha = LoginCaptcha::default();
+        let tokens = match self.grant(&pairs(&form(None)), &mut captcha).await? {
             Grant::Issued(tokens) => tokens,
             Grant::CodeRequired(body) => {
                 let Some(otp) = &self.otp else {
                     return Err(mfa_required(&body));
                 };
                 let code = otp.code().await?;
-                match self.token_request(&pairs(&form(Some(&code))), None).await? {
+                match self.grant(&pairs(&form(Some(&code))), &mut captcha).await? {
                     Grant::Issued(tokens) => tokens,
                     Grant::CodeRequired(body) => {
                         return Err(ApiError::new(
@@ -306,19 +309,35 @@ impl Session {
         Ok(tokens)
     }
 
-    /// Sends the password grant with captcha answers until one is accepted.
-    async fn captcha_grant(&self, solver: &CaptchaSolver, form: &[(&str, &str)]) -> Result<Grant> {
-        let mut attempt = 1;
+    /// Sends a password grant, with the answer to a new captcha once the server asked for one.
+    /// A rejected answer is retried with a new captcha.
+    async fn grant(&self, form: &[(&str, &str)], captcha: &mut LoginCaptcha) -> Result<Grant> {
         loop {
-            let captcha = self.solve_captcha(solver).await?;
-            match self.token_request(form, Some(&captcha)).await {
-                Err(Error::Api(error))
-                    if attempt < CAPTCHA_ATTEMPTS
-                        && error.error_code() == Some("INVALID_CAPTCHA") =>
-                {
-                    attempt += 1;
+            let answer = match &self.captcha {
+                Some(solver) if captcha.required => Some(self.solve_captcha(solver).await?),
+                _ => None,
+            };
+            let error = match self.token_request(form, answer.as_deref()).await {
+                Err(Error::Api(error)) if error.kind() == ErrorKind::CaptchaRequired => error,
+                Err(Error::Api(error)) if error.error_code() == Some("NOT_FOUND") => {
+                    return Err(error
+                        .with_kind(ErrorKind::Authentication)
+                        .with_message("no Whitebird account with this username")
+                        .into());
                 }
                 result => return result,
+            };
+            if !captcha.required {
+                if self.captcha.is_none() {
+                    return Err(error.with_message(CAPTCHA_HINT).into());
+                }
+                captcha.required = true;
+                continue;
+            }
+            captcha.rejected += 1;
+            if captcha.rejected >= CAPTCHA_ATTEMPTS || error.error_code() != Some("INVALID_CAPTCHA")
+            {
+                return Err(error.into());
             }
         }
     }
@@ -375,33 +394,6 @@ impl Session {
             )),
             None => Grant::CodeRequired(bytes),
         })
-    }
-
-    /// Asks whether the account has two-factor authentication on. The password is never sent
-    /// if this fails, like in the web app.
-    async fn two_factor_enabled(&self, username: &str) -> Result<bool> {
-        let response = self
-            .post(&self.endpoints.mfa_status)
-            .header(CONTENT_TYPE, "application/json")
-            .body(serde_json::json!({ "username": username }).to_string())
-            .send()
-            .await?;
-        let status = response.status();
-        let headers = response.headers().clone();
-        let bytes = response.bytes().await?;
-        let body: Value = serde_json::from_slice(&bytes).unwrap_or_default();
-        let unknown = status == StatusCode::NOT_FOUND
-            || body.get("status").and_then(Value::as_str) == Some("NOT_FOUND");
-        if unknown && !truthy(body.get("mfaEnabled")) {
-            return Err(ApiError::from_response(status, &headers, &bytes)
-                .with_kind(ErrorKind::Authentication)
-                .with_message("no Whitebird account with this username")
-                .into());
-        }
-        if !status.is_success() {
-            return Err(ApiError::from_response(status, &headers, &bytes).into());
-        }
-        Ok(truthy(body.get("mfaEnabled")))
     }
 
     /// Fetches a captcha, has `solver` solve it and returns the `captcha` header for the answer.
@@ -468,17 +460,6 @@ fn is_refusal(error: &ApiError) -> bool {
     matches!(error.status().as_u16(), 400 | 401) || error.status().is_success()
 }
 
-/// JavaScript truthiness, which the web app applies to `mfaEnabled`.
-fn truthy(value: Option<&Value>) -> bool {
-    match value {
-        None | Some(Value::Null) => false,
-        Some(Value::Bool(value)) => *value,
-        Some(Value::Number(number)) => number.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
-        Some(Value::String(text)) => !text.is_empty(),
-        Some(Value::Array(_) | Value::Object(_)) => true,
-    }
-}
-
 /// `expires_in` as whole seconds, whether sent as a number or a string.
 fn seconds(value: &Value) -> Option<u64> {
     match value {
@@ -526,17 +507,6 @@ fn not_signed_in() -> Error {
     )
 }
 
-fn captcha_required() -> Error {
-    ApiError::new(
-        ErrorKind::CaptchaRequired,
-        StatusCode::OK,
-        "the account has no two-factor authentication, so Whitebird asks for a captcha at \
-         sign-in: configure ClientBuilder::captcha or enable two-factor authentication",
-        &[],
-    )
-    .into()
-}
-
 fn mfa_required(body: &[u8]) -> Error {
     ApiError::new(
         ErrorKind::MfaRequired,
@@ -556,7 +526,6 @@ mod tests {
             http: reqwest::Client::new(),
             endpoints: Endpoints {
                 token: String::new(),
-                mfa_status: String::new(),
                 captcha: String::new(),
                 basic: String::new(),
             },
@@ -620,25 +589,6 @@ mod tests {
         session.replace(sent, Tokens::new("changed", None), Some("new secret"));
         assert_eq!(store.load(), Some(Tokens::new("changed", None)));
         assert_eq!(session.credentials().unwrap().password, "new secret");
-    }
-
-    #[test]
-    fn mfa_enabled_is_read_like_javascript() {
-        let values = [
-            serde_json::json!(true),
-            serde_json::json!(1),
-            serde_json::json!("yes"),
-        ];
-        assert!(values.iter().all(|value| truthy(Some(value))));
-        for value in [
-            serde_json::json!(false),
-            serde_json::json!(0),
-            serde_json::json!(""),
-            Value::Null,
-        ] {
-            assert!(!truthy(Some(&value)), "{value}");
-        }
-        assert!(!truthy(None));
     }
 
     #[test]

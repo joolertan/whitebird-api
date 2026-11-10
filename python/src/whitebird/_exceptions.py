@@ -123,8 +123,8 @@ class MFARequiredError(AuthenticationError):
 class CaptchaRequiredError(AuthenticationError):
     """Logging in needs a solved captcha.
 
-    Raised when an account without two-factor authentication logs in and the client has no
-    `captcha` solver, or when the answers of the solver were rejected three times.
+    Raised when Whitebird asks for a captcha at login and the client has no `captcha` solver, or
+    when the answers of the solver were rejected three times.
     """
 
 

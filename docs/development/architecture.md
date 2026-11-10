@@ -151,22 +151,21 @@ forever). A page that failed to load is fetched again on the next attempt.
 The client signs in as follows:
 
 1. Credentials missing: error before any request.
-2. `POST <oauth.mfa_status_path> {"username": ...}` on `auth`, with the username as given. If this
-   fails, no password is sent: 404 or status `NOT_FOUND` raises `AuthenticationError` (unknown
-   username), anything else is raised as it is. A 2xx answer means 2FA is on when `mfaEnabled`
-   is truthy.
-3. 2FA on: password grant without code and captcha. An answer with `access_token` ends the
-   sign-in. A 2xx answer with `mfaEnabled: true` and no token asks the code provider
-   (`MFARequiredError` without one) and sends the grant again with `code`.
-4. 2FA off: the slider captcha is required. Without a solver `CaptchaRequiredError` is raised
-   before any grant. Otherwise the client generates a UUID v4 `requestId`, calls
+2. Password grant without code and captcha. An answer with `access_token` ends the sign-in. A 2xx
+   answer with `mfaEnabled: true` and no token asks the code provider (`MFARequiredError`
+   without one) and sends the grant again with `code`. Status `NOT_FOUND` raises
+   `AuthenticationError` naming the unknown username.
+3. A grant refused with a captcha status (`REQUIRED_CAPTCHA`, or any status or OAuth `error`
+   containing `CAPTCHA`) makes the captcha required for the rest of the sign-in. Without a solver
+   `CaptchaRequiredError` is raised. Otherwise, before each later grant (including the one with
+   `code`), the client generates a UUID v4 `requestId`, calls
    `GET <oauth.captcha_path>?requestId=...` on `auth` (`{backgroundImage, puzzlePiece, positionY}`,
    images base64 PNG), passes `{request_id, background_image: bytes, puzzle_piece: bytes,
    position_y}` to the solver and sends the grant with the header
    `captcha: base64(JSON {"sliderPosition": "<position as a decimal string>", "requestId": str})`.
-   A rejection with status `INVALID_CAPTCHA` is retried with a fresh captcha, 3 attempts in all.
-   An answer asking for a code continues as in step 3.
-5. Grants: OAuth2 password grant at `auth` `/oauth/token`, form-encoded,
+   A rejection with status `INVALID_CAPTCHA` is retried with a fresh captcha; the third rejected
+   answer of a sign-in is raised.
+4. Grants: OAuth2 password grant at `auth` `/oauth/token`, form-encoded,
    `Authorization: Basic <oauth.basic>`, fields `grant_type=password`, `username` (lowercased),
    `password`, optional `code`. A rejected grant raises `AuthenticationError`; captcha errors
    are recognised only on this endpoint.

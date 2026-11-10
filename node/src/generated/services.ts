@@ -177,7 +177,6 @@ export const OAUTH = {
   service: 'auth',
   tokenPath: '/oauth/token',
   basic: 'YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA=',
-  mfaStatusPath: '/api/v1/client/mfa',
   captchaPath: '/api/v1/captcha/generate',
 } as const;
 

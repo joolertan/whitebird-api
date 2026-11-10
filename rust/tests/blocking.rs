@@ -24,7 +24,6 @@ impl Server {
             .build()
             .unwrap();
         let mock = runtime.block_on(MockServer::start());
-        runtime.block_on(mfa_check(true).mount(&mock));
         Self { mock, runtime }
     }
 

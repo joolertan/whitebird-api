@@ -13,8 +13,8 @@ use crate::auth::{Credentials, Endpoints, MemoryTokenStore, Session, TokenStore,
 use crate::captcha::CaptchaSolver;
 use crate::error::{ApiError, Error, ErrorKind, Result};
 use crate::generated::{
-    Environment, OAUTH_BASIC, OAUTH_CAPTCHA_PATH, OAUTH_MFA_STATUS_PATH, OAUTH_SERVICE,
-    OAUTH_TOKEN_PATH, OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH, Service,
+    Environment, OAUTH_BASIC, OAUTH_CAPTCHA_PATH, OAUTH_SERVICE, OAUTH_TOKEN_PATH,
+    OPERATION_MFA_SERVICE, OPERATION_MFA_TOKEN_PATH, Service,
 };
 use crate::otp::CodeProvider;
 use crate::request::{self, RequestBuilder, RequestOptions, Response};
@@ -67,18 +67,16 @@ impl Client {
     /// Logs in with the configured credentials and returns the new tokens.
     ///
     /// Login otherwise happens lazily on the first authenticated call; calling this first
-    /// surfaces credential and two-factor problems early. The client first
-    /// asks whether the account has two-factor authentication on. If it has, the password is
-    /// sent alone and, when the server asks for it, again with a code from the
-    /// [code provider](ClientBuilder::otp). Otherwise the password goes with a captcha answer
-    /// from the [solver](ClientBuilder::captcha). The password is never sent if the check
-    /// fails.
+    /// surfaces credential and two-factor problems early. The client sends the password alone
+    /// and, when the server asks for it, again with a code from the
+    /// [code provider](ClientBuilder::otp). When the server asks for a captcha, every later
+    /// request of the sign-in carries an answer from the [solver](ClientBuilder::captcha).
     ///
     /// # Errors
     ///
     /// Returns an error for which [`Error::is_mfa_required`] is `true` if the server asks for a
-    /// code and no code provider is configured, [`Error::is_captcha_required`] if the account
-    /// must pass a captcha and no solver is configured (or three answers were rejected), an
+    /// code and no code provider is configured, [`Error::is_captcha_required`] if the server
+    /// asks for a captcha and no solver is configured (or three answers were rejected), an
     /// [`ErrorKind::Authentication`](crate::ErrorKind::Authentication) error if there is no
     /// account with this username or the password or the code is rejected, and
     /// [`Error::Config`] if no credentials are configured.
@@ -494,9 +492,8 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// Sets the account email and password. The client sends the email as
-    /// given to ask whether the account has two-factor authentication, and lowercased with the
-    /// password.
+    /// Sets the account email and password. The client sends the email lowercased, like the web
+    /// app.
     pub fn credentials(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
         self.credentials = Some(Credentials {
             username: username.into(),
@@ -515,9 +512,9 @@ impl ClientBuilder {
         self
     }
 
-    /// Sets the solver of the slider captcha that the API asks accounts without two-factor
-    /// authentication to pass on login. Without one, such logins fail with an error for which
-    /// [`Error::is_captcha_required`] is `true`. See [`CaptchaSolver`] for an example.
+    /// Sets the solver of the slider captcha that the API may ask for on login. Without one, such
+    /// logins fail with an error for which [`Error::is_captcha_required`] is `true`. See
+    /// [`CaptchaSolver`] for an example.
     pub fn captcha(mut self, solver: CaptchaSolver) -> Self {
         self.captcha = Some(solver);
         self
@@ -607,7 +604,6 @@ impl ClientBuilder {
             http: http.clone(),
             endpoints: Endpoints {
                 token: format!("{auth_url}{OAUTH_TOKEN_PATH}"),
-                mfa_status: format!("{auth_url}{OAUTH_MFA_STATUS_PATH}"),
                 captcha: format!("{auth_url}{OAUTH_CAPTCHA_PATH}"),
                 basic: OAUTH_BASIC.to_owned(),
             },

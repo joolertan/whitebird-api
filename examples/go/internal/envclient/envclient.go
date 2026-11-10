@@ -22,8 +22,8 @@ const SessionFile = "whitebird-session.json"
 
 // New returns a client that signs in with WHITEBIRD_USERNAME and WHITEBIRD_PASSWORD and keeps
 // its session in SessionFile. Two-factor codes are asked for in the terminal, or computed from
-// WHITEBIRD_TOTP_SECRET when it is set; accounts without two-factor authentication solve the
-// sign-in captcha on a local page.
+// WHITEBIRD_TOTP_SECRET when it is set; a sign-in captcha, when Whitebird asks for one, is solved
+// on a local page.
 func New(opts ...whitebird.Option) (*whitebird.Client, error) {
 	codes, err := codeProvider()
 	if err != nil {

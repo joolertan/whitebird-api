@@ -46,11 +46,12 @@ func testJWT(subject string, exp time.Time) string {
 type authServer struct {
 	t   *testing.T
 	ttl time.Duration
-	// mfa is the answer of the MFA check; mfaFails makes the check fail and unknown answers
-	// that the account does not exist.
-	mfa      bool
-	mfaFails bool
-	unknown  bool
+	// mfa makes a password grant without a code answer {"mfaEnabled": true}, wantCaptcha makes a
+	// password grant without a captcha answer REQUIRED_CAPTCHA, and unknown makes password
+	// grants answer that the account does not exist.
+	mfa         bool
+	wantCaptcha bool
+	unknown     bool
 	// reply, if set, answers token requests instead of issuing a token, unless it returns
 	// status 0.
 	reply func(form url.Values) (status int, body string)
@@ -60,14 +61,12 @@ type authServer struct {
 	forms      []url.Values
 	answers    []string // captcha headers of the token requests
 	captchaIDs []string
-	usernames  []string // usernames of the MFA checks
 	issued     int
 }
 
 func newAuthServer(t *testing.T, mux *http.ServeMux) *authServer {
 	a := &authServer{t: t, ttl: time.Hour}
 	mux.HandleFunc("POST "+tokenPath, a.token)
-	mux.HandleFunc("POST "+mfaStatusPath, a.mfaCheck)
 	mux.HandleFunc("GET "+captchaPath, a.captcha)
 	return a
 }
@@ -87,6 +86,16 @@ func (a *authServer) token(w http.ResponseWriter, r *http.Request) {
 	a.issued++
 	n := a.issued
 	a.mu.Unlock()
+	if r.PostForm.Get("grant_type") == "password" {
+		switch {
+		case a.unknown:
+			writeError(w, `{"code":400,"status":"NOT_FOUND","message":"User not found"}`)
+			return
+		case a.wantCaptcha && r.Header.Get("Captcha") == "":
+			writeError(w, `{"code":400,"status":"REQUIRED_CAPTCHA","message":"Captcha required"}`)
+			return
+		}
+	}
 	if reply != nil {
 		if status, body := reply(r.PostForm); status != 0 {
 			w.WriteHeader(status)
@@ -104,25 +113,6 @@ func (a *authServer) token(w http.ResponseWriter, r *http.Request) {
 		"token_type":    "bearer",
 		"expires_in":    int(a.ttl.Seconds()),
 	})
-}
-
-func (a *authServer) mfaCheck(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Username string }
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		a.t.Error(err)
-	}
-	a.mu.Lock()
-	a.usernames = append(a.usernames, body.Username)
-	a.mu.Unlock()
-	switch {
-	case a.mfaFails:
-		http.Error(w, "unavailable", http.StatusInternalServerError)
-	case a.unknown:
-		w.WriteHeader(http.StatusNotFound)
-		writeJSON(w, map[string]string{"status": "NOT_FOUND", "message": "User not found"})
-	default:
-		writeJSON(w, map[string]bool{"mfaEnabled": a.mfa})
-	}
 }
 
 func (a *authServer) captcha(w http.ResponseWriter, r *http.Request) {
@@ -152,12 +142,6 @@ func (a *authServer) captchas() (ids, answers []string) {
 	return slices.Clone(a.captchaIDs), slices.Clone(a.answers)
 }
 
-func (a *authServer) checks() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return len(a.usernames)
-}
-
 // form returns the form of token request i.
 func (a *authServer) form(i int) url.Values {
 	a.mu.Lock()
@@ -182,6 +166,13 @@ func (a *authServer) grants() []string {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// writeError answers 400 Bad Request with a JSON body.
+func writeError(w http.ResponseWriter, body string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	fmt.Fprint(w, body)
 }
 
 // testOperation is an operation on the test service.

@@ -284,14 +284,6 @@ pub struct AuthMediaCapabilities {
     pub power_efficient: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AuthMfaStatus {
-    /// Inferred from how the web application uses the response; may be absent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mfa_enabled: Option<bool>,
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, bon::Builder)]
 #[builder(on(String, into))]
 #[serde(rename_all = "camelCase")]

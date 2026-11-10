@@ -17,7 +17,7 @@ export WHITEBIRD_PASSWORD=...
 To run them unattended, install `"whitebird-api[otp]"` and set `WHITEBIRD_TOTP_SECRET` to the
 base32 secret shown when two-factor authentication was enabled: codes are then computed from it.
 
-Accounts without two-factor authentication pass a slider captcha instead: the script writes it to
+When Whitebird asks for a slider captcha at sign-in, the script writes it to
 `whitebird-captcha.html` in the temporary directory and asks for the slider position shown there.
 
 The session is kept in `~/.config/whitebird/session.json` and reused until it expires, so only

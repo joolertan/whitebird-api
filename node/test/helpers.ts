@@ -8,9 +8,8 @@ export class MockApi {
   readonly #routes = new Map<string, Handler | Handler[]>();
 
   constructor(routes: Record<string, Handler | Handler[]> = {}) {
+    // The first password grant returns tokens: no captcha and no code step.
     this.route('POST /oauth/token', () => Response.json(tokenResponse()));
-    // An account with 2FA whose first password grant already returns tokens.
-    this.route('POST /api/v1/client/mfa', () => Response.json({ mfaEnabled: true }));
     for (const [route, handler] of Object.entries(routes)) this.route(route, handler);
   }
 

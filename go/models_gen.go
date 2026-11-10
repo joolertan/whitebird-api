@@ -191,12 +191,6 @@ type AuthMediaCapabilities struct {
 	PowerEfficient *bool `json:"powerEfficient,omitzero"`
 }
 
-// AuthMFAStatus is returned by [AuthResource.MFAStatus].
-type AuthMFAStatus struct {
-	// Inferred from the web application; not yet observed in responses.
-	MFAEnabled bool `json:"mfaEnabled,omitzero"`
-}
-
 // AuthWebGlData is used in [AuthSendFingerprintParams].
 type AuthWebGlData struct {
 	Renderer               *string `json:"renderer,omitzero"`

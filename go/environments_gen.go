@@ -78,7 +78,6 @@ var serviceURLs = map[Service]map[Environment]string{
 const (
 	tokenService      = ServiceAuth
 	tokenPath         = "/oauth/token"
-	mfaStatusPath     = "/api/v1/client/mfa"
 	captchaPath       = "/api/v1/captcha/generate"
 	clientCredentials = "YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA="
 )

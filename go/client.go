@@ -29,10 +29,9 @@ func NewClient(opts ...Option) (*Client, error) {
 // refreshes it if it is about to expire, or logs in with the credentials. Calling Login is
 // optional, as the first call that needs a token does the same; it is a way to fail early.
 //
-// A password login works in steps: the client asks whether the account has
-// two-factor authentication, then sends the password, and the TOTP code from the code provider
-// when the server asks for it. Accounts without two-factor authentication answer a captcha
-// instead (see [WithCaptchaSolver]).
+// A password login works in steps: the client sends the password, answers a captcha when the
+// server asks for one (see [WithCaptchaSolver]), and sends the TOTP code from the code provider
+// when the server asks for it.
 func (c *Client) Login(ctx context.Context) error {
 	_, err := c.core.accessToken(ctx)
 	return err

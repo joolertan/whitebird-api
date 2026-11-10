@@ -193,14 +193,9 @@ import (
 )
 
 // fixtureClient signs in to an account with two-factor authentication, as the web application
-// does: the two-factor check, the password alone, then the password with the code.
+// does: the password alone, then the password with the code.
 func fixtureClient(t *testing.T, mux *http.ServeMux) (*Client, *atomic.Int32) {
 	var logins atomic.Int32
-	mux.HandleFunc("POST /api/v1/client/mfa", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		expect(t, "MFA check", string(body), `{"username":"User@Example.test"}`)
-		fmt.Fprint(w, `{"mfaEnabled":true}`)
-	})
 	mux.HandleFunc("POST /oauth/token", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		expect(t, "username", r.PostForm.Get("username"), "user@example.test")

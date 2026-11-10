@@ -50,9 +50,8 @@ it.
 - **Two-factor login:** `otp` takes a code, a function returning one (such as a prompt), or
   `totp(secret)`. It is asked for a code only when Whitebird asks for one; `client.login(code)`
   passes a code directly.
-- **Captcha:** accounts without two-factor authentication get a slider captcha when logging in.
-  Pass a `captcha` solver that returns the slider position; without one such a login fails with
-  `CaptchaRequiredError` before the password is sent.
+- **Captcha:** Whitebird may ask for a slider captcha when logging in. Pass a `captcha` solver
+  that returns the slider position; without one such a login fails with `CaptchaRequiredError`.
 - **Operation MFA:** withdrawals need an operation MFA token. With `otp` configured the client
   gets one when the API asks for it and sends the operation again; otherwise call
   `client.confirmOperation('WITHDRAWAL', code)` first.

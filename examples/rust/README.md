@@ -15,8 +15,8 @@ Small programs using the [`whitebird-api`](../../rust) crate from this repositor
 The examples that need an account read `WHITEBIRD_USERNAME` and `WHITEBIRD_PASSWORD`, ask for
 the two-factor code in the terminal and share the session saved in `whitebird-session.json` (see
 [`src/lib.rs`](src/lib.rs)). With `WHITEBIRD_TOTP_SECRET` set to the base32 secret of the
-authenticator app, the codes are computed instead. Accounts without two-factor authentication
-get a captcha at sign-in instead: the examples write it to `whitebird-captcha.html` in the
+authenticator app, the codes are computed instead. When Whitebird asks for a captcha at sign-in,
+the examples write it to `whitebird-captcha.html` in the
 temporary directory, open it in a browser and enter the slider position it shows.
 
 ```sh

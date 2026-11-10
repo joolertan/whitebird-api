@@ -22,9 +22,6 @@ OAUTH_TOKEN_PATH: Final = {{ ir.oauth.token_path | literal }}
 OAUTH_BASIC: Final = {{ ir.oauth.basic | literal }}
 """HTTP Basic credentials of the public web client, sent to the token endpoint."""
 
-OAUTH_MFA_STATUS_PATH: Final = {{ ir.oauth.mfa_status_path | literal }}
-"""Path on the OAuth service telling whether an account has two-factor authentication."""
-
 OAUTH_CAPTCHA_PATH: Final = {{ ir.oauth.captcha_path | literal }}
 """Path on the OAuth service that generates the slider captcha of the sign-in form."""
 

@@ -209,7 +209,6 @@ class OAuth:
     service: str
     token_path: str
     basic: str
-    mfa_status_path: str
     captcha_path: str
 
 

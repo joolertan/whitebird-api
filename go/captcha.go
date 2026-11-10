@@ -12,9 +12,8 @@ import (
 	"strings"
 )
 
-// Captcha is the slider captcha shown when an account without two-factor authentication signs
-// in: the puzzle piece must be slid horizontally into the cut-out of the background. See
-// [WithCaptchaSolver].
+// Captcha is the slider captcha that Whitebird may ask for at sign-in: the puzzle piece must be
+// slid horizontally into the cut-out of the background. See [WithCaptchaSolver].
 type Captcha struct {
 	// RequestID identifies the captcha.
 	RequestID string

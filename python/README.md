@@ -48,8 +48,8 @@ streams.
 - **Two-factor codes:** `otp=` takes `TOTP(secret)`, a function returning the current code (one
   that asks the user keeps the secret out of the program; coroutine functions with
   `AsyncWhitebird`) or a fixed code. It is asked for a code only when Whitebird wants one.
-- **Captcha:** accounts without two-factor authentication sign in through a slider captcha; pass
-  `captcha=` a function that returns the slider position.
+- **Captcha:** when Whitebird asks for a slider captcha at login, the client calls `captcha=`, a
+  function that returns the slider position.
 - **Withdrawals:** when Whitebird refuses an operation for MFA and `otp` is configured, the client
   obtains the operation MFA token and sends the operation again;
   `client.confirm_operation("WITHDRAWAL", code)` does it explicitly.

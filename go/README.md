@@ -55,7 +55,7 @@ func main() {
   `client.User.Logout` ends the session.
 - **Two-factor codes:** `WithCodeProvider` takes an `*otp.TOTP`, a `CodeFunc` that asks for the
   code, so the secret stays out of the program, or a `StaticCode`.
-- **Captcha:** `WithCaptchaSolver` answers the slider captcha of accounts without 2FA.
+- **Captcha:** `WithCaptchaSolver` answers the slider captcha that Whitebird may ask for at sign-in.
 - **Withdrawals:** when the API asks for the operation MFA token, a client with a code provider
   obtains it and sends the operation again; `client.ConfirmOperation` does it explicitly.
 - **Errors:** API errors are `*whitebird.APIError`; match classes with `errors.Is`

@@ -9,7 +9,7 @@ use whitebird::params::UserPasswordChangeParams;
 use whitebird::{
     CodeProvider, Error, ErrorKind, MemoryTokenStore, Method, Service, TokenStore, Tokens,
 };
-use wiremock::matchers::{body_json, body_string_contains, header, method, path};
+use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
 async fn me_responds(server: &MockServer, token: &str) {
@@ -33,13 +33,6 @@ fn two_factor_client(server: &MockServer, otp: impl Into<CodeProvider>) -> white
 async fn logs_in_lazily_in_two_steps_like_the_web_app() {
     let server = MockServer::start().await;
     let access = jwt("me", 3600);
-    Mock::given(method("POST"))
-        .and(path(MFA_PATH))
-        .and(body_json(json!({ "username": "Trader@Example.com" })))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "mfaEnabled": true })))
-        .expect(1)
-        .mount(&server)
-        .await;
     password_grant()
         .and(|request: &Request| !has_code(request))
         .and(header(
@@ -90,7 +83,6 @@ async fn logs_in_lazily_in_two_steps_like_the_web_app() {
 #[tokio::test]
 async fn takes_the_tokens_of_the_first_step_without_asking_for_a_code() {
     let server = MockServer::start().await;
-    mfa_check(true).mount(&server).await;
     password_grant()
         .respond_with(grant(&jwt("me", 3600), "refresh-1"))
         .expect(1)
@@ -151,93 +143,32 @@ async fn awaits_an_async_code_provider() {
 }
 
 #[tokio::test]
-async fn asks_for_a_captcha_instead_of_a_code_without_two_factor() {
-    for status in [
-        json!({ "mfaEnabled": false }),
-        json!({ "mfaEnabled": null }),
-        json!({}),
-    ] {
-        let server = MockServer::start().await;
-        Mock::given(path(MFA_PATH))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&status))
-            .expect(1)
-            .mount(&server)
-            .await;
-        password_grant()
-            .respond_with(grant("unused", "unused"))
-            .expect(0)
-            .mount(&server)
-            .await;
-        let calls = Arc::new(Mutex::new(0));
-        let counter = Arc::clone(&calls);
-        let client = two_factor_client(
-            &server,
-            CodeProvider::from_fn(move || {
-                *counter.lock().unwrap() += 1;
-                Ok("123456".into())
-            }),
-        );
+async fn reports_an_unknown_username() {
+    let server = MockServer::start().await;
+    password_grant()
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "code": 400,
+            "status": "NOT_FOUND",
+            "message": "User not found",
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
 
-        let error = client.login().await.unwrap_err();
+    let error = two_factor_client(&server, "123456")
+        .login()
+        .await
+        .unwrap_err();
 
-        assert!(error.is_captcha_required(), "{status}: {error:?}");
-        assert!(
-            error
-                .api()
-                .unwrap()
-                .message()
-                .contains("ClientBuilder::captcha")
-        );
-        assert_eq!(*calls.lock().unwrap(), 0);
-    }
-}
-
-#[tokio::test]
-async fn never_sends_the_password_when_the_status_check_fails() {
-    let cases = [
-        (
-            ResponseTemplate::new(404).set_body_json(json!({ "status": "NOT_FOUND" })),
-            ErrorKind::Authentication,
-        ),
-        (
-            ResponseTemplate::new(200).set_body_json(json!({ "status": "NOT_FOUND" })),
-            ErrorKind::Authentication,
-        ),
-        (ResponseTemplate::new(500), ErrorKind::Server),
-        (ResponseTemplate::new(429), ErrorKind::RateLimited),
-    ];
-    for (answer, kind) in cases {
-        let server = MockServer::start().await;
-        Mock::given(path(MFA_PATH))
-            .respond_with(answer)
-            .expect(1)
-            .mount(&server)
-            .await;
-        password_grant()
-            .respond_with(grant("unused", "unused"))
-            .expect(0)
-            .mount(&server)
-            .await;
-
-        let error = two_factor_client(&server, "123456")
-            .login()
-            .await
-            .unwrap_err();
-
-        assert_eq!(error.kind(), Some(kind), "{error:?}");
-        if kind == ErrorKind::Authentication {
-            assert_eq!(
-                error.api().unwrap().message(),
-                "no Whitebird account with this username"
-            );
-        }
-    }
+    assert_eq!(error.kind(), Some(ErrorKind::Authentication), "{error:?}");
+    let api = error.api().unwrap();
+    assert_eq!(api.message(), "no Whitebird account with this username");
+    assert_eq!(api.error_code(), Some("NOT_FOUND"));
 }
 
 #[tokio::test]
 async fn reports_a_failing_code_provider() {
     let server = MockServer::start().await;
-    mfa_check(true).mount(&server).await;
     code_requested().expect(1).mount(&server).await;
     code_grant("")
         .respond_with(grant(&jwt("me", 3600), "refresh-1"))
@@ -260,7 +191,6 @@ async fn reports_a_failing_code_provider() {
 #[tokio::test]
 async fn computes_totp_codes_from_the_secret() {
     let server = MockServer::start().await;
-    mfa_check(true).mount(&server).await;
     code_requested().mount(&server).await;
     password_grant()
         .and(has_code)
@@ -283,7 +213,6 @@ async fn computes_totp_codes_from_the_secret() {
 #[tokio::test]
 async fn reports_mfa_required_when_the_server_asks_for_a_code_without_a_provider() {
     let server = MockServer::start().await;
-    mfa_check(true).expect(1).mount(&server).await;
     code_requested().expect(1).mount(&server).await;
 
     let client = builder(&server)
@@ -311,7 +240,6 @@ async fn rejected_code_is_an_authentication_error() {
         ),
     ] {
         let server = MockServer::start().await;
-        mfa_check(true).mount(&server).await;
         code_requested().mount(&server).await;
         code_grant("000000")
             .respond_with(answer)
@@ -337,7 +265,6 @@ async fn wrong_password_is_an_authentication_error() {
         json!({ "status": "BAD_CREDENTIALS", "message": "Bad credentials" }),
     ] {
         let server = MockServer::start().await;
-        mfa_check(true).mount(&server).await;
         password_grant()
             .respond_with(ResponseTemplate::new(400).set_body_json(&body))
             .expect(1)
@@ -366,7 +293,6 @@ async fn blocked_accounts_and_too_many_attempts_keep_their_kind() {
         ),
     ] {
         let server = MockServer::start().await;
-        mfa_check(true).mount(&server).await;
         password_grant()
             .respond_with(ResponseTemplate::new(400).set_body_json(&body))
             .mount(&server)
@@ -832,7 +758,6 @@ async fn later_logins_use_the_changed_password() {
         .expect(1)
         .mount(&server)
         .await;
-    mfa_check(true).mount(&server).await;
     password_grant()
         .respond_with(grant(&jwt("next", 3600), "refresh-2"))
         .expect(1)
@@ -887,7 +812,6 @@ async fn authenticated_call_without_credentials_is_a_config_error() {
 async fn sends_the_language_with_every_request() {
     let server = MockServer::start().await;
     let access = jwt("me", 3600);
-    mfa_check(true).mount(&server).await;
     password_grant()
         .respond_with(grant(&access, "refresh-1"))
         .mount(&server)
@@ -906,7 +830,7 @@ async fn sends_the_language_with_every_request() {
         .unwrap();
 
     let requests = server.received_requests().await.unwrap();
-    assert_eq!(requests.len(), 3);
+    assert_eq!(requests.len(), 2);
     for request in requests {
         assert_eq!(request.headers["accept-language"], "en", "{}", request.url);
     }

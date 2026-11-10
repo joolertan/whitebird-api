@@ -1713,16 +1713,6 @@ export interface AuthMediaCapabilities {
   powerEfficient?: boolean | null | undefined;
 }
 
-export interface AuthMfaStatus {
-  /** Inferred from the web application, not observed in API responses. */
-  mfaEnabled?: boolean;
-}
-
-export interface AuthMfaStatusRequest {
-  /** Account email as the user typed it. */
-  username: string;
-}
-
 export interface AuthMfaTokenRequest {
   operation: AuthMfaOperation;
   /** Current 6-digit TOTP code. */

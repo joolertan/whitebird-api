@@ -18,8 +18,7 @@ import (
 
 const mfaHint = "a TOTP code is required; set a code provider with WithCodeProvider"
 
-const noMFACaptchaHint = "the account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: " +
-	"configure WithCaptchaSolver or enable two-factor authentication"
+const captchaHint = "Whitebird asks for a captcha to sign in; configure WithCaptchaSolver"
 
 const unknownUserHint = "no Whitebird account with this username"
 
@@ -326,40 +325,14 @@ func newPassword(p *prepared) string {
 	return ""
 }
 
-// login signs in with the password, as the web application does: it asks whether the account
-// has two-factor authentication, then sends the password alone, adding a TOTP code if the
-// server asks for one, or along with the answer to a captcha.
+// login signs in with the password, as the web application does: it sends the password alone,
+// solves a captcha once the server asks for one (and for every later grant of the sign-in), and
+// sends the password again with a TOTP code if the server asks for one.
 func (c *core) login(ctx context.Context) (*Token, error) {
-	twoFactor, err := c.mfaEnabled(ctx)
+	var captcha loginCaptcha
+	reply, err := c.passwordGrant(ctx, "", &captcha)
 	if err != nil {
 		return nil, err
-	}
-	if twoFactor {
-		return c.passwordGrant(ctx, "")
-	}
-	if c.cfg.captcha == nil {
-		return nil, &APIError{Message: noMFACaptchaHint, sentinel: ErrCaptchaRequired}
-	}
-	for attempt := 1; ; attempt++ {
-		answer, err := c.solveCaptcha(ctx)
-		if err != nil {
-			return nil, err
-		}
-		token, err := c.passwordGrant(ctx, answer)
-		var apiErr *APIError
-		if errors.As(err, &apiErr) && strings.EqualFold(apiErr.ErrorCode, "INVALID_CAPTCHA") && attempt < captchaAttempts {
-			continue
-		}
-		return token, err
-	}
-}
-
-// passwordGrant sends the password, with the answer to a captcha if not empty, and the TOTP
-// code if the server asks for it.
-func (c *core) passwordGrant(ctx context.Context, captcha string) (*Token, error) {
-	reply, err := c.grant(ctx, c.passwordForm(""), captcha)
-	if err != nil {
-		return nil, loginError(err, captcha != "")
 	}
 	if reply.token != nil {
 		return reply.token, nil
@@ -374,13 +347,54 @@ func (c *core) passwordGrant(ctx context.Context, captcha string) (*Token, error
 	if err != nil {
 		return nil, err
 	}
-	if reply, err = c.grant(ctx, c.passwordForm(code), ""); err != nil {
-		return nil, loginError(err, false)
+	if reply, err = c.passwordGrant(ctx, code, &captcha); err != nil {
+		return nil, err
 	}
 	if reply.token == nil {
 		return nil, reply.noToken("invalid TOTP code")
 	}
 	return reply.token, nil
+}
+
+// loginCaptcha is the captcha state of a sign-in.
+type loginCaptcha struct {
+	required bool // the server asked for a captcha
+	rejected int  // answers the server rejected
+}
+
+// passwordGrant sends the password, with the TOTP code if not empty, and with the answer to a
+// new captcha once the server asked for one. A rejected answer is retried with a new captcha.
+func (c *core) passwordGrant(ctx context.Context, code string, captcha *loginCaptcha) (*grantReply, error) {
+	for {
+		var answer string
+		if captcha.required {
+			var err error
+			if answer, err = c.solveCaptcha(ctx); err != nil {
+				return nil, err
+			}
+		}
+		reply, err := c.grant(ctx, c.passwordForm(code), answer)
+		if err == nil {
+			return reply, nil
+		}
+		err = loginError(err, answer != "")
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) || !strings.Contains(strings.ToUpper(apiErr.ErrorCode), "CAPTCHA") {
+			return nil, err
+		}
+		switch {
+		case !captcha.required && c.cfg.captcha == nil:
+			apiErr.Message = withHint(captchaHint, apiErr.Message)
+			return nil, err
+		case !captcha.required:
+			captcha.required = true
+		default:
+			captcha.rejected++
+			if !strings.EqualFold(apiErr.ErrorCode, "INVALID_CAPTCHA") || captcha.rejected >= captchaAttempts {
+				return nil, err
+			}
+		}
+	}
 }
 
 // code asks the code provider for a TOTP code.
@@ -408,14 +422,17 @@ func (c *core) passwordForm(code string) url.Values {
 }
 
 // loginError classifies an error answered to a password grant. Wrong credentials and wrong
-// codes are authentication errors whatever their status, and a request for a captcha that was
-// not sent is [ErrCaptchaRequired].
+// codes are authentication errors whatever their status, an unknown username is named as such,
+// and a request for a captcha that was not sent is [ErrCaptchaRequired].
 func loginError(err error, sentCaptcha bool) error {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode >= http.StatusInternalServerError {
 		return err
 	}
 	switch {
+	case apiErr.ErrorCode == "NOT_FOUND":
+		apiErr.sentinel = ErrAuthentication
+		apiErr.Message = withHint(unknownUserHint, apiErr.Message)
 	case strings.EqualFold(apiErr.Message, messageManyRequests):
 		apiErr.sentinel = ErrRateLimited
 	case strings.EqualFold(apiErr.Message, messageUserBlocked):
@@ -516,43 +533,6 @@ func truthy(raw json.RawMessage) bool {
 		return err != nil || f != 0
 	}
 	return true
-}
-
-// mfaEnabled asks whether the account has two-factor authentication. If the server cannot
-// tell, the password is not sent at all.
-func (c *core) mfaEnabled(ctx context.Context) (bool, error) {
-	payload, err := json.Marshal(map[string]string{"username": c.cfg.email})
-	if err != nil {
-		return false, err
-	}
-	p := &prepared{
-		method: http.MethodPost,
-		url:    c.baseURLs[tokenService] + mfaStatusPath,
-		header: http.Header{
-			"Accept":       {"application/json"},
-			"Content-Type": {"application/json"},
-		},
-		body:       payload,
-		public:     true,
-		timeout:    c.cfg.timeout,
-		maxRetries: c.cfg.maxRetries,
-	}
-	r, err := c.do(ctx, p, false)
-	var apiErr *APIError
-	if errors.As(err, &apiErr) && (apiErr.StatusCode == http.StatusNotFound || apiErr.ErrorCode == "NOT_FOUND") {
-		apiErr.sentinel = ErrAuthentication
-		apiErr.Message = withHint(unknownUserHint, apiErr.Message)
-	}
-	if err != nil {
-		return false, err
-	}
-	var resp struct {
-		MFAEnabled json.RawMessage `json:"mfaEnabled"`
-	}
-	if err := json.Unmarshal(r.body, &resp); err != nil {
-		return false, fmt.Errorf("whitebird: decode two-factor status: %w", err)
-	}
-	return truthy(resp.MFAEnabled), nil
 }
 
 func withHint(hint, message string) string {

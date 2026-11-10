@@ -100,14 +100,6 @@ pub struct AuthCreateMfaTokenParams {
     pub mfa_code: String,
 }
 
-/// Parameters of [`Auth::mfa_status`](crate::resources::Auth::mfa_status).
-#[derive(Debug, Clone, PartialEq, Serialize, bon::Builder)]
-#[builder(on(String, into))]
-pub struct AuthMfaStatusParams {
-    /// Account email as the user typed it.
-    pub username: String,
-}
-
 /// Parameters of [`Auth::generate_captcha`](crate::resources::Auth::generate_captcha).
 #[derive(Debug, Clone, PartialEq, bon::Builder)]
 #[builder(on(String, into))]

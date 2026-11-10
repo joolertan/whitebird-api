@@ -55,13 +55,11 @@
 //		whitebird.WithCodeProvider(totp),
 //	)
 //
-// Before a password login the client asks whether the account has two-factor authentication;
-// an unknown username fails with [ErrAuthentication] and the
-// password is not sent. For an account with two-factor authentication it sends the password,
-// then the code when the server asks for one; without a code provider, the login fails with
-// [ErrMFARequired]. Accounts without two-factor authentication solve a slider captcha instead:
-// [WithCaptchaSolver] provides the solution, and without it their login fails with
-// [ErrCaptchaRequired] before the password is sent.
+// A password login sends the password, then the code when the server asks for one; without a
+// code provider, the login fails with [ErrMFARequired]. An unknown username fails with
+// [ErrAuthentication]. The server may also ask for a slider captcha: [WithCaptchaSolver]
+// provides the solution, sent with every later request of that login, and without it the login
+// fails with [ErrCaptchaRequired].
 //
 // Sensitive operations such as withdrawals also need an operation MFA token, sent with every
 // request once set. When the API refuses such an operation for want of a token, a client with

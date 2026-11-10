@@ -18,6 +18,7 @@ var uuidV4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-
 func TestLoginSolvesCaptcha(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.wantCaptcha = true
 	var got []Captcha
 	client := newTestClient(t, mux,
 		WithCredentials("trader@example.com", "secret"),
@@ -42,13 +43,16 @@ func TestLoginSolvesCaptcha(t *testing.T) {
 	if !slices.Equal(ids, []string{c.RequestID}) {
 		t.Errorf("captchas requested = %v, want [%s]", ids, c.RequestID)
 	}
-	answer, _ := base64.StdEncoding.DecodeString(answers[0])
+	if len(answers) != 2 || answers[0] != "" {
+		t.Fatalf("captcha headers = %q, want none, then the answer", answers)
+	}
+	answer, _ := base64.StdEncoding.DecodeString(answers[1])
 	// The web application sends the position as the string value of its slider.
 	if want := fmt.Sprintf(`{"sliderPosition":"117","requestId":%q}`, c.RequestID); string(answer) != want {
 		t.Errorf("captcha header = %s, want %s", answer, want)
 	}
-	if auth.firstForm().Has("code") {
-		t.Error("login sent a TOTP code for an account without 2FA")
+	if auth.form(1).Has("code") || auth.form(1).Encode() != auth.firstForm().Encode() {
+		t.Errorf("grant with the captcha = %v, want the first grant again", auth.form(1))
 	}
 }
 
@@ -57,6 +61,7 @@ func TestLoginRetriesInvalidCaptcha(t *testing.T) {
 		t.Run(fmt.Sprint(rejections, " rejections"), func(t *testing.T) {
 			mux := http.NewServeMux()
 			auth := newAuthServer(t, mux)
+			auth.wantCaptcha = true
 			var attempts atomic.Int32
 			auth.reply = func(url.Values) (int, string) {
 				if attempts.Add(1) <= int32(rejections) {
@@ -114,7 +119,7 @@ func TestLoginCaptchaRequired(t *testing.T) {
 	}
 }
 
-func TestLoginWithTwoFactorSkipsCaptcha(t *testing.T) {
+func TestLoginSolvesNoCaptchaUnlessAsked(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
 	auth.mfa = true
@@ -122,7 +127,7 @@ func TestLoginWithTwoFactorSkipsCaptcha(t *testing.T) {
 		WithCredentials("trader@example.com", "secret"),
 		WithCodeProvider(StaticCode("123456")),
 		WithCaptchaSolver(func(context.Context, Captcha) (int, error) {
-			t.Error("solver called for an account with 2FA")
+			t.Error("solver called although the server asked for no captcha")
 			return 0, nil
 		}),
 	)
@@ -137,6 +142,7 @@ func TestLoginWithTwoFactorSkipsCaptcha(t *testing.T) {
 func TestLoginAfterCaptchaAsksForCode(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.wantCaptcha = true
 	auth.reply = func(form url.Values) (int, string) {
 		if !form.Has("code") {
 			return http.StatusOK, `{"mfaEnabled":true}`
@@ -151,15 +157,18 @@ func TestLoginAfterCaptchaAsksForCode(t *testing.T) {
 	if err := client.Login(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	_, answers := auth.captchas()
-	if len(answers) != 2 || answers[0] == "" || answers[1] != "" || auth.form(1).Get("code") != "123456" {
-		t.Errorf("token requests = %v with captchas %q, want the captcha, then the code", auth.forms, answers)
+	// Once asked for, the captcha goes with every grant of the login, a new one each time.
+	ids, answers := auth.captchas()
+	if len(answers) != 3 || answers[0] != "" || answers[1] == "" || answers[2] == "" || answers[1] == answers[2] ||
+		len(ids) != 2 || auth.form(1).Has("code") || auth.form(2).Get("code") != "123456" {
+		t.Errorf("token requests = %v with captchas %q, want none, the captcha, then the code with a new one", auth.forms, answers)
 	}
 }
 
 func TestCaptchaSolverError(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.wantCaptcha = true
 	errGiveUp := errors.New("no idea")
 	client := newTestClient(t, mux,
 		WithCredentials("trader@example.com", "secret"),
@@ -168,7 +177,7 @@ func TestCaptchaSolverError(t *testing.T) {
 	if err := client.Login(context.Background()); !errors.Is(err, errGiveUp) {
 		t.Errorf("Login() = %v, want the solver error", err)
 	}
-	if len(auth.grants()) != 0 {
-		t.Error("token requested without a captcha answer")
+	if _, answers := auth.captchas(); len(answers) != 1 || answers[0] != "" {
+		t.Errorf("captcha headers = %q, want only the first grant, without one", answers)
 	}
 }

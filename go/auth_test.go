@@ -58,9 +58,6 @@ func TestLoginWithCode(t *testing.T) {
 	if form := auth.form(1); form.Encode() != want.Encode() {
 		t.Errorf("second grant = %v, want %v", form, want)
 	}
-	if auth.checks() != 1 || auth.usernames[0] != "Trader@Example.com" {
-		t.Errorf("MFA checks for %q, want one for the username as given", auth.usernames)
-	}
 	callEcho(t, client)
 	if len(auth.grants()) != 2 {
 		t.Errorf("grants = %v, want the token to be reused", auth.grants())
@@ -90,37 +87,24 @@ func TestLoginWithTwoFactorWithoutCodeStep(t *testing.T) {
 	}
 }
 
-func TestLoginStatusCheckFailure(t *testing.T) {
-	t.Run("server error", func(t *testing.T) {
-		mux := http.NewServeMux()
-		auth := newAuthServer(t, mux)
-		auth.mfaFails = true
-		client := newTestClient(t, mux, WithCredentials("trader@example.com", "secret"), withCode, WithMaxRetries(0))
-		if err := client.Login(context.Background()); !errors.Is(err, ErrServer) {
-			t.Errorf("Login() = %v, want the server error", err)
-		}
-		if len(auth.grants()) != 0 {
-			t.Error("password sent although the two-factor check failed")
-		}
-	})
-	t.Run("unknown username", func(t *testing.T) {
-		mux := http.NewServeMux()
-		auth := newAuthServer(t, mux)
-		auth.unknown = true
-		client := newTestClient(t, mux, WithCredentials("nobody@example.com", "secret"), withCode)
-		err := client.Login(context.Background())
-		if !errors.Is(err, ErrAuthentication) || errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), unknownUserHint) {
-			t.Errorf("Login() = %v, want ErrAuthentication naming the unknown account", err)
-		}
-		if len(auth.grants()) != 0 {
-			t.Error("password sent for an unknown account")
-		}
-	})
-}
-
-func TestLoginWithoutTwoFactorNeedsSolver(t *testing.T) {
+func TestLoginUnknownUsername(t *testing.T) {
 	mux := http.NewServeMux()
 	auth := newAuthServer(t, mux)
+	auth.unknown = true
+	client := newTestClient(t, mux, WithCredentials("nobody@example.com", "secret"), withCode)
+	err := client.Login(context.Background())
+	if !errors.Is(err, ErrAuthentication) || errors.Is(err, ErrBadRequest) || !strings.Contains(err.Error(), unknownUserHint) {
+		t.Errorf("Login() = %v, want ErrAuthentication naming the unknown account", err)
+	}
+	if got := auth.grants(); len(got) != 1 {
+		t.Errorf("grants = %v, want one", got)
+	}
+}
+
+func TestLoginCaptchaNeedsSolver(t *testing.T) {
+	mux := http.NewServeMux()
+	auth := newAuthServer(t, mux)
+	auth.wantCaptcha = true
 	asked := 0
 	client := newTestClient(t, mux,
 		WithCredentials("trader@example.com", "secret"),
@@ -131,10 +115,10 @@ func TestLoginWithoutTwoFactorNeedsSolver(t *testing.T) {
 		t.Errorf("Login() = %v, want ErrCaptchaRequired", err)
 	}
 	if asked != 0 {
-		t.Errorf("code provider called %d times for an account without 2FA", asked)
+		t.Errorf("code provider called %d times before the captcha", asked)
 	}
-	if len(auth.grants()) != 0 {
-		t.Error("client tried the password without a captcha")
+	if ids, answers := auth.captchas(); len(ids) != 0 || len(answers) != 1 || answers[0] != "" {
+		t.Errorf("captchas %v and answers %q, want one grant without a captcha", ids, answers)
 	}
 }
 
@@ -257,7 +241,7 @@ func TestNoCredentials(t *testing.T) {
 	if err := client.Login(context.Background()); !errors.Is(err, ErrAuthentication) {
 		t.Errorf("Login() = %v, want ErrAuthentication", err)
 	}
-	if len(auth.grants()) != 0 || auth.checks() != 0 || solved {
+	if ids, _ := auth.captchas(); len(auth.grants()) != 0 || len(ids) != 0 || solved {
 		t.Error("client signed in without credentials")
 	}
 }

@@ -13,7 +13,6 @@ import httpx
 from whitebird import AsyncWhitebird, Tokens, Whitebird
 from whitebird._generated.services import (
     OAUTH_CAPTCHA_PATH,
-    OAUTH_MFA_STATUS_PATH,
     OAUTH_SERVICE,
     OAUTH_TOKEN_PATH,
     OPERATION_MFA_SERVICE,
@@ -23,7 +22,6 @@ from whitebird._generated.services import (
 AUTH = "https://auth.test"
 API = "https://api.test"
 TOKEN_URL = f"{AUTH}{OAUTH_TOKEN_PATH}"
-MFA_URL = f"{AUTH}{OAUTH_MFA_STATUS_PATH}"
 CAPTCHA_URL = f"{AUTH}{OAUTH_CAPTCHA_PATH}"
 BASE_URLS = {OAUTH_SERVICE: AUTH, "api": API}
 CONFIRM_URL = f"{BASE_URLS[OPERATION_MFA_SERVICE]}{OPERATION_MFA_TOKEN_PATH}"

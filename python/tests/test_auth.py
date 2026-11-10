@@ -9,7 +9,6 @@ import respx
 
 from tests.support import (
     API,
-    MFA_URL,
     TOKEN_URL,
     AsyncClientFactory,
     ClientFactory,
@@ -40,11 +39,6 @@ def api(respx_mock: respx.MockRouter) -> respx.Route:
     return respx_mock.get(f"{API}/me").respond(json={"ok": True})
 
 
-@pytest.fixture
-def two_factor(respx_mock: respx.MockRouter) -> respx.Route:
-    return respx_mock.post(MFA_URL).respond(json={"mfaEnabled": True})
-
-
 def grants(route: respx.Route) -> list[dict[str, str]]:
     return [form(call.request) for call in route.calls]
 
@@ -53,7 +47,6 @@ def test_two_factor_login_asks_for_the_code_after_the_password(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
     api: respx.Route,
-    two_factor: respx.Route,
 ) -> None:
     access_token = jwt()
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[ASK_CODE, tokens(access_token)])
@@ -61,7 +54,6 @@ def test_two_factor_login_asks_for_the_code_after_the_password(
 
     assert client.request("api", "GET", "/me") == {"ok": True}
 
-    assert two_factor.calls.last.request.content == b'{"username":"Me@Example.com"}'
     password = {"grant_type": "password", "username": "me@example.com", "password": "secret"}
     assert grants(token) == [password, {**password, "code": "123456"}]
     for call in token.calls:
@@ -71,7 +63,7 @@ def test_two_factor_login_asks_for_the_code_after_the_password(
 
 
 def test_two_factor_login_without_a_code_step(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_client: ClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
     asked: list[str] = []
@@ -93,7 +85,6 @@ def test_two_factor_login_without_a_code_step(
 def test_codes_are_trimmed(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
-    two_factor: respx.Route,
     otp: CodeProvider,
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[ASK_CODE, tokens()])
@@ -107,7 +98,6 @@ def test_login_with_totp(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
     api: respx.Route,
-    two_factor: respx.Route,
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[ASK_CODE, tokens()])
     otp = TOTP("JBSWY3DPEHPK3PXP")
@@ -118,9 +108,7 @@ def test_login_with_totp(
     assert form(token.calls.last.request)["code"] in {otp.at(time.time() + d) for d in (-30, 0)}
 
 
-def test_explicit_login_with_code(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
-) -> None:
+def test_explicit_login_with_code(make_client: ClientFactory, respx_mock: respx.MockRouter) -> None:
     store = MemoryTokenStore()
     access_token = jwt()
     token = respx_mock.post(TOKEN_URL).mock(
@@ -136,51 +124,30 @@ def test_explicit_login_with_code(
     assert (saved.access_token, saved.refresh_token) == (access_token, "refresh-9")
 
 
-@pytest.mark.parametrize(
-    "response",
-    [
-        httpx.Response(404),
-        httpx.Response(400, json={"code": 400, "status": "NOT_FOUND", "message": "No user"}),
-    ],
-    ids=["404", "NOT_FOUND"],
-)
-def test_unknown_username_sends_no_password(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, response: httpx.Response
-) -> None:
-    respx_mock.post(MFA_URL).mock(return_value=response)
-    token = respx_mock.post(TOKEN_URL)
+def test_unknown_username(make_client: ClientFactory, respx_mock: respx.MockRouter) -> None:
+    body = {"code": 400, "status": "NOT_FOUND", "message": "No user"}
+    token = respx_mock.post(TOKEN_URL).respond(400, json=body)
 
     with pytest.raises(AuthenticationError, match="no Whitebird account") as raised:
         make_client("nobody@example.com", "secret", captcha=lambda _: 1).login()
 
-    assert raised.value.status_code == response.status_code
-    assert not token.called
+    assert raised.value.status_code == 400
+    assert raised.value.body == body
+    assert token.call_count == 1
 
 
-@pytest.mark.parametrize(
-    ("side_effect", "error"),
-    [
-        (httpx.Response(503, json={"message": "Down"}), ServerError),
-        (httpx.ConnectError("refused"), TransportError),
-    ],
-    ids=["server error", "network error"],
-)
-def test_failed_status_check_sends_no_password(
-    make_client: ClientFactory,
-    respx_mock: respx.MockRouter,
-    side_effect: httpx.Response | Exception,
-    error: type[Exception],
+def test_wrong_password_keeps_the_server_message(
+    make_client: ClientFactory, respx_mock: respx.MockRouter
 ) -> None:
-    respx_mock.post(MFA_URL).mock(side_effect=[side_effect])
-    token = respx_mock.post(TOKEN_URL)
+    body = {"code": 400, "status": "BAD_CREDENTIALS", "message": "Bad credentials"}
+    respx_mock.post(TOKEN_URL).respond(400, json=body)
 
-    with pytest.raises(error):
-        make_client("me@example.com", "secret", otp="123456", captcha=lambda _: 1).login()
-    assert not token.called
+    with pytest.raises(AuthenticationError, match="Bad credentials"):
+        make_client("me@example.com", "wrong").login()
 
 
 def test_missing_code_is_reported_after_the_password_step(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_client: ClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(return_value=ASK_CODE)
     client = make_client("me@example.com", "secret")
@@ -203,7 +170,6 @@ def test_missing_code_is_reported_after_the_password_step(
 def test_wrong_code(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
-    two_factor: respx.Route,
     response: httpx.Response,
 ) -> None:
     respx_mock.post(TOKEN_URL).mock(side_effect=[ASK_CODE, response])
@@ -226,7 +192,6 @@ def test_wrong_code(
 def test_wrong_password(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
-    two_factor: respx.Route,
     body: dict[str, object],
 ) -> None:
     respx_mock.post(TOKEN_URL).respond(400, json=body)
@@ -244,7 +209,6 @@ def test_wrong_password(
 def test_blocked_sign_in_is_not_a_wrong_password(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
-    two_factor: respx.Route,
     message: str,
     error: type[Exception],
 ) -> None:
@@ -320,7 +284,6 @@ def test_expired_refresh_token_is_not_sent(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
     api: respx.Route,
-    two_factor: respx.Route,
 ) -> None:
     store = MemoryTokenStore(session(expires_in=-10, refresh_token=jwt(-5)))
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
@@ -377,7 +340,6 @@ def test_rejected_refresh_forgets_the_session_and_logs_in(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
     api: respx.Route,
-    two_factor: respx.Route,
     status: int,
 ) -> None:
     class Store(MemoryTokenStore):
@@ -425,7 +387,6 @@ def test_failed_refresh_keeps_the_session(
     make_client: ClientFactory,
     respx_mock: respx.MockRouter,
     api: respx.Route,
-    two_factor: respx.Route,
     side_effect: httpx.Response | Exception,
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[side_effect])
@@ -438,7 +399,6 @@ def test_failed_refresh_keeps_the_session(
 
     assert token.call_count == 1
     assert store.load() == stale
-    assert not two_factor.called
 
 
 def test_session_renewed_elsewhere_is_adopted(
@@ -494,9 +454,7 @@ def test_store_failures(
     assert "Could not save the session" in caplog.text
 
 
-def test_logout_ends_the_session(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
-) -> None:
+def test_logout_ends_the_session(make_client: ClientFactory, respx_mock: respx.MockRouter) -> None:
     logout = respx_mock.post(f"{API}/logout").respond(500)
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
     store = MemoryTokenStore(session())
@@ -547,7 +505,7 @@ def test_password_change_replaces_the_session(
 
 
 def test_password_change_keeps_the_new_password_for_later_logins(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_client: ClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     respx_mock.put(f"{API}/password").respond(json={"access_token": jwt()})
     token = respx_mock.post(TOKEN_URL).mock(return_value=tokens())
@@ -630,7 +588,7 @@ async def test_async_concurrent_requests_share_one_refresh(
 
 
 async def test_async_login_and_reactive_refresh(
-    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     first, second = jwt(subject="first"), jwt(subject="second")
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[tokens(first), tokens(second)])
@@ -646,7 +604,7 @@ async def test_async_login_and_reactive_refresh(
 
 
 async def test_async_mfa_required(
-    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     respx_mock.post(TOKEN_URL).mock(return_value=ASK_CODE)
     client = make_async_client("me@example.com", "secret")
@@ -656,7 +614,7 @@ async def test_async_mfa_required(
 
 
 async def test_async_login_awaits_the_code_provider(
-    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(side_effect=[ASK_CODE, tokens()])
 
@@ -674,9 +632,8 @@ async def test_async_login_awaits_the_code_provider(
 async def test_async_logout_and_unknown_username(
     make_async_client: AsyncClientFactory, respx_mock: respx.MockRouter
 ) -> None:
-    respx_mock.post(MFA_URL).respond(404)
     respx_mock.post(f"{API}/logout").respond(200)
-    token = respx_mock.post(TOKEN_URL)
+    token = respx_mock.post(TOKEN_URL).respond(400, json={"status": "NOT_FOUND"})
     store = MemoryTokenStore(session())
     client = make_async_client("nobody@example.com", "secret", token_store=store)
 
@@ -684,11 +641,11 @@ async def test_async_logout_and_unknown_username(
     assert store.load() is None
     with pytest.raises(AuthenticationError, match="no Whitebird account"):
         await client.request("api", "GET", "/me")
-    assert not token.called
+    assert token.call_count == 1
 
 
 def test_sync_client_rejects_a_coroutine_code_provider(
-    make_client: ClientFactory, respx_mock: respx.MockRouter, two_factor: respx.Route
+    make_client: ClientFactory, respx_mock: respx.MockRouter
 ) -> None:
     token = respx_mock.post(TOKEN_URL).mock(return_value=ASK_CODE)
 

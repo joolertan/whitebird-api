@@ -828,7 +828,6 @@ class Emitter:
                 services=services,
                 oauth_service=self._service(oauth.service, "oauth"),
                 token_path=json.dumps(oauth.token_path),
-                mfa_status_path=json.dumps(oauth.mfa_status_path),
                 captcha_path=json.dumps(oauth.captcha_path),
                 basic=json.dumps(oauth.basic),
                 operation_mfa_service=self._service(mfa.service, "operation_mfa"),

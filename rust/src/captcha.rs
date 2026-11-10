@@ -26,7 +26,7 @@ pub struct Captcha {
 
 type Solve = dyn Fn(Captcha) -> BoxFuture<'static, Result<u32, BoxError>> + Send + Sync;
 
-/// Solves the slider captcha that accounts without two-factor authentication pass to sign in.
+/// Solves the slider captcha that Whitebird may ask for at sign-in.
 ///
 /// The solver returns the horizontal offset of the piece in background pixels (0 to 250). The SDK
 /// never solves captchas itself: show the images to a person or call a solving service. A wrong

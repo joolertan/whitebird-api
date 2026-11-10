@@ -53,9 +53,39 @@ fn sent_to<'a>(requests: &'a [Request], target: &str) -> Vec<&'a Request> {
 }
 
 #[tokio::test]
-async fn solves_the_captcha_before_logging_in_without_two_factor() {
+async fn sends_the_password_without_a_captcha_first() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    serve_captchas(&server).await;
+    password_grant()
+        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let (solver, seen) = recording_solver();
+
+    builder(&server)
+        .credentials("me@example.com", "secret")
+        .captcha(solver)
+        .build()
+        .unwrap()
+        .login()
+        .await
+        .unwrap();
+
+    assert!(seen.lock().unwrap().is_empty());
+    let requests = server.received_requests().await.unwrap();
+    assert!(sent_to(&requests, CAPTCHA_PATH).is_empty());
+    assert!(
+        !sent_to(&requests, TOKEN_PATH)[0]
+            .headers
+            .contains_key("captcha")
+    );
+}
+
+#[tokio::test]
+async fn solves_a_captcha_when_the_server_asks_for_one() {
+    let server = MockServer::start().await;
+    captcha_required().expect(1).mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
         .and(header_exists("captcha"))
@@ -89,23 +119,25 @@ async fn solves_the_captcha_before_logging_in_without_two_factor() {
     assert_eq!(request_id, seen[0].request_id);
     assert_eq!(request_id.len(), 36);
     let token = sent_to(&requests, TOKEN_PATH);
+    assert!(!token[0].headers.contains_key("captcha"));
     // The web app sends the value of its range input: a string.
     assert_eq!(
-        captcha_answer(token[0]),
+        captcha_answer(token[1]),
         json!({ "sliderPosition": "123", "requestId": request_id })
     );
-    assert!(!form(token[0]).iter().any(|(name, _)| name == "code"));
+    assert_eq!(form(token[1]), form(token[0]));
 }
 
 #[tokio::test]
 async fn retries_rejected_answers_with_fresh_captchas() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    captcha_required().mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
+        .and(header_exists("captcha"))
         .respond_with(invalid_captcha())
         .up_to_n_times(2)
-        .with_priority(1)
+        .with_priority(2)
         .mount(&server)
         .await;
     password_grant()
@@ -131,9 +163,10 @@ async fn retries_rejected_answers_with_fresh_captchas() {
 #[tokio::test]
 async fn gives_up_after_three_rejected_answers() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    captcha_required().expect(1).mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
+        .and(header_exists("captcha"))
         .respond_with(invalid_captcha())
         .expect(3)
         .mount(&server)
@@ -156,16 +189,17 @@ async fn gives_up_after_three_rejected_answers() {
 #[tokio::test]
 async fn reports_captcha_required_without_a_solver() {
     let server = MockServer::start().await;
-    mfa_check(false).expect(1).mount(&server).await;
+    captcha_required().expect(1).mount(&server).await;
     serve_captchas(&server).await;
-    password_grant()
-        .respond_with(grant("unused", "unused"))
-        .expect(0)
-        .mount(&server)
-        .await;
+    let calls = Arc::new(Mutex::new(0));
+    let counter = Arc::clone(&calls);
 
     let error = builder(&server)
         .credentials("me@example.com", "secret")
+        .otp(whitebird::CodeProvider::from_fn(move || {
+            *counter.lock().unwrap() += 1;
+            Ok("123456".into())
+        }))
         .build()
         .unwrap()
         .login()
@@ -174,16 +208,20 @@ async fn reports_captcha_required_without_a_solver() {
 
     assert_eq!(error.kind(), Some(ErrorKind::CaptchaRequired));
     assert!(error.is_authentication());
+    let api = error.api().unwrap();
+    assert!(api.message().contains("ClientBuilder::captcha"), "{api:?}");
+    assert_eq!(api.error_code(), Some("REQUIRED_CAPTCHA"));
+    assert_eq!(*calls.lock().unwrap(), 0);
     let requests = server.received_requests().await.unwrap();
     assert!(sent_to(&requests, CAPTCHA_PATH).is_empty());
 }
 
 #[tokio::test]
-async fn a_captcha_demand_to_a_two_factor_account_is_reported() {
+async fn solves_a_captcha_after_an_oauth_style_demand() {
     let server = MockServer::start().await;
-    mfa_check(true).mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
+        .and(|request: &Request| !request.headers.contains_key("captcha"))
         .respond_with(ResponseTemplate::new(400).set_body_json(json!({
             "error": "CAPTCHA_REQUIRED",
             "error_description": "Captcha is required",
@@ -191,31 +229,34 @@ async fn a_captcha_demand_to_a_two_factor_account_is_reported() {
         .expect(1)
         .mount(&server)
         .await;
+    password_grant()
+        .and(header_exists("captcha"))
+        .respond_with(grant(&jwt("me", 3600), "refresh-1"))
+        .expect(1)
+        .mount(&server)
+        .await;
     let (solver, seen) = recording_solver();
 
-    let error = builder(&server)
+    builder(&server)
         .credentials("me@example.com", "secret")
         .captcha(solver)
         .build()
         .unwrap()
         .login()
         .await
-        .unwrap_err();
+        .unwrap();
 
-    assert_eq!(error.kind(), Some(ErrorKind::CaptchaRequired));
-    assert!(error.is_authentication());
-    assert!(seen.lock().unwrap().is_empty());
-    let requests = server.received_requests().await.unwrap();
-    assert!(sent_to(&requests, CAPTCHA_PATH).is_empty());
+    assert_eq!(seen.lock().unwrap().len(), 1);
 }
 
 #[tokio::test]
-async fn asks_for_the_code_when_the_captcha_login_wants_one() {
+async fn solves_a_new_captcha_for_the_code_step() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    captcha_required().expect(1).mount(&server).await;
     serve_captchas(&server).await;
     code_requested().expect(1).mount(&server).await;
     code_grant("123456")
+        .and(header_exists("captcha"))
         .respond_with(grant(&jwt("me", 3600), "refresh-1"))
         .expect(1)
         .mount(&server)
@@ -232,15 +273,18 @@ async fn asks_for_the_code_when_the_captcha_login_wants_one() {
         .await
         .unwrap();
 
-    assert_eq!(seen.lock().unwrap().len(), 1);
+    assert_eq!(seen.lock().unwrap().len(), 2);
     let requests = server.received_requests().await.unwrap();
     let logins = sent_to(&requests, TOKEN_PATH);
-    assert!(logins[0].headers.contains_key("captcha"));
-    assert!(!logins[1].headers.contains_key("captcha"));
+    assert!(!logins[0].headers.contains_key("captcha"));
+    assert_ne!(
+        captcha_answer(logins[1])["requestId"],
+        captcha_answer(logins[2])["requestId"]
+    );
 }
 
 #[tokio::test]
-async fn sends_the_code_instead_when_two_factor_is_on() {
+async fn solves_no_captcha_for_the_code_step_unless_asked() {
     let server = MockServer::start().await;
     serve_captchas(&server).await;
     two_factor_login(&server, "123456", &jwt("me", 3600)).await;
@@ -262,7 +306,7 @@ async fn sends_the_code_instead_when_two_factor_is_on() {
 #[tokio::test]
 async fn accepts_async_solvers() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    captcha_required().mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
         .respond_with(grant(&jwt("me", 3600), "refresh-1"))
@@ -281,16 +325,17 @@ async fn accepts_async_solvers() {
         .unwrap();
 
     let requests = server.received_requests().await.unwrap();
-    let answer = captcha_answer(sent_to(&requests, TOKEN_PATH)[0]);
+    let answer = captcha_answer(sent_to(&requests, TOKEN_PATH)[1]);
     assert_eq!(answer["sliderPosition"], "77");
 }
 
 #[tokio::test]
 async fn reports_solver_failures() {
     let server = MockServer::start().await;
-    mfa_check(false).mount(&server).await;
+    captcha_required().expect(1).mount(&server).await;
     serve_captchas(&server).await;
     password_grant()
+        .and(header_exists("captcha"))
         .respond_with(grant(&jwt("me", 3600), "refresh-1"))
         .expect(0)
         .mount(&server)

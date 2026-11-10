@@ -84,7 +84,6 @@ class Builder:
             service=oauth["service"],
             token_path=oauth["token_path"],
             basic=oauth["basic"],
-            mfa_status_path=oauth["mfa_status_path"],
             captcha_path=oauth["captcha_path"],
         )
         mfa = environments["operation_mfa"]

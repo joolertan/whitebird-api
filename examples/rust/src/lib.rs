@@ -93,8 +93,8 @@ pub fn var(name: &str) -> Result<String, Error> {
 
 /// A client signed in as `WHITEBIRD_USERNAME` / `WHITEBIRD_PASSWORD` that keeps its session in
 /// `whitebird-session.json`. Two-factor codes are asked for in the terminal, or computed from
-/// `WHITEBIRD_TOTP_SECRET` when it is set; accounts without two-factor authentication solve the
-/// sign-in captcha on a page opened in a browser.
+/// `WHITEBIRD_TOTP_SECRET` when it is set; a sign-in captcha, when Whitebird asks for one, is
+/// solved on a page opened in a browser.
 ///
 /// # Errors
 ///

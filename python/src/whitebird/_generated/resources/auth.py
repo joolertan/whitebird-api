@@ -14,7 +14,6 @@ from whitebird._generated.models import (
     AuthGeo,
     AuthMediaCapabilities,
     AuthMfaOperation,
-    AuthMfaStatus,
     AuthWebGlData,
 )
 from whitebird._resource import AsyncResource, SyncResource
@@ -62,44 +61,6 @@ class AuthResource(SyncResource):
             options=options,
         )
 
-    def mfa_status(
-        self,
-        *,
-        username: str,
-        **options: Unpack[RequestOptions],
-    ) -> AuthMfaStatus:
-        """Check whether an account has 2FA enabled.
-
-        Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
-        with 2FA first send the password grant without code and without captcha; when the answer is
-        `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP code
-        in `code`. Accounts without 2FA must solve the captcha from `GET /api/v1/captcha/generate`.
-        Unknown users answer status `NOT_FOUND`; when this check fails the web app does not send the
-        password at all.
-
-        Public endpoint: works without credentials.
-
-        Args:
-            username: Account email as the user typed it.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The response as `AuthMfaStatus`.
-        """
-        return self._engine.request(
-            "auth",
-            "POST",
-            "/api/v1/client/mfa",
-            json={"username": username},
-            authenticated=False,
-            cast_to=AuthMfaStatus,
-            options=options,
-        )
-
     def generate_captcha(
         self,
         *,
@@ -116,6 +77,10 @@ class AuthResource(SyncResource):
         wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
         captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
         temporarily locked.
+
+        The sign-in form first sends the password grant without a captcha and asks for one only when
+        the server answers status `REQUIRED_CAPTCHA` (or `INVALID_CAPTCHA`); from then on every
+        grant of that sign-in, including the one with the 2FA code, carries a new captcha.
 
         Public endpoint: works without credentials.
 
@@ -360,44 +325,6 @@ class AsyncAuthResource(AsyncResource):
             options=options,
         )
 
-    async def mfa_status(
-        self,
-        *,
-        username: str,
-        **options: Unpack[RequestOptions],
-    ) -> AuthMfaStatus:
-        """Check whether an account has 2FA enabled.
-
-        Called by the sign-in form before `POST /oauth/token`, with the username as typed. Accounts
-        with 2FA first send the password grant without code and without captcha; when the answer is
-        `{"mfaEnabled": true}` without `access_token`, they send the grant again with the TOTP code
-        in `code`. Accounts without 2FA must solve the captcha from `GET /api/v1/captcha/generate`.
-        Unknown users answer status `NOT_FOUND`; when this check fails the web app does not send the
-        password at all.
-
-        Public endpoint: works without credentials.
-
-        Args:
-            username: Account email as the user typed it.
-            **options: Per-request options, see `RequestOptions`.
-
-        Note:
-            Experimental: the endpoint may change or disappear without notice. Reconstructed from
-            the Whitebird web application; fields may be missing.
-
-        Returns:
-            The response as `AuthMfaStatus`.
-        """
-        return await self._engine.request(
-            "auth",
-            "POST",
-            "/api/v1/client/mfa",
-            json={"username": username},
-            authenticated=False,
-            cast_to=AuthMfaStatus,
-            options=options,
-        )
-
     async def generate_captcha(
         self,
         *,
@@ -414,6 +341,10 @@ class AsyncAuthResource(AsyncResource):
         wrong answer is rejected with status `INVALID_CAPTCHA`; the web app then generates a new
         captcha with a fresh `requestId`. Status/message `Too many requests` means the account is
         temporarily locked.
+
+        The sign-in form first sends the password grant without a captcha and asks for one only when
+        the server answers status `REQUIRED_CAPTCHA` (or `INVALID_CAPTCHA`); from then on every
+        grant of that sign-in, including the one with the 2FA code, carries a new captcha.
 
         Public endpoint: works without credentials.
 

@@ -61,9 +61,6 @@ OAUTH_TOKEN_PATH: Final = "/oauth/token"
 OAUTH_BASIC: Final = "YXV0aENsaWVudElkOlhZN2ttem9OemwxMDA="
 """HTTP Basic credentials of the public web client, sent to the token endpoint."""
 
-OAUTH_MFA_STATUS_PATH: Final = "/api/v1/client/mfa"
-"""Path on the OAuth service telling whether an account has two-factor authentication."""
-
 OAUTH_CAPTCHA_PATH: Final = "/api/v1/captcha/generate"
 """Path on the OAuth service that generates the slider captcha of the sign-in form."""
 

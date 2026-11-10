@@ -76,9 +76,9 @@ func WithTokenStore(store TokenStore) Option {
 
 // WithCodeProvider sets the source of TOTP codes for accounts with two-factor authentication:
 // the client asks it for a code when the server wants one at sign-in, and to confirm sensitive
-// operations such as withdrawals (see [Client.ConfirmOperation]). It is not called for
-// accounts without two-factor authentication. The [github.com/joolertan/whitebird-api/go/otp]
-// package computes codes from the secret.
+// operations such as withdrawals (see [Client.ConfirmOperation]). It is not called unless the
+// server asks for a code. The [github.com/joolertan/whitebird-api/go/otp] package computes codes
+// from the secret.
 func WithCodeProvider(provider CodeProvider) Option {
 	return func(c *config) {
 		c.codes = provider
@@ -86,9 +86,9 @@ func WithCodeProvider(provider CodeProvider) Option {
 }
 
 // WithCaptchaSolver sets the function that solves the slider captcha the authorization server
-// requires when an account without two-factor authentication signs in. A rejected answer is
-// retried with a fresh captcha, for up to three attempts. Without a solver, such a login fails
-// with [ErrCaptchaRequired].
+// may ask for at sign-in. Once asked for, every later request of the sign-in carries a newly
+// solved captcha; a rejected answer is retried with a fresh captcha, for up to three attempts.
+// Without a solver, such a login fails with [ErrCaptchaRequired].
 //
 // The solver returns the horizontal position of the puzzle piece in background pixels, for
 // example as entered by a person shown the images:

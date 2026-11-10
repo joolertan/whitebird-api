@@ -29,7 +29,6 @@ export interface SessionConfig {
   /** Base URL of the authorization server. */
   authUrl: string;
   tokenPath: string;
-  mfaStatusPath: string;
   captchaPath: string;
   /** Value of the `Authorization: Basic` header of the OAuth client. */
   basic: string;
@@ -51,6 +50,12 @@ export interface TokenResponse {
   mfaEnabled?: boolean;
 }
 
+/** Captcha state of one login: whether Whitebird asked for one, and how many were rejected. */
+interface LoginCaptcha {
+  required: boolean;
+  rejected: number;
+}
+
 /** A login or refresh in progress, shared by the calls that wait for it. */
 interface Attempt {
   promise: Promise<Tokens>;
@@ -69,9 +74,9 @@ const NOT_LOGGED_IN =
 const MFA_HINT =
   'Two-factor authentication is enabled for this account: pass `otp` (a code, a function ' +
   "returning one, or totp(secret) from 'whitebird-api/otp'), or call login(code)";
-const NO_MFA_CAPTCHA =
-  'The account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: ' +
-  'configure a captcha solver (the captcha option) or enable two-factor authentication';
+const CAPTCHA_HINT =
+  'Whitebird asks for a captcha to log in: configure a captcha solver (the captcha option)';
+const NO_ACCOUNT = 'There is no Whitebird account with this username';
 const EXPIRED = 'The session expired and cannot be renewed without `username` and `password`';
 
 /**
@@ -299,17 +304,18 @@ export class Session {
   }
 
   /**
-   * Logs in like the web application: asks whether the account has 2FA, sends the password
-   * (with a solved captcha when it has not), and sends it again with a code if asked for one.
+   * Logs in like the web application: sends the password, solves a captcha once Whitebird asks
+   * for one (and for every later grant of the login), and sends the password again with a code
+   * if asked for one.
    */
   async #passwordLogin(otp: CodeProvider | undefined): Promise<Tokens> {
     const { username } = this.#config;
     const password = this.#password;
     if (!username || !password) throw new AuthenticationError(NOT_LOGGED_IN);
 
-    const twoFactor = await this.#twoFactorEnabled(username);
     const form = { grant_type: 'password', username: username.toLowerCase(), password };
-    const response = twoFactor ? await this.#grant(form) : await this.#grantWithCaptcha(form);
+    const captcha: LoginCaptcha = { required: false, rejected: 0 };
+    const response = await this.#passwordGrant(form, captcha);
     if (response.access_token) return toTokens(response);
     if (!response.mfaEnabled) {
       throw new AuthenticationError('The login returned no access token', {
@@ -320,7 +326,7 @@ export class Session {
 
     const code = await resolveCode(otp);
     if (code === undefined) throw new MFARequiredError(MFA_HINT, { status: 200, body: response });
-    const confirmed = await this.#grant({ ...form, code });
+    const confirmed = await this.#passwordGrant({ ...form, code }, captcha);
     if (confirmed.access_token) return toTokens(confirmed);
     throw new AuthenticationError('The two-factor code was rejected', {
       status: 200,
@@ -328,17 +334,26 @@ export class Session {
     });
   }
 
-  /** Sends the password with a solved captcha, solving a new one when it is rejected. */
-  async #grantWithCaptcha(form: Record<string, string>): Promise<TokenResponse> {
+  /** Sends a password grant, with a solved captcha once Whitebird asked for one. */
+  async #passwordGrant(
+    form: Record<string, string>,
+    captcha: LoginCaptcha,
+  ): Promise<TokenResponse> {
     const solver = this.#config.captcha;
-    if (!solver) throw new CaptchaRequiredError(NO_MFA_CAPTCHA);
-    for (let attempt = 1; ; attempt++) {
-      const captcha = await this.#solveCaptcha(solver);
+    for (;;) {
+      const headers: Record<string, string> =
+        captcha.required && solver ? { captcha: await this.#solveCaptcha(solver) } : {};
       try {
-        return await this.#grant(form, { captcha });
+        return await this.#grant(form, headers);
       } catch (error) {
         if (!(error instanceof APIError) || !isCaptchaError(error)) throw error;
-        if (error.errorCode !== 'INVALID_CAPTCHA' || attempt === CAPTCHA_ATTEMPTS) {
+        if (!captcha.required) {
+          if (!solver) throw new CaptchaRequiredError(CAPTCHA_HINT, details(error));
+          captcha.required = true;
+        } else if (
+          error.errorCode !== 'INVALID_CAPTCHA' ||
+          ++captcha.rejected === CAPTCHA_ATTEMPTS
+        ) {
           throw new CaptchaRequiredError(error.message, details(error));
         }
       }
@@ -353,6 +368,9 @@ export class Session {
     try {
       return await this.#token(form, headers);
     } catch (error) {
+      if (error instanceof APIError && error.errorCode === 'NOT_FOUND') {
+        throw new AuthenticationError(NO_ACCOUNT, details(error));
+      }
       const rejected =
         error instanceof BadRequestError &&
         !(error instanceof VerificationRequiredError) &&
@@ -365,44 +383,6 @@ export class Session {
   #solveCaptcha(solver: CaptchaSolver): Promise<string> {
     const { http, authUrl, captchaPath, headers } = this.#config;
     return solveCaptcha(http, authUrl + captchaPath, headers, solver);
-  }
-
-  /** Asks whether the account has 2FA; the password is never sent when this fails. */
-  async #twoFactorEnabled(username: string): Promise<boolean> {
-    const { http, authUrl, mfaStatusPath, headers } = this.#config;
-    let result: unknown;
-    try {
-      result = await http.send(
-        authUrl + mfaStatusPath,
-        {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          // As typed, like the web application; only the token request lowercases it.
-          body: JSON.stringify({ username }),
-        },
-        {},
-        readJson,
-      );
-    } catch (error) {
-      if (error instanceof APIError && (error.status === 404 || error.errorCode === 'NOT_FOUND')) {
-        throw new AuthenticationError('There is no Whitebird account with this username', {
-          ...details(error),
-        });
-      }
-      throw error;
-    }
-    const body = (typeof result === 'object' && result !== null ? result : {}) as {
-      mfaEnabled?: unknown;
-      status?: unknown;
-    };
-    if (body.status === 'NOT_FOUND') {
-      throw new AuthenticationError('There is no Whitebird account with this username', {
-        status: 200,
-        errorCode: 'NOT_FOUND',
-        body: result,
-      });
-    }
-    return Boolean(body.mfaEnabled);
   }
 
   async #token(

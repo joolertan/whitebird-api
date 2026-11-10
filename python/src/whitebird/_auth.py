@@ -2,12 +2,11 @@
 
 Logging in follows the sign-in form of the web application:
 
-1. Ask whether the account has two-factor authentication (`OAUTH_MFA_STATUS_PATH`). If that
-   fails, no password is sent.
-2. With two-factor authentication, send a password grant. Whitebird either answers with tokens
-   or with `{"mfaEnabled": true}`, and then a second grant carries the one-time code.
-3. Without it, the password grant carries a solved slider captcha; a rejected answer is retried
-   with a new captcha. An answer of `{"mfaEnabled": true}` leads to the code step as well.
+1. Send a password grant without a captcha. Whitebird answers with tokens, with
+   `{"mfaEnabled": true}`, or with status `REQUIRED_CAPTCHA`.
+2. Once a captcha was asked for, every grant of the login carries a newly solved slider captcha;
+   a rejected answer (`INVALID_CAPTCHA`) is retried with a new captcha.
+3. After `{"mfaEnabled": true}`, a second grant carries the one-time code.
 """
 
 from __future__ import annotations
@@ -40,7 +39,6 @@ from ._exceptions import (
 from ._generated.services import (
     OAUTH_BASIC,
     OAUTH_CAPTCHA_PATH,
-    OAUTH_MFA_STATUS_PATH,
     OAUTH_SERVICE,
     OAUTH_TOKEN_PATH,
 )
@@ -59,10 +57,7 @@ _MFA_REQUIRED = (
     "Two-factor authentication is enabled for this account: pass otp= to the client "
     "(a code, a callable or whitebird.otp.TOTP) or call login(code=...)"
 )
-_CAPTCHA_REQUIRED = (
-    "The account has no two-factor authentication, so Whitebird asks for a captcha at sign-in: "
-    "pass captcha= a solver or enable two-factor authentication"
-)
+_CAPTCHA_REQUIRED = "Whitebird asks for a captcha to log in: pass captcha= a solver"
 _NOT_LOGGED_IN = (
     "Not logged in: pass username and password to the client, or a token store that holds a session"
 )
@@ -253,15 +248,6 @@ class _Authenticator:
             form["code"] = code
         return self._token_request(form, {"captcha": answer} if answer else {})
 
-    def _mfa_check_request(self) -> httpx.Request:
-        return self._build_request(
-            "POST",
-            self._config.url(OAUTH_SERVICE, OAUTH_MFA_STATUS_PATH),
-            json={"username": self.credentials.username},
-            headers=self._config.headers(),
-            timeout=self._config.timeout,
-        )
-
     def _captcha_request(self, request_id: str) -> httpx.Request:
         return self._build_request(
             "GET",
@@ -370,40 +356,35 @@ class SyncAuthenticator(_Authenticator):
 
     def _login(self, code: str | None, generation: int) -> Tokens:
         self._require_credentials()
-        if self._mfa_status():
-            response = self._send(self._password_request(), login=True)
-        elif self._captcha is None:
-            raise CaptchaRequiredError(_CAPTCHA_REQUIRED)
-        else:
-            response = self._captcha_login(self._captcha)
+        login = _Login()
+        response = self._grant(login, None)
         if not self._code_step(response):
             return self._login_tokens(response, generation, code_sent=False)
         code = code or self.credentials.code()
         if code is None:
             raise MFARequiredError(_MFA_REQUIRED)
-        response = self._send(self._password_request(code), login=True)
+        response = self._grant(login, code)
         return self._login_tokens(response, generation, code_sent=True)
 
-    def _captcha_login(self, solver: CaptchaSolver) -> httpx.Response:
-        attempt = 1
+    def _grant(self, login: _Login, code: str | None) -> httpx.Response:
+        """Sends a password grant, with a solved captcha once Whitebird asked for one."""
         while True:
-            request_id = str(uuid.uuid4())
-            captcha = _parse_captcha(request_id, self._send(self._captcha_request(request_id)))
-            answer = _captcha_answer(captcha, solver(captcha))
+            answer = self._solve_captcha() if login.captcha else None
             try:
-                return self._send(self._password_request(None, answer), login=True)
+                return self._send(self._password_request(code, answer), login=True)
             except CaptchaRequiredError as error:
-                if not _retry_captcha(error, attempt):
+                login.rejected(error, solver=self._captcha is not None)
+            except APIError as error:
+                unknown = _unknown_account(error)
+                if unknown is None:
                     raise
-            attempt += 1
+                raise unknown from error
 
-    def _mfa_status(self) -> bool:
-        """Asks whether the account has two-factor authentication enabled."""
-        try:
-            response = self._send(self._mfa_check_request())
-        except APIError as error:
-            raise _status_error(error) from error
-        return _mfa_enabled(response)
+    def _solve_captcha(self) -> str:
+        assert self._captcha is not None
+        request_id = str(uuid.uuid4())
+        captcha = _parse_captcha(request_id, self._send(self._captcha_request(request_id)))
+        return _captcha_answer(captcha, self._captcha(captcha))
 
     def _send(self, request: httpx.Request, *, login: bool = False) -> httpx.Response:
         try:
@@ -469,44 +450,38 @@ class AsyncAuthenticator(_Authenticator):
 
     async def _login(self, code: str | None, generation: int) -> Tokens:
         self._require_credentials()
-        if await self._mfa_status():
-            response = await self._send(self._password_request(), login=True)
-        elif self._captcha is None:
-            raise CaptchaRequiredError(_CAPTCHA_REQUIRED)
-        else:
-            response = await self._captcha_login(self._captcha)
+        login = _Login()
+        response = await self._grant(login, None)
         if not self._code_step(response):
             return self._login_tokens(response, generation, code_sent=False)
         code = code or await self.credentials.acode()
         if code is None:
             raise MFARequiredError(_MFA_REQUIRED)
-        response = await self._send(self._password_request(code), login=True)
+        response = await self._grant(login, code)
         return self._login_tokens(response, generation, code_sent=True)
 
-    async def _captcha_login(self, solver: AsyncCaptchaSolver) -> httpx.Response:
-        attempt = 1
+    async def _grant(self, login: _Login, code: str | None) -> httpx.Response:
+        """Sends a password grant, with a solved captcha once Whitebird asked for one."""
         while True:
-            request_id = str(uuid.uuid4())
-            response = await self._send(self._captcha_request(request_id))
-            captcha = _parse_captcha(request_id, response)
-            position = solver(captcha)
-            if inspect.isawaitable(position):
-                position = await position
-            answer = _captcha_answer(captcha, position)
+            answer = await self._solve_captcha() if login.captcha else None
             try:
-                return await self._send(self._password_request(None, answer), login=True)
+                return await self._send(self._password_request(code, answer), login=True)
             except CaptchaRequiredError as error:
-                if not _retry_captcha(error, attempt):
+                login.rejected(error, solver=self._captcha is not None)
+            except APIError as error:
+                unknown = _unknown_account(error)
+                if unknown is None:
                     raise
-            attempt += 1
+                raise unknown from error
 
-    async def _mfa_status(self) -> bool:
-        """Asks whether the account has two-factor authentication enabled."""
-        try:
-            response = await self._send(self._mfa_check_request())
-        except APIError as error:
-            raise _status_error(error) from error
-        return _mfa_enabled(response)
+    async def _solve_captcha(self) -> str:
+        assert self._captcha is not None
+        request_id = str(uuid.uuid4())
+        captcha = _parse_captcha(request_id, await self._send(self._captcha_request(request_id)))
+        position = self._captcha(captcha)
+        if inspect.isawaitable(position):
+            position = await position
+        return _captcha_answer(captcha, position)
 
     async def _send(self, request: httpx.Request, *, login: bool = False) -> httpx.Response:
         try:
@@ -518,13 +493,35 @@ class AsyncAuthenticator(_Authenticator):
         return response
 
 
-def _status_error(error: APIError) -> APIError:
-    """The error to raise when the two-factor status check fails: no password is sent then."""
-    unknown = error.status_code == 404 or (
-        isinstance(error.body, dict) and error.body.get("status") == NOT_FOUND
-    )
-    if not unknown:
-        return error
+class _Login:
+    """Captcha state of one login: whether Whitebird asked for one, and how many were rejected."""
+
+    def __init__(self) -> None:
+        self.captcha = False
+        self._rejected = 0
+
+    def rejected(self, error: CaptchaRequiredError, *, solver: bool) -> None:
+        """Takes a captcha refusal of a grant; raises unless a new captcha should be solved."""
+        if not self.captcha:
+            self.captcha = True
+            if not solver:
+                raise CaptchaRequiredError(
+                    _CAPTCHA_REQUIRED,
+                    status_code=error.status_code,
+                    error_code=error.error_code,
+                    body=error.body,
+                    response=error.response,
+                ) from error
+            return
+        self._rejected += 1
+        if not _retry_captcha(error, self._rejected):
+            raise error
+
+
+def _unknown_account(error: APIError) -> AuthenticationError | None:
+    """A clearer error for a grant refused because the account does not exist."""
+    if not (isinstance(error.body, dict) and error.body.get("status") == NOT_FOUND):
+        return None
     return AuthenticationError(
         _NO_ACCOUNT,
         status_code=error.status_code,
@@ -619,10 +616,6 @@ def _retry_captcha(error: CaptchaRequiredError, attempt: int) -> bool:
         logger.info("Captcha answer rejected, solving a new captcha")
         return True
     return False
-
-
-def _mfa_enabled(response: httpx.Response) -> bool:
-    return bool(_json_object(response).get("mfaEnabled"))
 
 
 def _json_object(response: httpx.Response) -> dict[str, Any]:

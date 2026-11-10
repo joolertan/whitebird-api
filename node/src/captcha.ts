@@ -1,6 +1,6 @@
 import { type HttpClient, readJson } from './http.js';
 
-/** A slider captcha that accounts without two-factor authentication solve to log in. */
+/** A slider captcha that Whitebird may ask for when logging in. */
 export interface Captcha {
   /** ID of this captcha, sent back with the answer. */
   requestId: string;
